@@ -7,7 +7,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.test.core.app.ApplicationProvider
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
-import com.joseph.substratesmp.data.model.SeedChannels
+import com.joseph.substratesmp.data.model.DefaultChannels
 import com.joseph.substratesmp.data.repository.AuthUserState
 import com.joseph.substratesmp.ui.components.ChannelDrawerContent
 import com.joseph.substratesmp.ui.theme.SubstrateSMPTheme
@@ -37,8 +37,8 @@ class ExampleRobolectricTest {
     composeTestRule.setContent {
       SubstrateSMPTheme {
         ChannelDrawerContent(
-          channels = SeedChannels,
-          activeChannel = SeedChannels[1],
+          channels = DefaultChannels,
+          activeChannel = DefaultChannels[1],
           userState = AuthUserState(gamertag = "TestMiner", role = "BUILDER"),
           onSelectChannel = {},
           onOpenGamertagDialog = {},
