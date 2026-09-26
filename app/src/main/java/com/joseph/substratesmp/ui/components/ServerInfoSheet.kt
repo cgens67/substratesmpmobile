@@ -1,0 +1,168 @@
+package com.joseph.substratesmp.ui.components
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
+import com.joseph.substratesmp.ui.theme.SubstrateTheme
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ServerInfoSheet(
+  onDismiss: () -> Unit
+) {
+  val sheetState = rememberModalBottomSheetState()
+  val clipboardManager = LocalClipboardManager.current
+
+  ModalBottomSheet(
+    onDismissRequest = onDismiss,
+    sheetState = sheetState,
+    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+  ) {
+    Column(
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 20.dp, vertical = 8.dp)
+        .testTag("server_info_sheet")
+    ) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+          modifier = Modifier
+            .size(10.dp)
+            .clip(CircleShape)
+            .background(SubstrateTheme.customColors.statusOnline)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+          text = "Substrate SMP (Bedrock Edition)",
+          style = MaterialTheme.typography.titleMedium,
+          fontWeight = FontWeight.Bold
+        )
+      }
+
+      Spacer(modifier = Modifier.height(14.dp))
+
+      Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        modifier = Modifier.fillMaxWidth()
+      ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+          ServerDetailRow(
+            icon = Icons.Default.Dns,
+            label = "Server IP / Domain",
+            value = "mc.substratesmp.net"
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+          ServerDetailRow(
+            icon = Icons.Default.Sensors,
+            label = "Bedrock Port",
+            value = "19132"
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+          ServerDetailRow(
+            icon = Icons.Default.Group,
+            label = "Online Players",
+            value = "14 / 40 Players"
+          )
+          Spacer(modifier = Modifier.height(8.dp))
+          ServerDetailRow(
+            icon = Icons.Default.Shield,
+            label = "Bedrock Version",
+            value = "v1.21.x (Pure Survival SMP)"
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(16.dp))
+
+      Button(
+        onClick = {
+          clipboardManager.setText(AnnotatedString("mc.substratesmp.net:19132"))
+          onDismiss()
+        },
+        modifier = Modifier
+          .fillMaxWidth()
+          .testTag("copy_server_ip_button")
+      ) {
+        Icon(
+          imageVector = Icons.Default.ContentCopy,
+          contentDescription = null,
+          modifier = Modifier.size(18.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Copy Server IP:Port")
+      }
+
+      Spacer(modifier = Modifier.height(24.dp))
+    }
+  }
+}
+
+@Composable
+fun ServerDetailRow(
+  icon: androidx.compose.ui.graphics.vector.ImageVector,
+  label: String,
+  value: String
+) {
+  Row(
+    modifier = Modifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically,
+    horizontalArrangement = Arrangement.SpaceBetween
+  ) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.size(16.dp)
+      )
+      Spacer(modifier = Modifier.width(8.dp))
+      Text(
+        text = label,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+      )
+    }
+    Text(
+      text = value,
+      style = CoordinateTextStyle,
+      color = MaterialTheme.colorScheme.onSurface,
+      fontWeight = FontWeight.SemiBold
+    )
+  }
+}

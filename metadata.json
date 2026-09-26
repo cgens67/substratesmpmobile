@@ -1,0 +1,6 @@
+{
+  "name": "Substrate SMP",
+  "description": "Discord-like community app for the Substrate Minecraft Bedrock server featuring real-time text channels, voice channels, and server status.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
