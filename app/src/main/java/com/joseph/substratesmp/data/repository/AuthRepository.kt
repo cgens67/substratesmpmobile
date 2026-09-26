@@ -2,6 +2,7 @@ package com.joseph.substratesmp.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
@@ -20,6 +21,7 @@ data class AuthUserState(
 )
 
 class AuthRepository(private val context: Context) {
+  private val TAG = "SubstrateAuth"
   private val prefs: SharedPreferences =
     context.getSharedPreferences("substrate_auth_prefs", Context.MODE_PRIVATE)
 
@@ -39,27 +41,33 @@ class AuthRepository(private val context: Context) {
     var currentUid = "local_${System.currentTimeMillis() % 10000}"
 
     try {
-      if (FirebaseApp.getApps(context).isNotEmpty()) {
-        val auth = FirebaseAuth.getInstance()
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-          currentUid = currentUser.uid
-        } else {
-          val authResult = auth.signInAnonymously().await()
-          currentUid = authResult.user?.uid ?: currentUid
-        }
-
-        // Update display name with gamertag
-        auth.currentUser?.updateProfile(
-          userProfileChangeRequest {
-            displayName = savedGamertag
-          }
-        )?.await()
-
-        isReady = true
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        FirebaseApp.initializeApp(context)
       }
-    } catch (_: Exception) {
-      // Gracefully fall back to local session if Firebase credentials are pending
+
+      val app = FirebaseApp.getInstance()
+      Log.i(TAG, "Connected to Firebase project: ${app.options.projectId}")
+
+      val auth = FirebaseAuth.getInstance()
+      val currentUser = auth.currentUser
+      if (currentUser != null) {
+        currentUid = currentUser.uid
+      } else {
+        val authResult = auth.signInAnonymously().await()
+        currentUid = authResult.user?.uid ?: currentUid
+      }
+
+      // Update display name with gamertag
+      auth.currentUser?.updateProfile(
+        userProfileChangeRequest {
+          displayName = savedGamertag
+        }
+      )?.await()
+
+      isReady = true
+      Log.i(TAG, "Firebase Anonymous Auth established for gamertag: $savedGamertag (uid: $currentUid)")
+    } catch (e: Exception) {
+      Log.w(TAG, "Firebase Auth offline fallback: ${e.message}")
       isReady = false
     }
 

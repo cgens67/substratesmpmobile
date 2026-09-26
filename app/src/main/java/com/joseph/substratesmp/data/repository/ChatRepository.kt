@@ -1,20 +1,19 @@
 package com.joseph.substratesmp.data.repository
 
 import android.content.Context
+import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.joseph.substratesmp.data.model.ChatMessage
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import java.util.UUID
 
 class ChatRepository(private val context: Context) {
+  private val TAG = "SubstrateChat"
 
   // In-memory store per channel
   private val channelMessagesMap = mutableMapOf<String, MutableList<ChatMessage>>()
@@ -93,17 +92,26 @@ class ChatRepository(private val context: Context) {
     val currentList = channelMessagesMap.getOrPut(channelId) { mutableListOf() }
     _messagesFlow.value = currentList.toList()
 
-    // Attach Firestore real-time listener if Firebase is available
+    // Attach Firestore real-time listener to substrate-smp
     try {
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        FirebaseApp.initializeApp(context)
+      }
+
       if (FirebaseApp.getApps(context).isNotEmpty()) {
         val firestore = FirebaseFirestore.getInstance()
+        Log.i(TAG, "Attaching Firestore realtime snapshot listener to channels/$channelId/messages")
+
         firestoreListener = firestore.collection("channels")
           .document(channelId)
           .collection("messages")
           .orderBy("timestamp", Query.Direction.ASCENDING)
           .addSnapshotListener { snapshot, error ->
-            if (error != null || snapshot == null) return@addSnapshotListener
-            if (!snapshot.isEmpty) {
+            if (error != null) {
+              Log.w(TAG, "Firestore snapshot listener error for channel $channelId: ${error.message}")
+              return@addSnapshotListener
+            }
+            if (snapshot != null && !snapshot.isEmpty) {
               val remoteMessages = snapshot.documents.mapNotNull { doc ->
                 val id = doc.id
                 val chId = doc.getString("channelId") ?: channelId
@@ -124,17 +132,18 @@ class ChatRepository(private val context: Context) {
                   coordinates = coords
                 )
               }
-              // Merge with local seed if needed
+              // Merge seed messages with remote Firestore messages
               val combined = (currentList.filter { it.id.startsWith("ann-") || it.id.startsWith("gen-") } + remoteMessages)
                 .distinctBy { it.id }
                 .sortedBy { it.timestamp }
               channelMessagesMap[channelId] = combined.toMutableList()
               _messagesFlow.value = combined
+              Log.d(TAG, "Loaded ${remoteMessages.size} messages from Firestore for #$channelId")
             }
           }
       }
-    } catch (_: Exception) {
-      // Graceful fallback to local state
+    } catch (e: Exception) {
+      Log.w(TAG, "Firestore connection fallback: ${e.message}")
     }
   }
 
@@ -162,8 +171,12 @@ class ChatRepository(private val context: Context) {
       _messagesFlow.value = currentList.toList()
     }
 
-    // Write to Firestore if connected
+    // Write to live Firestore database for project substrate-smp
     try {
+      if (FirebaseApp.getApps(context).isEmpty()) {
+        FirebaseApp.initializeApp(context)
+      }
+
       if (FirebaseApp.getApps(context).isNotEmpty()) {
         val firestore = FirebaseFirestore.getInstance()
         val docData = hashMapOf(
@@ -179,9 +192,15 @@ class ChatRepository(private val context: Context) {
           .collection("messages")
           .document(newMsg.id)
           .set(docData)
+          .addOnSuccessListener {
+            Log.d(TAG, "Message ${newMsg.id} synced to Firestore channel $channelId")
+          }
+          .addOnFailureListener { e ->
+            Log.w(TAG, "Firestore sync failed: ${e.message}")
+          }
       }
-    } catch (_: Exception) {
-      // In-memory message preserved
+    } catch (e: Exception) {
+      Log.w(TAG, "Local message buffered; Firestore write error: ${e.message}")
     }
   }
 }

@@ -3,6 +3,7 @@ package com.joseph.substratesmp.voice
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.joseph.substratesmp.SubstrateApplication
 import com.joseph.substratesmp.data.model.ActiveVoiceRoom
 import com.joseph.substratesmp.data.model.VoiceParticipant
 import io.agora.rtc2.Constants
@@ -26,11 +27,9 @@ data class AgoraSettings(
   val channelProfile: Int = Constants.CHANNEL_PROFILE_COMMUNICATION
 )
 
-class AgoraVoiceManager(private val context: Context) {
+class AgoraVoiceManager(private val context: Context? = null) {
   private val TAG = "AgoraVoiceManager"
   private val scope = CoroutineScope(Dispatchers.Main + Job())
-  private val prefs: SharedPreferences =
-    context.getSharedPreferences("substrate_agora_prefs", Context.MODE_PRIVATE)
 
   companion object {
     const val DEFAULT_AGORA_APP_ID = "f2cf0761f7584f48b8d647b7b29c8572"
@@ -39,13 +38,23 @@ class AgoraVoiceManager(private val context: Context) {
   private var rtcEngine: RtcEngine? = null
   private var visualizerJob: Job? = null
 
+  private fun getSafeContext(): Context? {
+    val ctx = context?.applicationContext ?: context
+    if (ctx != null) return ctx
+    return SubstrateApplication.instance
+  }
+
+  private fun getPrefs(): SharedPreferences? {
+    return getSafeContext()?.getSharedPreferences("substrate_agora_prefs", Context.MODE_PRIVATE)
+  }
+
   private val _voiceRoomState = MutableStateFlow<ActiveVoiceRoom?>(null)
   val voiceRoomState: StateFlow<ActiveVoiceRoom?> = _voiceRoomState.asStateFlow()
 
   private val _settings = MutableStateFlow(
     AgoraSettings(
-      appId = prefs.getString("agora_app_id", DEFAULT_AGORA_APP_ID) ?: DEFAULT_AGORA_APP_ID,
-      token = prefs.getString("agora_token", "") ?: ""
+      appId = getPrefs()?.getString("agora_app_id", DEFAULT_AGORA_APP_ID) ?: DEFAULT_AGORA_APP_ID,
+      token = getPrefs()?.getString("agora_token", "") ?: ""
     )
   )
   val settings: StateFlow<AgoraSettings> = _settings.asStateFlow()
@@ -139,10 +148,25 @@ class AgoraVoiceManager(private val context: Context) {
     initAgoraEngine()
   }
 
-  private fun initAgoraEngine() {
+  fun initAgoraEngine() {
+    if (rtcEngine != null) return
+
+    val validContext = getSafeContext()
+    if (validContext == null) {
+      Log.w(TAG, "Cannot initialize Agora RtcEngine: Context is not ready yet")
+      return
+    }
+
     try {
+      val appContext = validContext.applicationContext ?: validContext
+
+      // Pre-initialize Agora internal ContextUtils so internal components have a valid application context
+      try {
+        io.agora.base.internal.ContextUtils.initialize(appContext)
+      } catch (_: Throwable) {}
+
       val config = RtcEngineConfig().apply {
-        mContext = context.applicationContext
+        mContext = appContext
         mAppId = _settings.value.appId
         mEventHandler = rtcEventHandler
         mChannelProfile = Constants.CHANNEL_PROFILE_COMMUNICATION
@@ -152,15 +176,15 @@ class AgoraVoiceManager(private val context: Context) {
       rtcEngine?.enableAudioVolumeIndication(200, 3, true)
       Log.i(TAG, "Agora RtcEngine initialized successfully with App ID: ${_settings.value.appId}")
     } catch (e: Throwable) {
-      Log.e(TAG, "Agora RtcEngine initialization fallback: ${e.message}")
+      Log.w(TAG, "Agora RtcEngine initialization fallback: ${e.message}")
     }
   }
 
   fun updateSettings(appId: String, token: String) {
-    prefs.edit()
-      .putString("agora_app_id", appId)
-      .putString("agora_token", token)
-      .apply()
+    getPrefs()?.edit()
+      ?.putString("agora_app_id", appId)
+      ?.putString("agora_token", token)
+      ?.apply()
 
     _settings.value = AgoraSettings(appId, token)
 
@@ -175,6 +199,11 @@ class AgoraVoiceManager(private val context: Context) {
 
   fun joinVoiceChannel(channelId: String, channelName: String, localGamertag: String) {
     visualizerJob?.cancel()
+
+    // Ensure engine is initialized
+    if (rtcEngine == null) {
+      initAgoraEngine()
+    }
 
     // Leave any currently connected channel first
     try {
@@ -215,12 +244,9 @@ class AgoraVoiceManager(private val context: Context) {
     val sanitizedChannel = channelId.replace("-", "_")
 
     try {
-      if (rtcEngine == null) {
-        initAgoraEngine()
-      }
       rtcEngine?.setEnableSpeakerphone(true)
       rtcEngine?.muteLocalAudioStream(false)
-      // Call joinChannel(null, channelName, "", 0) as specified for test mode
+      // Call joinChannel(null, channelName, "", 0) for testing mode
       val res = rtcEngine?.joinChannel(token, sanitizedChannel, "", 0)
       Log.d(TAG, "joinChannel result code: $res")
     } catch (e: Throwable) {
