@@ -128,13 +128,18 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         .addSnapshotListener { snapshot, _ ->
           if (snapshot != null) {
             val list = snapshot.documents.mapNotNull { doc ->
+              val reactionsRaw = doc.get("reactionCounts") as? Map<*, *>
+              val reactions = reactionsRaw?.mapKeys { it.key.toString() }?.mapValues { (it.value as? Long)?.toInt() ?: 0 } ?: emptyMap()
               StatusUpdate(
                 id = doc.id,
                 authorGamertag = doc.getString("authorGamertag") ?: "Player",
                 content = doc.getString("content") ?: "",
                 timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
                 isAdmin = doc.getBoolean("isAdmin") ?: false,
-                emoji = doc.getString("emoji") ?: "⛏️"
+                activityTag = doc.getString("activityTag") ?: "Mining",
+                backgroundTheme = doc.getString("backgroundTheme") ?: "EMERALD",
+                coordinates = doc.getString("coordinates"),
+                reactionCounts = reactions
               )
             }
             _statuses.value = list
@@ -160,7 +165,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     } catch (_: Exception) {}
   }
 
-  fun postStatus(content: String, emoji: String) {
+  fun postStatus(content: String, theme: String, activity: String, coords: String?) {
     if (content.isBlank()) return
     val user = userState.value
     firestore.collection("statuses").add(
@@ -169,9 +174,24 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         "content" to content.trim(),
         "timestamp" to System.currentTimeMillis(),
         "isAdmin" to user.isAdmin,
-        "emoji" to emoji
+        "backgroundTheme" to theme,
+        "activityTag" to activity,
+        "coordinates" to coords,
+        "reactionCounts" to emptyMap<String, Int>()
       )
     )
+  }
+
+  fun deleteStatus(statusId: String) {
+    firestore.collection("statuses").document(statusId).delete()
+  }
+
+  fun reactToStatus(statusId: String, emoji: String) {
+    firestore.collection("statuses").document(statusId).get().addOnSuccessListener { doc ->
+      val counts = (doc.get("reactionCounts") as? Map<*, *>)?.mapKeys { it.key.toString() }?.mapValues { (it.value as? Long)?.toInt() ?: 0 }?.toMutableMap() ?: mutableMapOf()
+      counts[emoji] = (counts[emoji] ?: 0) + 1
+      firestore.collection("statuses").document(statusId).update("reactionCounts", counts)
+    }
   }
 
   fun createChannel(name: String, type: ChannelType, desc: String, onlyAdmin: Boolean) {
@@ -252,12 +272,24 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     )
   }
 
-  fun registerGamertag(gamertag: String, onResult: (Result<String>) -> Unit) {
+  fun loginAccount(gamertag: String, pass: String, onResult: (Result<String>) -> Unit) {
     viewModelScope.launch {
-      val result = authRepository.registerGamertag(gamertag)
+      val result = authRepository.loginAccount(gamertag, pass)
       if (result.isSuccess) {
-        val savedTag = result.getOrNull() ?: gamertag
-        chatRepository.updateLocalGamertag(savedTag)
+        val tag = result.getOrNull() ?: gamertag
+        chatRepository.updateLocalGamertag(tag)
+        _showGamertagDialog.value = false
+      }
+      onResult(result)
+    }
+  }
+
+  fun registerAccount(gamertag: String, pass: String, onResult: (Result<String>) -> Unit) {
+    viewModelScope.launch {
+      val result = authRepository.registerAccount(gamertag, pass)
+      if (result.isSuccess) {
+        val tag = result.getOrNull() ?: gamertag
+        chatRepository.updateLocalGamertag(tag)
         _showGamertagDialog.value = false
       }
       onResult(result)
