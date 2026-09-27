@@ -20,7 +20,6 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,6 +93,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
+import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.ui.components.ActiveVoiceBar
 import com.joseph.substratesmp.ui.components.AdminControlSheet
@@ -145,18 +145,17 @@ fun SubstrateApp(
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
 
-  var currentScreen by remember { mutableStateOf("home") } // "home", "chat_screen", or "video_call_screen"
-  var selectedTab by remember { mutableIntStateOf(0) } // 0: Chats, 1: Updates, 2: Calls
+  var currentScreen by remember { mutableStateOf("home") }
+  var selectedTab by remember { mutableIntStateOf(0) }
   var activeFilterChip by remember { mutableStateOf("All") }
   var searchQuery by remember { mutableStateOf("") }
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
 
-  // Status creation and viewing
   var showCreateStatusDialog by remember { mutableStateOf(false) }
   var viewedStatus by remember { mutableStateOf<StatusUpdate?>(null) }
 
-  // Chat message & emoji state
   var chatInputText by remember { mutableStateOf("") }
+  var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
 
@@ -170,7 +169,6 @@ fun SubstrateApp(
     }
   }
 
-  // Permission Launcher for Agora Calls
   var pendingAction by remember { mutableStateOf<(() -> Unit)?>(null) }
   val permissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -224,9 +222,7 @@ fun SubstrateApp(
                 currentScreen = "home"
               }
             )
-          } ?: run {
-            currentScreen = "home"
-          }
+          } ?: run { currentScreen = "home" }
         }
 
         "chat_screen" -> {
@@ -260,6 +256,7 @@ fun SubstrateApp(
                 navigationIcon = {
                   IconButton(onClick = {
                     showEmojiPicker = false
+                    replyingToMessage = null
                     currentScreen = "home"
                   }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = WhatsAppTextPrimary)
@@ -296,12 +293,8 @@ fun SubstrateApp(
             },
             contentWindowInsets = WindowInsets.statusBars
           ) { chatPadding ->
-            Box(
-              modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)
-            ) {
-              Column(
-                modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()
-              ) {
+            Box(modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)) {
+              Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                   if (messages.isEmpty()) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -325,7 +318,11 @@ fun SubstrateApp(
                       }
 
                       items(messages, key = { it.id }) { message ->
-                        ChatMessageItem(message = message, modifier = Modifier.animateItem())
+                        ChatMessageItem(
+                          message = message,
+                          onReply = { msg -> replyingToMessage = msg },
+                          modifier = Modifier.animateItem()
+                        )
                       }
                     }
                   }
@@ -370,10 +367,20 @@ fun SubstrateApp(
                     channelName = activeChannel.name,
                     text = chatInputText,
                     onTextChanged = { chatInputText = it },
-                    onSendMessage = { content, coords ->
-                      viewModel.sendMessage(content, coords)
+                    onSendMessage = { content, coords, img, aud, dur, reply ->
+                      viewModel.sendMessage(
+                        content = content,
+                        coordinates = coords,
+                        imageUrl = img,
+                        audioUrl = aud,
+                        audioDurationSeconds = dur,
+                        replyTo = reply
+                      )
                       chatInputText = ""
+                      replyingToMessage = null
                     },
+                    replyingTo = replyingToMessage,
+                    onCancelReply = { replyingToMessage = null },
                     isEmojiPickerVisible = showEmojiPicker,
                     onToggleEmojiPicker = {
                       showEmojiPicker = !showEmojiPicker
@@ -748,7 +755,6 @@ fun SubstrateApp(
     }
   }
 
-  // Gemini-Style Bottom Sheet Dropdown Menu
   if (showMenuDropdownSheet) {
     CustomDropdownModalSheet(
       options = listOf(
@@ -769,7 +775,6 @@ fun SubstrateApp(
     )
   }
 
-  // Admin Control Sheet
   if (showAdminConsole && userState.isAdmin) {
     AdminControlSheet(
       channels = channels,
@@ -784,7 +789,6 @@ fun SubstrateApp(
     )
   }
 
-  // Add Real Status Dialog
   if (showCreateStatusDialog) {
     StatusCreatorDialog(
       onDismiss = { showCreateStatusDialog = false },
@@ -795,7 +799,6 @@ fun SubstrateApp(
     )
   }
 
-  // WhatsApp-Style Full-Screen Status Viewer
   viewedStatus?.let { status ->
     StatusViewerScreen(
       status = status,
@@ -811,7 +814,6 @@ fun SubstrateApp(
     )
   }
 
-  // Gamertag Login & Registration Dialog
   if (showGamertagDialog || userState.needsGamertagSetup) {
     GamertagDialog(
       currentGamertag = userState.gamertag,
