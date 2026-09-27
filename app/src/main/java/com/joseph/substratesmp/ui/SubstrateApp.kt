@@ -7,7 +7,9 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,12 +29,21 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.DonutLarge
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PhoneInTalk
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
@@ -43,14 +54,17 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -60,11 +74,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -82,12 +96,16 @@ import com.joseph.substratesmp.ui.components.ChatMessageItem
 import com.joseph.substratesmp.ui.components.GamertagDialog
 import com.joseph.substratesmp.ui.components.ServerInfoSheet
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
-import com.joseph.substratesmp.ui.theme.SubstrateTheme
-import com.joseph.substratesmp.ui.theme.WhatsAppBackgroundDark
-import com.joseph.substratesmp.ui.theme.WhatsAppChatIncoming
-import com.joseph.substratesmp.ui.theme.WhatsAppChatOutgoing
-import com.joseph.substratesmp.ui.theme.WhatsAppGreenPrimary
-import com.joseph.substratesmp.ui.theme.WhatsAppTealHeader
+import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
+import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
+import com.joseph.substratesmp.ui.theme.WhatsAppDivider
+import com.joseph.substratesmp.ui.theme.WhatsAppGreen
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
+import com.joseph.substratesmp.ui.theme.WhatsAppHeaderGreen
+import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
+import com.joseph.substratesmp.ui.theme.WhatsAppSearchBackground
+import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -108,17 +126,19 @@ fun SubstrateApp(
   val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
 
-  var selectedTab by remember { mutableIntStateOf(0) } // 0: Chats, 1: Calls, 2: Realm Status
+  // Navigation states
+  var currentScreen by remember { mutableStateOf<String>("home") } // "home" or "chat_screen"
+  var selectedTab by remember { mutableIntStateOf(0) } // 0: Chats, 1: Updates, 2: Communities, 3: Calls
+  var activeFilterChip by remember { mutableStateOf("All") }
   var menuExpanded by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
 
-  // Camera & Audio Permission Launcher
+  // Permission Launcher for Agora Calls
   var pendingVoiceChannel by remember { mutableStateOf<Channel?>(null) }
   val permissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestMultiplePermissions()
   ) { permissions ->
     val audioGranted = permissions[Manifest.permission.RECORD_AUDIO] == true
-    val cameraGranted = permissions[Manifest.permission.CAMERA] == true
     if (audioGranted) {
       pendingVoiceChannel?.let { ch ->
         viewModel.selectChannel(ch)
@@ -147,302 +167,920 @@ fun SubstrateApp(
     }
   }
 
-  Scaffold(
-    modifier = modifier
-      .fillMaxSize()
-      .testTag("substrate_main_scaffold"),
-    containerColor = WhatsAppBackgroundDark,
-    topBar = {
-      Column(modifier = Modifier.background(WhatsAppTealHeader)) {
-        // Top App Header
-        TopAppBar(
-          title = {
-            Column {
-              Text(
-                text = "Substrate",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-              )
-              Text(
-                text = if (userState.isAdmin) "${userState.gamertag} (ADMIN)" else userState.gamertag,
-                style = MaterialTheme.typography.labelSmall,
-                color = if (userState.isAdmin) RoleAdminGold else WhatsAppGreenPrimary,
-                fontSize = 11.sp
-              )
-            }
-          },
-          actions = {
-            IconButton(onClick = { viewModel.setServerInfoSheetVisible(true) }) {
-              Icon(
-                imageVector = Icons.Default.Dns,
-                contentDescription = "Server IP",
-                tint = Color.White
-              )
-            }
-
-            Box {
-              IconButton(onClick = { menuExpanded = true }) {
-                Icon(
-                  imageVector = Icons.Default.MoreVert,
-                  contentDescription = "Options",
-                  tint = Color.White
-                )
-              }
-
-              DropdownMenu(
-                expanded = menuExpanded,
-                onDismissRequest = { menuExpanded = false },
-                containerColor = WhatsAppChatIncoming
+  // Active Voice Bar docked overlay if connected to an Agora call
+  Box(modifier = modifier.fillMaxSize().background(Color.White)) {
+    if (currentScreen == "chat_screen") {
+      // SCREEN: Inside Conversation (WhatsApp Chat view matching Screenshots 2 & 3)
+      Scaffold(
+        topBar = {
+          TopAppBar(
+            title = {
+              Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { viewModel.setServerInfoSheetVisible(true) }
               ) {
-                DropdownMenuItem(
-                  text = { Text("Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", color = Color.White) },
-                  onClick = {
-                    menuExpanded = false
-                    viewModel.setGamertagDialogVisible(true)
-                  }
-                )
-                DropdownMenuItem(
-                  text = { Text("Agora Call Settings", color = Color.White) },
-                  onClick = {
-                    menuExpanded = false
-                    viewModel.setAgoraDialogVisible(true)
-                  }
-                )
-                DropdownMenuItem(
-                  text = { Text("Bedrock Realm Details", color = Color.White) },
-                  onClick = {
-                    menuExpanded = false
-                    viewModel.setServerInfoSheetVisible(true)
-                  }
+                // Contact / Channel avatar circle
+                Box(
+                  modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE9EDEF)),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Text(
+                    text = activeChannel.name.take(1).uppercase(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppGreenDark
+                  )
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                  Text(
+                    text = activeChannel.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppTextPrimary,
+                    fontSize = 17.sp
+                  )
+                  Text(
+                    text = "mc.substratesmp.net • 14 online",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = WhatsAppTextSecondary,
+                    fontSize = 11.5.sp
+                  )
+                }
+              }
+            },
+            navigationIcon = {
+              IconButton(onClick = { currentScreen = "home" }) {
+                Icon(
+                  imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                  contentDescription = "Back",
+                  tint = WhatsAppTextPrimary
                 )
               }
-            }
-          },
-          colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = WhatsAppTealHeader
-          )
-        )
+            },
+            actions = {
+              // Video call icon -> Agora RTC
+              IconButton(
+                onClick = {
+                  val voiceChannel = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
+                  requestCallPermissionsAndJoin(voiceChannel)
+                }
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Videocam,
+                  contentDescription = "Video Call",
+                  tint = WhatsAppTextPrimary
+                )
+              }
 
-        // Top Navigation Tabs: CHATS | CALLS | REALM
-        PrimaryTabRow(
-          selectedTabIndex = selectedTab,
-          containerColor = WhatsAppTealHeader,
-          contentColor = WhatsAppGreenPrimary
-        ) {
-          Tab(
-            selected = selectedTab == 0,
-            onClick = { selectedTab = 0 },
-            text = { Text("CHATS", fontWeight = FontWeight.Bold, color = if (selectedTab == 0) WhatsAppGreenPrimary else WhatsAppTextSecondary) }
-          )
-          Tab(
-            selected = selectedTab == 1,
-            onClick = { selectedTab = 1 },
-            text = { Text("CALLS", fontWeight = FontWeight.Bold, color = if (selectedTab == 1) WhatsAppGreenPrimary else WhatsAppTextSecondary) }
-          )
-          Tab(
-            selected = selectedTab == 2,
-            onClick = { selectedTab = 2 },
-            text = { Text("REALM", fontWeight = FontWeight.Bold, color = if (selectedTab == 2) WhatsAppGreenPrimary else WhatsAppTextSecondary) }
+              // Audio call icon -> Agora RTC
+              IconButton(
+                onClick = {
+                  val voiceChannel = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
+                  requestCallPermissionsAndJoin(voiceChannel)
+                }
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Call,
+                  contentDescription = "Voice Call",
+                  tint = WhatsAppTextPrimary
+                )
+              }
+
+              // Menu
+              Box {
+                IconButton(onClick = { menuExpanded = true }) {
+                  Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Options",
+                    tint = WhatsAppTextPrimary
+                  )
+                }
+                DropdownMenu(
+                  expanded = menuExpanded,
+                  onDismissRequest = { menuExpanded = false },
+                  containerColor = Color.White
+                ) {
+                  DropdownMenuItem(
+                    text = { Text("Gamertag: ${userState.gamertag.ifBlank { "Setup" }}") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setGamertagDialogVisible(true)
+                    }
+                  )
+                  DropdownMenuItem(
+                    text = { Text("Agora Audio Settings") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setAgoraDialogVisible(true)
+                    }
+                  )
+                  DropdownMenuItem(
+                    text = { Text("Bedrock Server Info") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setServerInfoSheetVisible(true)
+                    }
+                  )
+                }
+              }
+            },
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
           )
         }
-      }
-    }
-  ) { innerPadding ->
-    Column(
-      modifier = Modifier
-        .fillMaxSize()
-        .padding(innerPadding)
-        .background(WhatsAppBackgroundDark)
-    ) {
-      when (selectedTab) {
-        // Tab 0: WhatsApp-Style Conversation Stream
-        0 -> {
-          // Channel selector chip row
-          val textChannels = channels.filter { it.type == ChannelType.TEXT }
-          LazyRow(
-            modifier = Modifier
-              .fillMaxWidth()
-              .background(WhatsAppTealHeader.copy(alpha = 0.6f))
-              .padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-          ) {
-            items(textChannels, key = { it.id }) { channel ->
-              val isSelected = channel.id == activeChannel.id
-              Surface(
-                shape = RoundedCornerShape(16.dp),
-                color = if (isSelected) WhatsAppGreenPrimary else WhatsAppChatIncoming,
-                modifier = Modifier.clickable { viewModel.selectChannel(channel) }
-              ) {
-                Text(
-                  text = "#${channel.name}",
-                  color = if (isSelected) Color.Black else Color.White,
-                  style = MaterialTheme.typography.labelMedium,
-                  fontWeight = FontWeight.Bold,
-                  modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+      ) { chatPadding ->
+        // Chat Canvas with WhatsApp Cream/Beige Background & Subtle Pattern
+        Box(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(chatPadding)
+            .background(WhatsAppChatBackground)
+        ) {
+          // Subtle doodle texture simulation
+          Canvas(modifier = Modifier.fillMaxSize()) {
+            val step = 80f
+            for (x in 0..(size.width.toInt()) step step.toInt()) {
+              for (y in 0..(size.height.toInt()) step step.toInt()) {
+                drawCircle(
+                  color = Color.Black.copy(alpha = 0.015f),
+                  radius = 2.5f,
+                  center = Offset(x.toFloat(), y.toFloat())
                 )
               }
             }
           }
 
-          // Message Stream
-          Box(
-            modifier = Modifier
-              .weight(1f)
-              .fillMaxWidth()
-          ) {
-            if (messages.isEmpty()) {
-              Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-              ) {
-                Text(
-                  text = "Welcome to #${activeChannel.name}",
-                  color = WhatsAppTextSecondary,
-                  style = MaterialTheme.typography.bodyMedium
-                )
-              }
-            } else {
-              LazyColumn(
-                state = listState,
-                modifier = Modifier
-                  .fillMaxSize()
-                  .padding(vertical = 6.dp)
-              ) {
-                items(
-                  items = messages,
-                  key = { it.id }
-                ) { message ->
-                  ChatMessageItem(message = message)
+          Column(modifier = Modifier.fillMaxSize()) {
+            // Message List
+            Box(
+              modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+            ) {
+              if (messages.isEmpty()) {
+                Box(
+                  modifier = Modifier.fillMaxSize(),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.White.copy(alpha = 0.9f),
+                    shadowElevation = 1.dp
+                  ) {
+                    Text(
+                      text = "Messages in #${activeChannel.name} are end-to-end encrypted.",
+                      color = WhatsAppTextSecondary,
+                      style = MaterialTheme.typography.labelSmall,
+                      modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                    )
+                  }
+                }
+              } else {
+                LazyColumn(
+                  state = listState,
+                  modifier = Modifier
+                    .fillMaxSize()
+                    .padding(vertical = 4.dp)
+                ) {
+                  item {
+                    // Date pill indicator (e.g. "Today")
+                    Box(
+                      modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                      contentAlignment = Alignment.Center
+                    ) {
+                      Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = Color.White.copy(alpha = 0.95f),
+                        shadowElevation = 1.dp
+                      ) {
+                        Text(
+                          text = "Today",
+                          color = WhatsAppTextSecondary,
+                          style = MaterialTheme.typography.labelSmall,
+                          modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+                          fontWeight = FontWeight.Medium
+                        )
+                      }
+                    }
+                  }
+
+                  items(
+                    items = messages,
+                    key = { it.id }
+                  ) { message ->
+                    ChatMessageItem(message = message)
+                  }
                 }
               }
             }
-          }
 
-          // In-call Floating Card
-          AnimatedVisibility(
-            visible = activeVoiceRoom != null,
-            enter = slideInVertically { it },
-            exit = slideOutVertically { it }
-          ) {
-            activeVoiceRoom?.let { room ->
-              ActiveVoiceBar(
-                voiceRoom = room,
-                onToggleMute = { viewModel.voiceManager.toggleMute() },
-                onToggleSpeaker = { viewModel.voiceManager.toggleSpeaker() },
-                onToggleDeafen = { viewModel.voiceManager.toggleDeafen() },
-                onToggleCamera = { viewModel.voiceManager.toggleCamera() },
-                onDisconnect = { viewModel.voiceManager.disconnect() }
-              )
+            // In-call Floating Card
+            AnimatedVisibility(
+              visible = activeVoiceRoom != null,
+              enter = slideInVertically { it },
+              exit = slideOutVertically { it }
+            ) {
+              activeVoiceRoom?.let { room ->
+                ActiveVoiceBar(
+                  voiceRoom = room,
+                  onToggleMute = { viewModel.voiceManager.toggleMute() },
+                  onToggleSpeaker = { viewModel.voiceManager.toggleSpeaker() },
+                  onToggleDeafen = { viewModel.voiceManager.toggleDeafen() },
+                  onToggleCamera = { viewModel.voiceManager.toggleCamera() },
+                  onDisconnect = { viewModel.voiceManager.disconnect() }
+                )
+              }
             }
-          }
 
-          // Pinned Bottom WhatsApp Input Bar
-          ChatInputBar(
-            channelName = activeChannel.name,
-            onSendMessage = { content, coords ->
-              viewModel.sendMessage(content, coords)
-            }
-          )
+            // Pinned Bottom WhatsApp Input Bar
+            ChatInputBar(
+              channelName = activeChannel.name,
+              onSendMessage = { content, coords ->
+                viewModel.sendMessage(content, coords)
+              }
+            )
+          }
         }
-
-        // Tab 1: Calls Tab (Agora Live Channels with Real Gamertags)
-        1 -> {
-          val voiceChannels = channels.filter { it.type == ChannelType.VOICE }
-          LazyColumn(
-            modifier = Modifier
-              .fillMaxSize()
-              .padding(12.dp)
-          ) {
-            item {
+      }
+    } else {
+      // SCREEN: Main WhatsApp Tabs View (Chats | Updates | Communities | Calls)
+      Scaffold(
+        topBar = {
+          Column(modifier = Modifier.background(Color.White)) {
+            // WhatsApp Header: Bold Green "WhatsApp" title + menu (Screenshot 1)
+            Row(
+              modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
               Text(
-                text = "Voice & Video Channels",
-                style = MaterialTheme.typography.titleMedium,
+                text = "WhatsApp",
+                style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
-                color = Color.White,
-                modifier = Modifier.padding(vertical = 8.dp)
+                color = WhatsAppHeaderGreen,
+                fontSize = 25.sp,
+                letterSpacing = (-0.4).sp
               )
+
+              Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = { menuExpanded = true }) {
+                  Icon(
+                    imageVector = Icons.Default.MoreVert,
+                    contentDescription = "Menu",
+                    tint = WhatsAppTextPrimary
+                  )
+                }
+
+                DropdownMenu(
+                  expanded = menuExpanded,
+                  onDismissRequest = { menuExpanded = false },
+                  containerColor = Color.White
+                ) {
+                  DropdownMenuItem(
+                    text = { Text("Gamertag: ${userState.gamertag.ifBlank { "Setup" }}") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setGamertagDialogVisible(true)
+                    }
+                  )
+                  DropdownMenuItem(
+                    text = { Text("Agora Call Settings") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setAgoraDialogVisible(true)
+                    }
+                  )
+                  DropdownMenuItem(
+                    text = { Text("Bedrock Realm Details") },
+                    onClick = {
+                      menuExpanded = false
+                      viewModel.setServerInfoSheetVisible(true)
+                    }
+                  )
+                }
+              }
             }
 
-            items(voiceChannels) { channel ->
-              val isCurrent = activeVoiceRoom?.channelId == channel.id
-              Card(
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = WhatsAppChatIncoming),
+            if (selectedTab == 0) {
+              // WhatsApp Pill Search Bar: "Ask Meta AI or Search"
+              Surface(
+                shape = RoundedCornerShape(24.dp),
+                color = WhatsAppSearchBackground,
                 modifier = Modifier
                   .fillMaxWidth()
-                  .padding(vertical = 6.dp)
+                  .padding(horizontal = 16.dp, vertical = 4.dp)
+                  .height(44.dp)
               ) {
                 Row(
                   modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(14.dp),
-                  verticalAlignment = Alignment.CenterVertically,
-                  horizontalArrangement = Arrangement.SpaceBetween
+                    .fillMaxSize()
+                    .padding(horizontal = 14.dp),
+                  verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                      modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(if (isCurrent) WhatsAppGreenPrimary else WhatsAppTealHeader),
-                      contentAlignment = Alignment.Center
-                    ) {
-                      Icon(
-                        imageVector = Icons.Default.Call,
-                        contentDescription = null,
-                        tint = if (isCurrent) Color.Black else WhatsAppGreenPrimary,
-                        modifier = Modifier.size(22.dp)
-                      )
-                    }
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Column {
-                      Text(
-                        text = channel.name,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
-                      )
-                      Text(
-                        text = channel.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = WhatsAppTextSecondary,
-                        maxLines = 1
-                      )
-                    }
-                  }
+                  Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = null,
+                    tint = WhatsAppTextSecondary,
+                    modifier = Modifier.size(20.dp)
+                  )
+                  Spacer(modifier = Modifier.width(10.dp))
+                  Text(
+                    text = "Ask Meta AI or Search",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = WhatsAppTextSecondary,
+                    fontSize = 15.sp
+                  )
+                }
+              }
 
-                  IconButton(
-                    onClick = {
-                      if (isCurrent) {
-                        viewModel.voiceManager.disconnect()
-                      } else {
-                        requestCallPermissionsAndJoin(channel)
-                      }
-                    },
-                    modifier = Modifier
-                      .size(42.dp)
-                      .clip(CircleShape)
-                      .background(if (isCurrent) SubstrateTheme.customColors.statusMuted else WhatsAppGreenPrimary)
+              // WhatsApp Horizontal Filter Chips: All | Unread | Favourites | Groups | +
+              val filterChips = listOf("All", "Unread", "Favourites", "Groups")
+              LazyRow(
+                modifier = Modifier
+                  .fillMaxWidth()
+                  .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                items(filterChips) { chip ->
+                  val isSelected = activeFilterChip == chip
+                  Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = if (isSelected) WhatsAppNavSelectedPill else WhatsAppChipUnselected,
+                    border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9EDEF)),
+                    modifier = Modifier.clickable { activeFilterChip = chip }
+                  ) {
+                    Text(
+                      text = chip,
+                      color = if (isSelected) WhatsAppGreenDark else WhatsAppTextSecondary,
+                      style = MaterialTheme.typography.labelMedium,
+                      fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                      modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                      fontSize = 13.sp
+                    )
+                  }
+                }
+                item {
+                  Surface(
+                    shape = CircleShape,
+                    color = WhatsAppChipUnselected,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9EDEF)),
+                    modifier = Modifier.size(30.dp),
+                    contentAlignment = Alignment.Center
                   ) {
                     Icon(
-                      imageVector = if (isCurrent) Icons.Default.CallEnd else Icons.Default.PhoneInTalk,
-                      contentDescription = if (isCurrent) "Hang Up" else "Join Call",
-                      tint = Color.White,
-                      modifier = Modifier.size(20.dp)
+                      imageVector = Icons.Default.Add,
+                      contentDescription = "Add Filter",
+                      tint = WhatsAppTextSecondary,
+                      modifier = Modifier.size(16.dp)
                     )
                   }
                 }
               }
             }
           }
-        }
+        },
+        bottomBar = {
+          // WhatsApp 4-Tab Bottom Navigation Bar (Chats | Updates | Communities | Calls)
+          NavigationBar(
+            containerColor = Color.White,
+            tonalElevation = 8.dp
+          ) {
+            NavigationBarItem(
+              selected = selectedTab == 0,
+              onClick = { selectedTab = 0 },
+              icon = {
+                Icon(
+                  imageVector = Icons.Default.Chat,
+                  contentDescription = "Chats"
+                )
+              },
+              label = { Text("Chats", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = WhatsAppGreenDark,
+                selectedTextColor = WhatsAppGreenDark,
+                indicatorColor = WhatsAppNavSelectedPill,
+                unselectedIconColor = WhatsAppTextSecondary,
+                unselectedTextColor = WhatsAppTextSecondary
+              )
+            )
 
-        // Tab 2: Bedrock Realm Server Info
-        2 -> {
-          Box(modifier = Modifier.fillMaxSize()) {
-            ServerInfoSheet(onDismiss = {})
+            NavigationBarItem(
+              selected = selectedTab == 1,
+              onClick = { selectedTab = 1 },
+              icon = {
+                Icon(
+                  imageVector = Icons.Default.DonutLarge,
+                  contentDescription = "Updates"
+                )
+              },
+              label = { Text("Updates", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = WhatsAppGreenDark,
+                selectedTextColor = WhatsAppGreenDark,
+                indicatorColor = WhatsAppNavSelectedPill,
+                unselectedIconColor = WhatsAppTextSecondary,
+                unselectedTextColor = WhatsAppTextSecondary
+              )
+            )
+
+            NavigationBarItem(
+              selected = selectedTab == 2,
+              onClick = { selectedTab = 2 },
+              icon = {
+                Icon(
+                  imageVector = Icons.Default.Groups,
+                  contentDescription = "Communities"
+                )
+              },
+              label = { Text("Communities", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = WhatsAppGreenDark,
+                selectedTextColor = WhatsAppGreenDark,
+                indicatorColor = WhatsAppNavSelectedPill,
+                unselectedIconColor = WhatsAppTextSecondary,
+                unselectedTextColor = WhatsAppTextSecondary
+              )
+            )
+
+            NavigationBarItem(
+              selected = selectedTab == 3,
+              onClick = { selectedTab = 3 },
+              icon = {
+                Icon(
+                  imageVector = Icons.Default.Call,
+                  contentDescription = "Calls"
+                )
+              },
+              label = { Text("Calls", fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+              colors = NavigationBarItemDefaults.colors(
+                selectedIconColor = WhatsAppGreenDark,
+                selectedTextColor = WhatsAppGreenDark,
+                indicatorColor = WhatsAppNavSelectedPill,
+                unselectedIconColor = WhatsAppTextSecondary,
+                unselectedTextColor = WhatsAppTextSecondary
+              )
+            )
+          }
+        },
+        floatingActionButton = {
+          // WhatsApp Signature Green Squircle Floating Action Button
+          FloatingActionButton(
+            onClick = {
+              if (selectedTab == 3) {
+                val voiceChannel = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
+                requestCallPermissionsAndJoin(voiceChannel)
+              } else {
+                viewModel.setServerInfoSheetVisible(true)
+              }
+            },
+            shape = RoundedCornerShape(16.dp),
+            containerColor = WhatsAppGreenTeal,
+            contentColor = Color.White,
+            elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp)
+          ) {
+            Icon(
+              imageVector = if (selectedTab == 3) Icons.Default.Call else Icons.Default.Chat,
+              contentDescription = "Action",
+              modifier = Modifier.size(24.dp)
+            )
+          }
+        }
+      ) { innerPadding ->
+        Column(
+          modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .background(Color.White)
+        ) {
+          when (selectedTab) {
+            // TAB 0: CHATS LIST (Screenshot 1)
+            0 -> {
+              val textChannels = channels.filter { it.type == ChannelType.TEXT }
+              LazyColumn(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .background(Color.White)
+              ) {
+                // Self User Profile Snippet (like @siang.5680 (You))
+                item {
+                  Row(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .clickable { viewModel.setGamertagDialogVisible(true) }
+                      .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Box(
+                      modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(if (userState.isAdmin) RoleAdminGold else Color(0xFF1F2C34)),
+                      contentAlignment = Alignment.Center
+                    ) {
+                      Text(
+                        text = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "Y",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                      )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                          text = if (userState.gamertag.isNotBlank()) "@${userState.gamertag} (You)" else "Choose Gamertag",
+                          style = MaterialTheme.typography.titleMedium,
+                          fontWeight = FontWeight.SemiBold,
+                          color = WhatsAppTextPrimary,
+                          fontSize = 16.sp
+                        )
+                        if (userState.isAdmin) {
+                          Spacer(modifier = Modifier.width(6.dp))
+                          Surface(
+                            shape = RoundedCornerShape(4.dp),
+                            color = RoleAdminGoldContainer
+                          ) {
+                            Text(
+                              text = "ADMIN",
+                              color = RoleAdminGold,
+                              style = MaterialTheme.typography.labelSmall,
+                              fontWeight = FontWeight.ExtraBold,
+                              fontSize = 8.5.sp,
+                              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                          }
+                        }
+                      }
+                      Text(
+                        text = "Bedrock Player Presence • Tap to edit profile",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = WhatsAppTextSecondary,
+                        fontSize = 13.sp
+                      )
+                    }
+                  }
+                  HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
+                }
+
+                // Chat Channels list
+                items(textChannels) { channel ->
+                  val isCurrent = channel.id == activeChannel.id
+                  Row(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .clickable {
+                        viewModel.selectChannel(channel)
+                        currentScreen = "chat_screen"
+                      }
+                      .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    // Circular Avatar with vibrant initials
+                    Box(
+                      modifier = Modifier
+                        .size(52.dp)
+                        .clip(CircleShape)
+                        .background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else WhatsAppNavSelectedPill),
+                      contentAlignment = Alignment.Center
+                    ) {
+                      Text(
+                        text = channel.name.take(1).uppercase(),
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (channel.id == "announcements") Color(0xFFEA0038) else WhatsAppGreenDark,
+                        fontWeight = FontWeight.Bold
+                      )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                      Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                      ) {
+                        Text(
+                          text = channel.name,
+                          style = MaterialTheme.typography.titleMedium,
+                          fontWeight = FontWeight.SemiBold,
+                          color = WhatsAppTextPrimary,
+                          fontSize = 16.5.sp
+                        )
+                        Text(
+                          text = "11:37 am",
+                          style = MaterialTheme.typography.labelSmall,
+                          color = WhatsAppTextSecondary,
+                          fontSize = 12.sp
+                        )
+                      }
+
+                      Spacer(modifier = Modifier.height(2.dp))
+
+                      Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                      ) {
+                        Text(
+                          text = channel.description,
+                          style = MaterialTheme.typography.bodyMedium,
+                          color = WhatsAppTextSecondary,
+                          maxLines = 1,
+                          fontSize = 13.5.sp,
+                          modifier = Modifier.weight(1f)
+                        )
+                        Icon(
+                          imageVector = Icons.Default.PushPin,
+                          contentDescription = "Pinned",
+                          tint = Color(0xFF8696A0),
+                          modifier = Modifier.size(14.dp)
+                        )
+                      }
+                    }
+                  }
+                  HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
+                }
+              }
+            }
+
+            // TAB 1: UPDATES & STATUS (Screenshot 6)
+            1 -> {
+              LazyColumn(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .background(Color.White)
+                  .padding(16.dp)
+              ) {
+                item {
+                  Text(
+                    text = "Status",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppTextPrimary,
+                    fontSize = 18.sp
+                  )
+                  Spacer(modifier = Modifier.height(12.dp))
+
+                  // Story Cards Row
+                  Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    // "Add Status" Card
+                    Card(
+                      shape = RoundedCornerShape(16.dp),
+                      colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F8FA)),
+                      modifier = Modifier.size(width = 96.dp, height = 140.dp)
+                    ) {
+                      Box(modifier = Modifier.fillMaxSize()) {
+                        Box(
+                          modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .padding(top = 16.dp)
+                            .size(52.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF1F2C34)),
+                          contentAlignment = Alignment.Center
+                        ) {
+                          Text(text = "SMP", color = Color.White, fontWeight = FontWeight.Bold)
+                          Box(
+                            modifier = Modifier
+                              .align(Alignment.BottomEnd)
+                              .size(18.dp)
+                              .clip(CircleShape)
+                              .background(WhatsAppGreen),
+                            contentAlignment = Alignment.Center
+                          ) {
+                            Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
+                          }
+                        }
+                        Text(
+                          text = "Add status",
+                          style = MaterialTheme.typography.labelSmall,
+                          color = WhatsAppTextPrimary,
+                          fontWeight = FontWeight.Medium,
+                          modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 12.dp)
+                        )
+                      }
+                    }
+
+                    // Minecraft Status Story Card
+                    Card(
+                      shape = RoundedCornerShape(16.dp),
+                      colors = CardDefaults.cardColors(containerColor = WhatsAppNavSelectedPill),
+                      modifier = Modifier.size(width = 96.dp, height = 140.dp)
+                    ) {
+                      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                          Text(text = "⛏️", fontSize = 28.sp)
+                          Spacer(modifier = Modifier.height(8.dp))
+                          Text(
+                            text = "Minecraft",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = WhatsAppGreenDark
+                          )
+                          Text(text = "Bedrock v1.21", style = MaterialTheme.typography.labelSmall, color = WhatsAppTextSecondary, fontSize = 9.sp)
+                        }
+                      }
+                    }
+                  }
+
+                  Spacer(modifier = Modifier.height(24.dp))
+                  Text(
+                    text = "Channels",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppTextPrimary,
+                    fontSize = 18.sp
+                  )
+                  Spacer(modifier = Modifier.height(10.dp))
+                }
+
+                // Official Announcements Channel preview
+                item {
+                  Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
+                    Box(
+                      modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(WhatsAppNavSelectedPill),
+                      contentAlignment = Alignment.Center
+                    ) {
+                      Text(text = "MC", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark)
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                      Text(text = "Minecraft Substrate SMP", fontWeight = FontWeight.Bold, color = WhatsAppTextPrimary)
+                      Text(text = "Head into the wild realm server at mc.substratesmp.net:19132", color = WhatsAppTextSecondary, fontSize = 12.sp, maxLines = 1)
+                    }
+                    Surface(
+                      shape = CircleShape,
+                      color = WhatsAppGreen,
+                      modifier = Modifier.size(20.dp)
+                    ) {
+                      Box(contentAlignment = Alignment.Center) {
+                        Text(text = "1", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                      }
+                    }
+                  }
+                }
+              }
+            }
+
+            // TAB 2: COMMUNITIES / REALM DETAILS
+            2 -> {
+              Box(modifier = Modifier.fillMaxSize()) {
+                ServerInfoSheet(onDismiss = {})
+              }
+            }
+
+            // TAB 3: CALLS LIST (Screenshot 5)
+            3 -> {
+              val voiceChannels = channels.filter { it.type == ChannelType.VOICE }
+              LazyColumn(
+                modifier = Modifier
+                  .fillMaxSize()
+                  .background(Color.White)
+                  .padding(horizontal = 16.dp, vertical = 10.dp)
+              ) {
+                // Top Circular Quick Actions: Call | Schedule | Keypad | Favourites
+                item {
+                  Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceAround
+                  ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                      Surface(shape = CircleShape, color = Color(0xFFF0F2F5), modifier = Modifier.size(50.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                          Icon(imageVector = Icons.Default.Call, contentDescription = null, tint = WhatsAppTextPrimary)
+                        }
+                      }
+                      Spacer(modifier = Modifier.height(6.dp))
+                      Text(text = "Call", style = MaterialTheme.typography.labelSmall, color = WhatsAppTextPrimary)
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                      Surface(shape = CircleShape, color = Color(0xFFF0F2F5), modifier = Modifier.size(50.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                          Icon(imageVector = Icons.Default.CalendarMonth, contentDescription = null, tint = WhatsAppTextPrimary)
+                        }
+                      }
+                      Spacer(modifier = Modifier.height(6.dp))
+                      Text(text = "Schedule", style = MaterialTheme.typography.labelSmall, color = WhatsAppTextPrimary)
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                      Surface(shape = CircleShape, color = Color(0xFFF0F2F5), modifier = Modifier.size(50.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                          Icon(imageVector = Icons.Default.Dialpad, contentDescription = null, tint = WhatsAppTextPrimary)
+                        }
+                      }
+                      Spacer(modifier = Modifier.height(6.dp))
+                      Text(text = "Keypad", style = MaterialTheme.typography.labelSmall, color = WhatsAppTextPrimary)
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                      Surface(shape = CircleShape, color = Color(0xFFF0F2F5), modifier = Modifier.size(50.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                          Icon(imageVector = Icons.Default.Favorite, contentDescription = null, tint = WhatsAppTextPrimary)
+                        }
+                      }
+                      Spacer(modifier = Modifier.height(6.dp))
+                      Text(text = "Favourites", style = MaterialTheme.typography.labelSmall, color = WhatsAppTextPrimary)
+                    }
+                  }
+
+                  Spacer(modifier = Modifier.height(16.dp))
+                  Text(
+                    text = "Recent",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppTextPrimary,
+                    fontSize = 18.sp
+                  )
+                  Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Voice Channels list with phone & video call buttons
+                items(voiceChannels) { channel ->
+                  val isCurrent = activeVoiceRoom?.channelId == channel.id
+                  Row(
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .clickable { requestCallPermissionsAndJoin(channel) }
+                      .padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                  ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                      Box(
+                        modifier = Modifier
+                          .size(50.dp)
+                          .clip(CircleShape)
+                          .background(if (isCurrent) WhatsAppNavSelectedPill else Color(0xFFF0F2F5)),
+                        contentAlignment = Alignment.Center
+                      ) {
+                        Text(
+                          text = channel.name.take(1).uppercase(),
+                          style = MaterialTheme.typography.titleMedium,
+                          color = WhatsAppGreenDark,
+                          fontWeight = FontWeight.Bold
+                        )
+                      }
+
+                      Spacer(modifier = Modifier.width(14.dp))
+
+                      Column {
+                        Text(
+                          text = channel.name,
+                          style = MaterialTheme.typography.titleMedium,
+                          fontWeight = FontWeight.SemiBold,
+                          color = WhatsAppTextPrimary,
+                          fontSize = 16.sp
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                          Text(
+                            text = if (isCurrent) "↗ Connected (In Call)" else "↗ Yesterday, 3:03 pm",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isCurrent) WhatsAppGreenDark else WhatsAppTextSecondary,
+                            fontSize = 13.sp
+                          )
+                        }
+                      }
+                    }
+
+                    IconButton(
+                      onClick = {
+                        if (isCurrent) {
+                          viewModel.voiceManager.disconnect()
+                        } else {
+                          requestCallPermissionsAndJoin(channel)
+                        }
+                      }
+                    ) {
+                      Icon(
+                        imageVector = if (isCurrent) Icons.Default.CallEnd else Icons.Default.Call,
+                        contentDescription = "Call",
+                        tint = if (isCurrent) Color(0xFFEA0038) else WhatsAppGreenDark,
+                        modifier = Modifier.size(24.dp)
+                      )
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
