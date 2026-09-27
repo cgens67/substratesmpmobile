@@ -68,6 +68,67 @@ fun formatChatListTime(timestamp: Long): String {
   }
 }
 
+@Composable
+fun FloatingBottomNavBar(
+  currentScreen: String,
+  onNavigate: (String) -> Unit,
+  userInitial: String
+) {
+  Surface(
+    shape = RoundedCornerShape(32.dp),
+    color = Color.White,
+    shadowElevation = 8.dp,
+    modifier = Modifier.padding(bottom = 16.dp).height(64.dp)
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 12.dp),
+      horizontalArrangement = Arrangement.SpaceEvenly,
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      NavBarPillItem(icon = Icons.Default.ChatBubble, label = "Chats", isSelected = currentScreen == "home") { onNavigate("home") }
+      Spacer(modifier = Modifier.width(8.dp))
+      NavBarPillItem(icon = Icons.Default.Person, label = "Contacts", isSelected = currentScreen == "contacts") { onNavigate("contacts") }
+      Spacer(modifier = Modifier.width(8.dp))
+      NavBarPillItem(icon = Icons.Default.Settings, label = "Settings", isSelected = currentScreen == "settings_screen") { onNavigate("settings_screen") }
+      Spacer(modifier = Modifier.width(8.dp))
+      NavBarPillItem(
+        icon = null,
+        label = "Profile",
+        isSelected = currentScreen == "profile_screen",
+        customIcon = {
+          Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF1C2228)), contentAlignment = Alignment.Center) {
+            Text(userInitial, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+          }
+        },
+        onClick = { onNavigate("profile_screen") }
+      )
+    }
+  }
+}
+
+@Composable
+fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, isSelected: Boolean, customIcon: @Composable (() -> Unit)? = null, onClick: () -> Unit) {
+  val bgColor = if (isSelected) Color(0xFFE1F5FE) else Color.Transparent
+  val contentColor = if (isSelected) Color(0xFF0288D1) else Color.Gray
+
+  Surface(
+    shape = RoundedCornerShape(20.dp),
+    color = bgColor,
+    modifier = Modifier.clickable(onClick = onClick)
+  ) {
+    Row(
+      modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+      verticalAlignment = Alignment.CenterVertically
+    ) {
+      if (customIcon != null) customIcon() else Icon(imageVector = icon!!, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
+      if (isSelected) {
+        Spacer(modifier = Modifier.width(6.dp))
+        Text(label, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+      }
+    }
+  }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SubstrateApp(
@@ -94,20 +155,16 @@ fun SubstrateApp(
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
 
-  val showGamertagDialog by viewModel.showGamertagDialog.collectAsStateWithLifecycle()
   val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
-  val showSelectContactDialog by viewModel.showSelectContactDialog.collectAsStateWithLifecycle()
 
   var currentScreen by rememberSaveable { mutableStateOf("home") }
-  var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   var activeFilterChip by rememberSaveable { mutableStateOf("All") }
   var searchQuery by rememberSaveable { mutableStateOf("") }
   var chatInputText by rememberSaveable { mutableStateOf("") }
 
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
-  var showCreateStatusDialog by remember { mutableStateOf(false) }
   var longPressedChannel by remember { mutableStateOf<Channel?>(null) }
   
   var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
@@ -140,7 +197,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth scroll to bottom upon entering chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
       delay(80L)
@@ -148,7 +204,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth scroll when a new incoming message arrives while already viewing near bottom
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -161,7 +216,6 @@ fun SubstrateApp(
     previousMsgCount = messages.size
   }
 
-  // Typing state update (does NOT scroll)
   LaunchedEffect(chatInputText) {
     if (chatInputText.isNotBlank()) {
       viewModel.setTyping(true)
@@ -202,7 +256,7 @@ fun SubstrateApp(
       showEmojiPicker = false
     } else if (currentScreen == "video_call_screen") {
       currentScreen = if (activeVoiceRoom?.isConnected == true) "chat_screen" else "home"
-    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen") {
+    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts") {
       currentScreen = "home"
     } else {
       currentScreen = "home"
@@ -257,14 +311,29 @@ fun SubstrateApp(
             userState = userState,
             onNavigateSettings = { currentScreen = "settings_screen" },
             onNavigateHome = { currentScreen = "home" },
-            onUpdateProfile = { bio, bday -> viewModel.updateProfile(bio, bday) }
+            onUpdateProfile = { bio, bday -> viewModel.updateProfile(bio, bday) },
+            onLogin = { tag, pass, res -> viewModel.loginAccount(tag, pass, res) },
+            onRegister = { tag, pass, res -> viewModel.registerAccount(tag, pass, res) }
           )
         }
         
         "settings_screen" -> {
           SettingsScreen(
             userState = userState,
-            onNavigateBack = { currentScreen = "profile_screen" }
+            onNavigateBack = { currentScreen = "home" },
+            onNavigateProfile = { currentScreen = "profile_screen" }
+          )
+        }
+        
+        "contacts" -> {
+          SelectContactDialog(
+            members = members,
+            currentGamertag = userState.gamertag,
+            onDismiss = { currentScreen = "home" },
+            onSelectMember = { target ->
+              viewModel.startPrivateChat(target.gamertag)
+              currentScreen = "chat_screen"
+            }
           )
         }
 
@@ -288,10 +357,7 @@ fun SubstrateApp(
                 title = {
                   Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable {
-                      // Tapping contact/channel header toggles info & mute/block options
-                      showMenuDropdownSheet = true
-                    }
+                    modifier = Modifier.clickable { showMenuDropdownSheet = true }
                   ) {
                     Box(
                       modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFE9EDEF)),
@@ -416,7 +482,6 @@ fun SubstrateApp(
                     }
                   }
 
-                  // Floating scroll-to-bottom button
                   androidx.compose.animation.AnimatedVisibility(
                     visible = !isScrolledToBottom,
                     enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
@@ -521,7 +586,6 @@ fun SubstrateApp(
                       chatInputText = ""
                       replyingToMessage = null
 
-                      // SMOOTH SCROLL ONLY ON SEND
                       scope.launch {
                         delay(60L)
                         val targetIndex = (messages.size + 1).coerceAtLeast(0)
@@ -598,424 +662,197 @@ fun SubstrateApp(
                   }
                 }
 
-                if (selectedTab == 0) {
-                  Surface(
-                    shape = RoundedCornerShape(24.dp),
-                    color = WhatsAppSearchBackground,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(44.dp)
-                  ) {
-                    Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                      Icon(Icons.Default.Search, contentDescription = "Search", tint = WhatsAppTextSecondary, modifier = Modifier.size(20.dp))
-                      Spacer(modifier = Modifier.width(10.dp))
-                      BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier.weight(1f),
-                        textStyle = MaterialTheme.typography.bodyMedium.copy(color = WhatsAppTextPrimary, fontSize = 15.sp),
-                        singleLine = true,
-                        decorationBox = { inner ->
-                          if (searchQuery.isEmpty()) Text("Search", style = MaterialTheme.typography.bodyMedium, color = WhatsAppTextSecondary, fontSize = 15.sp)
-                          inner()
-                        }
-                      )
-                      if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                          Icon(Icons.Default.Close, contentDescription = "Clear", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
-                        }
+                Surface(
+                  shape = RoundedCornerShape(24.dp),
+                  color = WhatsAppSearchBackground,
+                  modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(44.dp)
+                ) {
+                  Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = WhatsAppTextSecondary, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(10.dp))
+                    BasicTextField(
+                      value = searchQuery,
+                      onValueChange = { searchQuery = it },
+                      modifier = Modifier.weight(1f),
+                      textStyle = MaterialTheme.typography.bodyMedium.copy(color = WhatsAppTextPrimary, fontSize = 15.sp),
+                      singleLine = true,
+                      decorationBox = { inner ->
+                        if (searchQuery.isEmpty()) Text("Search", style = MaterialTheme.typography.bodyMedium, color = WhatsAppTextSecondary, fontSize = 15.sp)
+                        inner()
                       }
-                    }
-                  }
-
-                  // ACTIVE & WORKING FILTER CHIPS: All | Unread | Favourites | Groups
-                  val filterChips = listOf("All", "Unread", "Favourites", "Groups")
-                  LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(filterChips) { chip ->
-                      val isSelected = activeFilterChip == chip
-                      Surface(
-                        shape = RoundedCornerShape(18.dp),
-                        color = if (isSelected) WhatsAppNavSelectedPill else WhatsAppChipUnselected,
-                        border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9EDEF)),
-                        modifier = Modifier.clickable { activeFilterChip = chip }
-                      ) {
-                        Text(chip, color = if (isSelected) WhatsAppGreenDark else WhatsAppTextSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
+                    )
+                    if (searchQuery.isNotEmpty()) {
+                      IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
                       }
                     }
                   }
                 }
-              }
-            },
-            bottomBar = {
-              NavigationBar(containerColor = Color.White, tonalElevation = 8.dp) {
-                NavigationBarItem(
-                  selected = selectedTab == 0,
-                  onClick = { selectedTab = 0 },
-                  icon = { Icon(Icons.Default.Chat, contentDescription = "Chats") },
-                  label = { Text("Chats", fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                  colors = NavigationBarItemDefaults.colors(selectedIconColor = WhatsAppGreenDark, indicatorColor = WhatsAppNavSelectedPill)
-                )
-                NavigationBarItem(
-                  selected = selectedTab == 1,
-                  onClick = { selectedTab = 1 },
-                  icon = { Icon(Icons.Default.DonutLarge, contentDescription = "Updates") },
-                  label = { Text("Updates", fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                  colors = NavigationBarItemDefaults.colors(selectedIconColor = WhatsAppGreenDark, indicatorColor = WhatsAppNavSelectedPill)
-                )
-                NavigationBarItem(
-                  selected = selectedTab == 2,
-                  onClick = { selectedTab = 2 },
-                  icon = { Icon(Icons.Default.Call, contentDescription = "Calls") },
-                  label = { Text("Calls", fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                  colors = NavigationBarItemDefaults.colors(selectedIconColor = WhatsAppGreenDark, indicatorColor = WhatsAppNavSelectedPill)
-                )
-              }
-            },
-            floatingActionButton = {
-              FloatingActionButton(
-                onClick = {
-                  if (selectedTab == 0) {
-                    viewModel.setSelectContactDialogVisible(true)
-                  } else if (selectedTab == 1) {
-                    showCreateStatusDialog = true
-                  } else if (selectedTab == 2) {
-                    val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
-                    runWithPermissions { viewModel.selectChannel(vc) }
+
+                val filterChips = listOf("All", "Unread", "Favourites", "Groups")
+                LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                  items(filterChips) { chip ->
+                    val isSelected = activeFilterChip == chip
+                    Surface(
+                      shape = RoundedCornerShape(18.dp),
+                      color = if (isSelected) WhatsAppNavSelectedPill else WhatsAppChipUnselected,
+                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9EDEF)),
+                      modifier = Modifier.clickable { activeFilterChip = chip }
+                    ) {
+                      Text(chip, color = if (isSelected) WhatsAppGreenDark else WhatsAppTextSecondary, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
+                    }
                   }
-                },
-                shape = RoundedCornerShape(16.dp),
-                containerColor = WhatsAppGreenTeal,
-                contentColor = Color.White
-              ) {
-                Icon(
-                  imageVector = if (selectedTab == 1) Icons.Default.Add else if (selectedTab == 2) Icons.Default.Call else Icons.Default.Chat,
-                  contentDescription = "Action",
-                  modifier = Modifier.size(24.dp)
-                )
+                }
               }
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(Color.White)) {
-              AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                  if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
-                  } else {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
-                  }
-                },
-                label = "tab_transition"
-              ) { tabIndex ->
-                when (tabIndex) {
-                  0 -> {
-                    // DYNAMIC FILTERING LOGIC FOR ALL 4 CHIPS
-                    val filtered = channels.filter { it.type == ChannelType.TEXT }
-                      .filter { ch ->
-                        when (activeFilterChip) {
-                          "Unread" -> {
-                            val isLocalSender = ch.lastMessageSender != null && ch.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
-                            val hasUnreadIncoming = !ch.lastMessageIsRead && !isLocalSender && ch.lastMessage != null
-                            ch.unreadCount > 0 || hasUnreadIncoming
-                          }
-                          "Favourites" -> {
-                            favouriteChannels.contains(ch.id) || ch.id == "announcements" || ch.id == "general-chat"
-                          }
-                          "Groups" -> {
-                            !ch.isDm // Shows only groups, filters out 1-on-1 private messages
-                          }
-                          else -> true // "All"
-                        }
-                      }
-                      .filter { ch ->
-                        if (searchQuery.isBlank()) true
-                        else ch.name.contains(searchQuery, true) || ch.description.contains(searchQuery, true) || (ch.lastMessage?.contains(searchQuery, true) == true)
-                      }
-
-                    LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White)) {
-                      item {
-                        Row(
-                          modifier = Modifier.fillMaxWidth().clickable { currentScreen = "profile_screen" }.padding(horizontal = 16.dp, vertical = 10.dp),
-                          verticalAlignment = Alignment.CenterVertically
-                        ) {
-                          Box(
-                            modifier = Modifier.size(52.dp).clip(CircleShape).background(if (userState.isAdmin) RoleAdminGold else Color(0xFF1F2C34)),
-                            contentAlignment = Alignment.Center
-                          ) {
-                            Text(if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "Y", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                          }
-                          Spacer(modifier = Modifier.width(14.dp))
-                          Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                              Text(if (userState.gamertag.isNotBlank()) "@${userState.gamertag} (You)" else "Log In / Register", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
-                              if (userState.isAdmin) {
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGoldContainer) {
-                                  Text("ADMIN", color = RoleAdminGold, fontWeight = FontWeight.ExtraBold, fontSize = 8.5.sp, modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp))
-                                }
-                              }
-                            }
-                            Text("Bedrock Role: ${userState.role} • Tap to view profile", color = WhatsAppTextSecondary, fontSize = 13.sp)
-                          }
-                        }
-                        HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
-                      }
-
-                      if (filtered.isEmpty()) {
-                        item {
-                          Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
-                            Text(
-                              text = when (activeFilterChip) {
-                                "Unread" -> "No unread chats"
-                                "Favourites" -> "No favourite chats yet. Long-press any chat to star it."
-                                "Groups" -> "No group channels found"
-                                else -> "No chats found"
-                              },
-                              color = WhatsAppTextSecondary,
-                              fontSize = 14.sp
-                            )
-                          }
-                        }
-                      } else {
-                        items(filtered, key = { it.id }) { channel ->
-                          val isMuted = mutedChannels.contains(channel.id)
-                          val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
-                          val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
-                          val isLastMessageRead = channel.lastMessageIsRead
-
-                          val displayPreview = when {
-                            channel.lastMessage.isNullOrBlank() -> channel.description
-                            channel.isDm -> channel.lastMessage
-                            isLocalSender -> "You: ${channel.lastMessage}"
-                            channel.lastMessageSender != null -> "${channel.lastMessageSender}: ${channel.lastMessage}"
-                            else -> channel.lastMessage
-                          }
-
-                          Row(
-                            modifier = Modifier
-                              .fillMaxWidth()
-                              .combinedClickable(
-                                onClick = {
-                                  viewModel.selectChannel(channel)
-                                  currentScreen = "chat_screen"
-                                },
-                                onLongClick = {
-                                  // Long-press opens quick menu for Mute, Star, Block
-                                  longPressedChannel = channel
-                                }
-                              )
-                              .padding(horizontal = 16.dp, vertical = 12.dp)
-                              .animateItem(),
-                            verticalAlignment = Alignment.CenterVertically
-                          ) {
-                            Box(
-                              modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else WhatsAppNavSelectedPill),
-                              contentAlignment = Alignment.Center
-                            ) {
-                              Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
-                            }
-                            Spacer(modifier = Modifier.width(14.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
-                                  Text(
-                                    text = channel.name,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = WhatsAppTextPrimary,
-                                    fontSize = 16.5.sp,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                  )
-                                  if (channel.isDm) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                  }
-                                  if (channel.isRestrictedToAdmin) {
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
-                                  }
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                  if (isMuted) {
-                                    Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                  }
-                                  if (formattedTime.isNotBlank()) {
-                                    Text(formattedTime, color = if (isLastMessageRead) WhatsAppTextSecondary else WhatsAppGreenDark, fontSize = 12.sp)
-                                  }
-                                }
-                              }
-
-                              Spacer(modifier = Modifier.height(2.dp))
-
-                              Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                if (isLocalSender && channel.lastMessage != null) {
-                                  Icon(
-                                    Icons.Default.DoneAll,
-                                    contentDescription = if (isLastMessageRead) "Read" else "Sent",
-                                    tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
-                                    modifier = Modifier.size(15.dp)
-                                  )
-                                  Spacer(modifier = Modifier.width(3.dp))
-                                }
-                                Text(
-                                  text = displayPreview,
-                                  color = WhatsAppTextSecondary,
-                                  fontSize = 13.5.sp,
-                                  maxLines = 1,
-                                  overflow = TextOverflow.Ellipsis,
-                                  modifier = Modifier.weight(1f)
-                                )
-                              }
-                            }
-                          }
-                          HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
-                        }
-                      }
+              val filtered = channels.filter { it.type == ChannelType.TEXT }
+                .filter { ch ->
+                  when (activeFilterChip) {
+                    "Unread" -> {
+                      val isLocalSender = ch.lastMessageSender != null && ch.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
+                      val hasUnreadIncoming = !ch.lastMessageIsRead && !isLocalSender && ch.lastMessage != null
+                      ch.unreadCount > 0 || hasUnreadIncoming
                     }
-                  }
-
-                  1 -> {
-                    LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White).padding(16.dp)) {
-                      item {
-                        Text("Status", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Spacer(modifier = Modifier.height(14.dp))
-
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                          item {
-                            Card(
-                              shape = RoundedCornerShape(16.dp),
-                              colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F8FA)),
-                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { showCreateStatusDialog = true }
-                            ) {
-                              Box(modifier = Modifier.fillMaxSize()) {
-                                Box(
-                                  modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp).size(50.dp).clip(CircleShape).background(Color(0xFF1F2C34)),
-                                  contentAlignment = Alignment.Center
-                                ) {
-                                  Text(userState.gamertag.take(1).ifBlank { "Y" }.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
-                                  Box(
-                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreenDark)
-                                  ) {
-                                    Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                  }
-                                }
-                                Text("Add status", color = WhatsAppTextPrimary, fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp))
-                              }
-                            }
-                          }
-
-                          items(statuses, key = { it.id }) { status ->
-                            val cardBg = when (status.backgroundTheme) {
-                              "CRIMSON" -> Color(0xFFFF4500)
-                              "END_VOID" -> Color(0xFF6A0DAD)
-                              "DIAMOND" -> Color(0xFF00E5FF)
-                              "GOLDEN" -> Color(0xFFFFD700)
-                              "OBSIDIAN" -> Color(0xFF273142)
-                              else -> WhatsAppNavSelectedPill
-                            }
-
-                            Card(
-                              shape = RoundedCornerShape(16.dp),
-                              colors = CardDefaults.cardColors(containerColor = cardBg),
-                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { openStatus(status) }.animateItem()
-                            ) {
-                              Box(modifier = Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                  Text(status.activityTag.take(2), fontSize = 28.sp)
-                                  Spacer(modifier = Modifier.height(6.dp))
-                                  Text(status.authorGamertag, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = if (status.backgroundTheme == "EMERALD") WhatsAppGreenDark else Color.White, maxLines = 1)
-                                  Text(status.content, fontSize = 10.sp, color = if (status.backgroundTheme == "EMERALD") WhatsAppTextSecondary else Color.White.copy(alpha = 0.85f), maxLines = 2)
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
+                    "Favourites" -> {
+                      favouriteChannels.contains(ch.id) || ch.id == "announcements" || ch.id == "general-chat"
                     }
-                  }
-
-                  2 -> {
-                    val voiceChannels = channels.filter { it.type == ChannelType.VOICE }
-                    LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White).padding(16.dp)) {
-                      item {
-                        Text("Active Realm Voice & Video Rooms", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                        Text("Low-latency Agora RTC engine with camera previews & boosted audio", color = WhatsAppTextSecondary, fontSize = 12.sp)
-                        Spacer(modifier = Modifier.height(14.dp))
-                      }
-
-                      items(voiceChannels, key = { it.id }) { channel ->
-                        val isCurrent = activeVoiceRoom?.channelId == channel.id
-                        val participantsInRoom = if (isCurrent) activeVoiceRoom?.participants ?: emptyList() else emptyList()
-
-                        Card(
-                          shape = RoundedCornerShape(16.dp),
-                          colors = CardDefaults.cardColors(containerColor = if (isCurrent) WhatsAppNavSelectedPill.copy(alpha = 0.5f) else Color(0xFFF7F8FA)),
-                          modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).animateItem()
-                        ) {
-                          Column(modifier = Modifier.padding(14.dp)) {
-                            Row(
-                              modifier = Modifier.fillMaxWidth(),
-                              horizontalArrangement = Arrangement.SpaceBetween,
-                              verticalAlignment = Alignment.CenterVertically
-                            ) {
-                              Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(modifier = Modifier.size(46.dp).clip(CircleShape).background(WhatsAppNavSelectedPill), contentAlignment = Alignment.Center) {
-                                  Text("🔊", fontSize = 20.sp)
-                                }
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Column {
-                                  Text(channel.name, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                  Text(channel.description, color = WhatsAppTextSecondary, fontSize = 12.sp)
-                                }
-                              }
-
-                              Row {
-                                IconButton(onClick = {
-                                  runWithPermissions {
-                                    viewModel.startVideoCall(channel)
-                                    currentScreen = "video_call_screen"
-                                  }
-                                }) {
-                                  Icon(Icons.Default.Videocam, contentDescription = "Video", tint = WhatsAppGreenDark)
-                                }
-                                IconButton(onClick = {
-                                  if (isCurrent) {
-                                    viewModel.voiceManager.disconnect()
-                                  } else {
-                                    runWithPermissions { viewModel.selectChannel(channel) }
-                                  }
-                                }) {
-                                  Icon(if (isCurrent) Icons.Default.CallEnd else Icons.Default.Call, contentDescription = "Voice", tint = if (isCurrent) Color(0xFFEA0038) else WhatsAppGreenDark)
-                                }
-                              }
-                            }
-
-                            if (participantsInRoom.isNotEmpty()) {
-                              Spacer(modifier = Modifier.height(8.dp))
-                              Text("In this call right now (${participantsInRoom.size}):", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = WhatsAppGreenDark)
-                              LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                                items(participantsInRoom) { p ->
-                                  Surface(shape = RoundedCornerShape(8.dp), color = Color.White) {
-                                    Row(modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                                      Text(if (p.isSpeaking) "🟢" else "⚪", fontSize = 8.sp)
-                                      Spacer(modifier = Modifier.width(4.dp))
-                                      Text(p.name, fontSize = 11.sp, fontWeight = if (p.isAdmin) FontWeight.Bold else FontWeight.Normal, color = if (p.isAdmin) RoleAdminGold else Color.Black)
-                                    }
-                                  }
-                                }
-                              }
-                            }
-                          }
-                        }
-                      }
+                    "Groups" -> {
+                      !ch.isDm
                     }
+                    else -> true
                   }
                 }
+                .filter { ch ->
+                  if (searchQuery.isBlank()) true
+                  else ch.name.contains(searchQuery, true) || ch.description.contains(searchQuery, true) || (ch.lastMessage?.contains(searchQuery, true) == true)
+                }
+
+              LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White)) {
+                if (filtered.isEmpty()) {
+                  item {
+                    Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                      Text(
+                        text = when (activeFilterChip) {
+                          "Unread" -> "No unread chats"
+                          "Favourites" -> "No favourite chats yet. Long-press any chat to star it."
+                          "Groups" -> "No group channels found"
+                          else -> "No chats found"
+                        },
+                        color = WhatsAppTextSecondary,
+                        fontSize = 14.sp
+                      )
+                    }
+                  }
+                } else {
+                  items(filtered, key = { it.id }) { channel ->
+                    val isMuted = mutedChannels.contains(channel.id)
+                    val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
+                    val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
+                    val isLastMessageRead = channel.lastMessageIsRead
+
+                    val displayPreview = when {
+                      channel.lastMessage.isNullOrBlank() -> channel.description
+                      channel.isDm -> channel.lastMessage
+                      isLocalSender -> "You: ${channel.lastMessage}"
+                      channel.lastMessageSender != null -> "${channel.lastMessageSender}: ${channel.lastMessage}"
+                      else -> channel.lastMessage
+                    }
+
+                    Row(
+                      modifier = Modifier
+                        .fillMaxWidth()
+                        .combinedClickable(
+                          onClick = {
+                            viewModel.selectChannel(channel)
+                            currentScreen = "chat_screen"
+                          },
+                          onLongClick = { longPressedChannel = channel }
+                        )
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .animateItem(),
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      Box(
+                        modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else WhatsAppNavSelectedPill),
+                        contentAlignment = Alignment.Center
+                      ) {
+                        Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                      }
+                      Spacer(modifier = Modifier.width(14.dp))
+                      Column(modifier = Modifier.weight(1f)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                          Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                            Text(
+                              text = channel.name,
+                              fontWeight = FontWeight.SemiBold,
+                              color = WhatsAppTextPrimary,
+                              fontSize = 16.5.sp,
+                              maxLines = 1,
+                              overflow = TextOverflow.Ellipsis
+                            )
+                            if (channel.isDm) {
+                              Spacer(modifier = Modifier.width(4.dp))
+                              Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                            }
+                            if (channel.isRestrictedToAdmin) {
+                              Spacer(modifier = Modifier.width(4.dp))
+                              Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
+                            }
+                          }
+                          Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isMuted) {
+                              Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
+                              Spacer(modifier = Modifier.width(4.dp))
+                            }
+                            if (formattedTime.isNotBlank()) {
+                              Text(formattedTime, color = if (isLastMessageRead) WhatsAppTextSecondary else WhatsAppGreenDark, fontSize = 12.sp)
+                            }
+                          }
+                        }
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                          if (isLocalSender && channel.lastMessage != null) {
+                            Icon(
+                              Icons.Default.DoneAll,
+                              contentDescription = if (isLastMessageRead) "Read" else "Sent",
+                              tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                              modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                          }
+                          Text(
+                            text = displayPreview,
+                            color = WhatsAppTextSecondary,
+                            fontSize = 13.5.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                          )
+                        }
+                      }
+                    }
+                    HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
+                  }
+                }
+                item { Spacer(modifier = Modifier.height(100.dp)) }
               }
             }
           }
         }
+      }
+    }
+
+    if (currentScreen in listOf("home", "profile_screen", "settings_screen", "contacts")) {
+      Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        FloatingBottomNavBar(
+          currentScreen = currentScreen,
+          onNavigate = { currentScreen = it },
+          userInitial = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?"
+        )
       }
     }
 
@@ -1063,7 +900,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth WhatsApp-style Animated Entry/Exit for the Status Viewer Screen
   androidx.compose.animation.AnimatedVisibility(
     visible = isStatusViewerVisible && statusToDisplay != null,
     enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
@@ -1085,7 +921,6 @@ fun SubstrateApp(
     }
   }
 
-  // Long-press Context Sheet for Chats in Home List (Mute, Star, Block)
   if (longPressedChannel != null) {
     val ch = longPressedChannel!!
     val isMuted = viewModel.isChannelMuted(ch.id)
@@ -1111,19 +946,6 @@ fun SubstrateApp(
     )
   }
 
-  if (showSelectContactDialog) {
-    SelectContactDialog(
-      members = members,
-      currentGamertag = userState.gamertag,
-      onDismiss = { viewModel.setSelectContactDialogVisible(false) },
-      onSelectMember = { target ->
-        viewModel.startPrivateChat(target.gamertag)
-        currentScreen = "chat_screen"
-      }
-    )
-  }
-
-  // Header & 3-Dots Dropdown with Mute, Block, Server Info
   if (showMenuDropdownSheet) {
     val isDm = activeChannel.isDm
     val recipient = activeChannel.dmRecipientGamertag
@@ -1167,29 +989,6 @@ fun SubstrateApp(
       onUpdateMemberRole = { id, role -> viewModel.updateMemberRole(id, role) },
       onUpdateMemberGamertag = { id, name -> viewModel.updateMemberGamertag(id, name) },
       onRemoveMember = { id -> viewModel.removeMember(id) }
-    )
-  }
-
-  if (showCreateStatusDialog) {
-    StatusCreatorDialog(
-      onDismiss = { showCreateStatusDialog = false },
-      onPostStatus = { text, theme, activity, coords ->
-        viewModel.postStatus(text, theme, activity, coords)
-        showCreateStatusDialog = false
-      }
-    )
-  }
-
-  if (showGamertagDialog || userState.needsGamertagSetup) {
-    GamertagDialog(
-      currentGamertag = userState.gamertag,
-      onDismiss = { viewModel.setGamertagDialogVisible(false) },
-      onLogin = { gamertag, pass, onComplete ->
-        viewModel.loginAccount(gamertag, pass, onComplete)
-      },
-      onRegister = { gamertag, pass, onComplete ->
-        viewModel.registerAccount(gamertag, pass, onComplete)
-      }
     )
   }
 
