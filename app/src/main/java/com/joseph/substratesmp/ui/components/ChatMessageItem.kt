@@ -52,7 +52,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,8 +92,6 @@ import com.joseph.substratesmp.ui.theme.WhatsAppCheckmarkBlue
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppIncomingBubble
 import com.joseph.substratesmp.ui.theme.WhatsAppOutgoingBubble
-import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
-import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -113,6 +110,7 @@ fun formatDuration(ms: Int): String {
 fun ChatMessageItem(
   message: ChatMessage,
   translatedText: String? = null,
+  isDarkMode: Boolean,
   isRead: Boolean = false,
   canDelete: Boolean = false,
   onDeleteMessage: (ChatMessage) -> Unit = {},
@@ -127,6 +125,11 @@ fun ChatMessageItem(
   val scope = rememberCoroutineScope()
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
+
+  val bubbleColor = if (isLocal) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppOutgoingBubble) else (if (isDarkMode) Color(0xFF202C33) else WhatsAppIncomingBubble)
+  val textColor = if (isDarkMode) Color.White else Color.Black
+  val subTextColor = if (isDarkMode) Color(0xFF8696A0) else Color.Gray
+  val dialogBg = if (isDarkMode) Color(0xFF303030) else Color.White
 
   var isMessageVisible by remember { mutableStateOf(true) }
   var showOptionsDialog by remember { mutableStateOf(false) }
@@ -313,7 +316,7 @@ fun ChatMessageItem(
               contentScale = ContentScale.Fit
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(message.formattedTime, fontSize = 9.5.sp, color = WhatsAppTextSecondary)
+              Text(message.formattedTime, fontSize = 9.5.sp, color = subTextColor)
               if (isLocal) {
                 Spacer(modifier = Modifier.width(3.dp))
                 Icon(
@@ -328,7 +331,7 @@ fun ChatMessageItem(
         } else {
           Card(
             shape = bubbleShape,
-            colors = CardDefaults.cardColors(containerColor = if (isLocal) WhatsAppOutgoingBubble else WhatsAppIncomingBubble),
+            colors = CardDefaults.cardColors(containerColor = bubbleColor),
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier
               .widthIn(min = 90.dp, max = 320.dp)
@@ -342,7 +345,6 @@ fun ChatMessageItem(
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
                   Text(
                     text = message.senderName,
-                    style = MaterialTheme.typography.labelMedium,
                     color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.5.sp
@@ -363,7 +365,7 @@ fun ChatMessageItem(
               if (!message.replyToSender.isNullOrBlank()) {
                 Surface(
                   shape = RoundedCornerShape(6.dp),
-                  color = Color.Black.copy(alpha = 0.06f),
+                  color = Color.Black.copy(alpha = 0.15f),
                   modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                 ) {
                   Row(modifier = Modifier.padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -371,7 +373,7 @@ fun ChatMessageItem(
                     Spacer(modifier = Modifier.width(6.dp))
                     Column {
                       Text(message.replyToSender, fontWeight = FontWeight.Bold, fontSize = 11.sp, color = WhatsAppGreenDark)
-                      Text(message.replyToContent ?: "", fontSize = 11.sp, color = WhatsAppTextSecondary, maxLines = 1)
+                      Text(message.replyToContent ?: "", fontSize = 11.sp, color = subTextColor, maxLines = 1)
                     }
                   }
                 }
@@ -408,7 +410,7 @@ fun ChatMessageItem(
               if (!message.fileUrl.isNullOrBlank()) {
                 Surface(
                   shape = RoundedCornerShape(8.dp),
-                  color = Color.Black.copy(alpha = 0.05f),
+                  color = Color.Black.copy(alpha = 0.15f),
                   modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clickable {
                     scope.launch {
                       try {
@@ -447,8 +449,8 @@ fun ChatMessageItem(
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                      Text(message.fileName ?: "Document", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary, maxLines = 1)
-                      Text("Tap to download", fontSize = 10.sp, color = WhatsAppTextSecondary)
+                      Text(message.fileName ?: "Document", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = textColor, maxLines = 1)
+                      Text("Tap to download", fontSize = 10.sp, color = subTextColor)
                     }
                   }
                 }
@@ -464,7 +466,7 @@ fun ChatMessageItem(
 
                 Surface(
                   shape = RoundedCornerShape(10.dp),
-                  color = Color.Black.copy(alpha = 0.05f),
+                  color = Color.Black.copy(alpha = 0.15f),
                   modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                 ) {
                   Row(
@@ -507,7 +509,7 @@ fun ChatMessageItem(
                         text = audioTitle,
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 13.sp,
-                        color = WhatsAppTextPrimary,
+                        color = textColor,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.fillMaxWidth()
@@ -608,12 +610,12 @@ fun ChatMessageItem(
                         Text(
                           text = formatDuration(currentAudioPos),
                           fontSize = 11.sp,
-                          color = WhatsAppTextSecondary
+                          color = subTextColor
                         )
                         Text(
                           text = if (totalAudioDur > 0) formatDuration(totalAudioDur) else "--:--",
                           fontSize = 11.sp,
-                          color = WhatsAppTextSecondary
+                          color = subTextColor
                         )
                       }
                     }
@@ -624,8 +626,7 @@ fun ChatMessageItem(
               if (message.content.isNotBlank()) {
                 Text(
                   text = message.content,
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = WhatsAppTextPrimary,
+                  color = textColor,
                   lineHeight = 18.sp,
                   fontSize = 14.5.sp
                 )
@@ -634,14 +635,13 @@ fun ChatMessageItem(
               if (translatedText != null) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.Gray.copy(alpha = 0.3f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(Icons.Default.Translate, contentDescription = null, tint = WhatsAppTextSecondary, modifier = Modifier.size(12.dp))
+                  Icon(Icons.Default.Translate, contentDescription = null, tint = subTextColor, modifier = Modifier.size(12.dp))
                   Spacer(modifier = Modifier.width(4.dp))
-                  Text(text = "Translated", fontSize = 10.sp, color = WhatsAppTextSecondary, fontWeight = FontWeight.Bold)
+                  Text(text = "Translated", fontSize = 10.sp, color = subTextColor, fontWeight = FontWeight.Bold)
                 }
                 Text(
                   text = translatedText,
-                  style = MaterialTheme.typography.bodyMedium,
-                  color = WhatsAppTextPrimary,
+                  color = textColor,
                   fontSize = 14.5.sp,
                   modifier = Modifier.padding(top = 2.dp)
                 )
@@ -659,16 +659,16 @@ fun ChatMessageItem(
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(message.coordinates, style = CoordinateTextStyle, color = WhatsAppGreenDark, fontSize = 11.5.sp)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = WhatsAppTextSecondary, modifier = Modifier.size(12.dp))
+                    Icon(Icons.Default.ContentCopy, contentDescription = "Copy", tint = subTextColor, modifier = Modifier.size(12.dp))
                   }
                 }
               }
 
               Row(modifier = Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (message.isEdited) {
-                  Text("Edited", fontSize = 9.sp, color = WhatsAppTextSecondary, modifier = Modifier.padding(end = 4.dp))
+                  Text("Edited", fontSize = 9.sp, color = subTextColor, modifier = Modifier.padding(end = 4.dp))
                 }
-                Text(message.formattedTime, style = MaterialTheme.typography.labelSmall, color = WhatsAppTextSecondary, fontSize = 10.sp)
+                Text(message.formattedTime, color = subTextColor, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
                   Icon(
@@ -690,18 +690,18 @@ fun ChatMessageItem(
     if (showTranslateMenu) {
       AlertDialog(
         onDismissRequest = { showTranslateMenu = false; showOptionsDialog = false },
-        containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
+        containerColor = dialogBg, titleContentColor = textColor, textContentColor = textColor,
         title = { Text("Translate Message", fontWeight = FontWeight.Bold) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { onTranslate(message.id, "en"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text("Translate to English", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              Text("Translate to English", fontSize = 16.sp, color = textColor)
             }
             TextButton(onClick = { onTranslate(message.id, "zh"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text("Translate to Chinese", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              Text("Translate to Chinese", fontSize = 16.sp, color = textColor)
             }
             TextButton(onClick = { onTranslate(message.id, "ms"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text("Translate to Malay", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              Text("Translate to Malay", fontSize = 16.sp, color = textColor)
             }
           }
         },
@@ -712,21 +712,21 @@ fun ChatMessageItem(
     } else {
       AlertDialog(
         onDismissRequest = { showOptionsDialog = false },
-        containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
+        containerColor = dialogBg, titleContentColor = textColor, textContentColor = textColor,
         title = { Text("Message Options", fontWeight = FontWeight.Bold) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
-              Text("Reply", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              Text("Reply", fontSize = 16.sp, color = textColor)
             }
             if (message.isLocalUser && message.content.isNotBlank()) {
               TextButton(onClick = { onEdit(message); showOptionsDialog = false }) {
-                Text("Edit", fontSize = 16.sp, color = WhatsAppTextPrimary)
+                Text("Edit", fontSize = 16.sp, color = textColor)
               }
             }
             if (message.content.isNotBlank()) {
               TextButton(onClick = { showTranslateMenu = true }) {
-                Text("Translate Message", fontSize = 16.sp, color = WhatsAppTextPrimary)
+                Text("Translate Message", fontSize = 16.sp, color = textColor)
               }
             }
             if (message.content.isNotBlank() || !message.coordinates.isNullOrBlank()) {
@@ -735,7 +735,7 @@ fun ChatMessageItem(
                 clipboardManager.setText(AnnotatedString(copyText))
                 showOptionsDialog = false
               }) {
-                Text("Copy Text", fontSize = 16.sp, color = WhatsAppTextPrimary)
+                Text("Copy Text", fontSize = 16.sp, color = textColor)
               }
             }
             if (canDelete) {
