@@ -7,6 +7,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.joseph.substratesmp.data.model.ChatMessage
+import com.joseph.substratesmp.ui.components.SoundHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +21,7 @@ class ChatRepository(private val context: Context) {
   private var activeChannelId: String = "general-chat"
   private var firestoreListener: ListenerRegistration? = null
   private var currentGamertag: String = ""
+  private var isInitialLoadDone = false
 
   private val firestore: FirebaseFirestore by lazy {
     if (FirebaseApp.getApps(context).isEmpty()) {
@@ -44,6 +46,7 @@ class ChatRepository(private val context: Context) {
     firestoreListener?.remove()
     firestoreListener = null
     _messagesFlow.value = emptyList()
+    isInitialLoadDone = false
 
     try {
       firestoreListener = firestore.collection("channels")
@@ -57,6 +60,7 @@ class ChatRepository(private val context: Context) {
           }
 
           if (snapshot != null) {
+            val previousCount = _messagesFlow.value.size
             val liveMessages = snapshot.documents.mapNotNull { doc ->
               val id = doc.id
               val chId = doc.getString("channelId") ?: channelId
@@ -69,6 +73,7 @@ class ChatRepository(private val context: Context) {
               val img = doc.getString("imageUrl")
               val aud = doc.getString("audioUrl")
               val audDuration = doc.getLong("audioDurationSeconds")?.toInt() ?: 0
+              val sticker = doc.getBoolean("isSticker") ?: false
               val repId = doc.getString("replyToId")
               val repSender = doc.getString("replyToSender")
               val repContent = doc.getString("replyToContent")
@@ -86,11 +91,21 @@ class ChatRepository(private val context: Context) {
                 imageUrl = img,
                 audioUrl = aud,
                 audioDurationSeconds = audDuration,
+                isSticker = sticker,
                 replyToId = repId,
                 replyToSender = repSender,
                 replyToContent = repContent
               )
             }
+
+            // Play incoming sound only when a new remote message arrives after initial fetch
+            if (isInitialLoadDone && liveMessages.size > previousCount) {
+              val newest = liveMessages.lastOrNull()
+              if (newest != null && !newest.isLocalUser) {
+                SoundHelper.playMessageSound(context)
+              }
+            }
+            isInitialLoadDone = true
             _messagesFlow.value = liveMessages
           }
         }
@@ -108,6 +123,7 @@ class ChatRepository(private val context: Context) {
     imageUrl: String? = null,
     audioUrl: String? = null,
     audioDurationSeconds: Int = 0,
+    isSticker: Boolean = false,
     replyToId: String? = null,
     replyToSender: String? = null,
     replyToContent: String? = null
@@ -131,6 +147,7 @@ class ChatRepository(private val context: Context) {
       "imageUrl" to imageUrl,
       "audioUrl" to audioUrl,
       "audioDurationSeconds" to audioDurationSeconds,
+      "isSticker" to isSticker,
       "replyToId" to replyToId,
       "replyToSender" to replyToSender,
       "replyToContent" to replyToContent
