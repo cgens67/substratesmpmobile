@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -78,6 +79,7 @@ import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
+import com.google.firebase.firestore.FirebaseFirestore
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
@@ -90,6 +92,7 @@ import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
@@ -113,8 +116,8 @@ fun ChatMessageItem(
   var isMessageVisible by remember { mutableStateOf(true) }
   var showOptionsDialog by remember { mutableStateOf(false) }
 
-  // Audio Playback & Interactive Seeking State
   var isPlayingAudio by remember { mutableStateOf(false) }
+  var isDownloadingAudio by remember { mutableStateOf(false) }
   var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
   var currentAudioPos by remember { mutableIntStateOf(0) }
   var totalAudioDur by remember { mutableIntStateOf(if (message.audioDurationSeconds > 0) message.audioDurationSeconds * 1000 else 0) }
@@ -128,13 +131,13 @@ fun ChatMessageItem(
     }
   }
 
-  fun preparePlayerIfNeeded() {
-    if (mediaPlayer == null && !message.audioUrl.isNullOrBlank()) {
+  fun loadAndPreparePlayer(onReady: (MediaPlayer?) -> Unit) {
+    val audioUrl = message.audioUrl ?: return onReady(null)
+    val tempFile = File(context.cacheDir, "audio_${message.id}.m4a")
+
+    if (tempFile.exists() && tempFile.length() > 0) {
       try {
-        val rawBytes = Base64.decode(message.audioUrl.substringAfter("base64,"), Base64.NO_WRAP)
-        val tempFile = File(context.cacheDir, "audio_${message.id}.m4a")
-        FileOutputStream(tempFile).use { it.write(rawBytes) }
-        mediaPlayer = MediaPlayer().apply {
+        val player = MediaPlayer().apply {
           setDataSource(tempFile.absolutePath)
           prepare()
           if (duration > 0) totalAudioDur = duration
@@ -143,7 +146,49 @@ fun ChatMessageItem(
             currentAudioPos = 0
           }
         }
-      } catch (_: Exception) {}
+        onReady(player)
+        return
+      } catch (_: Exception) {
+        tempFile.delete()
+      }
+    }
+
+    scope.launch {
+      isDownloadingAudio = true
+      try {
+        val base64Data = if (audioUrl.startsWith("chunked:")) {
+          val snapshot = FirebaseFirestore.getInstance()
+            .collection("channels")
+            .document(message.channelId)
+            .collection("messages")
+            .document(message.id)
+            .collection("audioChunks")
+            .get()
+            .await()
+          snapshot.documents.sortedBy { it.id }.joinToString("") { it.getString("data") ?: "" }
+        } else {
+          audioUrl
+        }
+
+        val rawBytes = Base64.decode(base64Data.substringAfter("base64,"), Base64.NO_WRAP)
+        FileOutputStream(tempFile).use { it.write(rawBytes) }
+
+        val player = MediaPlayer().apply {
+          setDataSource(tempFile.absolutePath)
+          prepare()
+          if (duration > 0) totalAudioDur = duration
+          setOnCompletionListener {
+            isPlayingAudio = false
+            currentAudioPos = 0
+          }
+        }
+        onReady(player)
+      } catch (e: Exception) {
+        Toast.makeText(context, "Audio playback error: ${e.message}", Toast.LENGTH_SHORT).show()
+        onReady(null)
+      } finally {
+        isDownloadingAudio = false
+      }
     }
   }
 
@@ -339,19 +384,38 @@ fun ChatMessageItem(
                 )
               }
 
+              // Document/File with chunked assembly support
               if (!message.fileUrl.isNullOrBlank()) {
                 Surface(
                   shape = RoundedCornerShape(8.dp),
                   color = Color.Black.copy(alpha = 0.05f),
                   modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clickable {
-                    try {
-                      val bytes = Base64.decode(message.fileUrl.substringAfter("base64,"), Base64.NO_WRAP)
-                      val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                      val file = File(downloadsDir, message.fileName ?: "document.file")
-                      FileOutputStream(file).use { it.write(bytes) }
-                      Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
-                    } catch (_: Exception) {
-                      Toast.makeText(context, "Failed to download file", Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                      try {
+                        val fileUrl = message.fileUrl
+                        val base64Data = if (fileUrl.startsWith("chunked:")) {
+                          Toast.makeText(context, "Downloading file chunks...", Toast.LENGTH_SHORT).show()
+                          val snapshot = FirebaseFirestore.getInstance()
+                            .collection("channels")
+                            .document(message.channelId)
+                            .collection("messages")
+                            .document(message.id)
+                            .collection("fileChunks")
+                            .get()
+                            .await()
+                          snapshot.documents.sortedBy { it.id }.joinToString("") { it.getString("data") ?: "" }
+                        } else {
+                          fileUrl
+                        }
+
+                        val bytes = Base64.decode(base64Data.substringAfter("base64,"), Base64.NO_WRAP)
+                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                        val file = File(downloadsDir, message.fileName ?: "document.file")
+                        FileOutputStream(file).use { it.write(bytes) }
+                        Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
+                      } catch (e: Exception) {
+                        Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                      }
                     }
                   }
                 ) {
@@ -370,7 +434,7 @@ fun ChatMessageItem(
                 }
               }
 
-              // Interactive Seekable Audio Player
+              // Interactive Seekable Audio Player with Chunk Loading
               if (!message.audioUrl.isNullOrBlank()) {
                 val isVoiceNote = message.audioDurationSeconds > 0
                 val audioTitle = if (isVoiceNote) {
@@ -394,14 +458,27 @@ fun ChatMessageItem(
                           mediaPlayer?.pause()
                           isPlayingAudio = false
                         } else {
-                          preparePlayerIfNeeded()
-                          mediaPlayer?.start()
-                          isPlayingAudio = true
+                          if (mediaPlayer == null) {
+                            loadAndPreparePlayer { player ->
+                              mediaPlayer = player
+                              if (player != null) {
+                                player.start()
+                                isPlayingAudio = true
+                              }
+                            }
+                          } else {
+                            mediaPlayer?.start()
+                            isPlayingAudio = true
+                          }
                         }
                       },
                       modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100))
                     ) {
-                      Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(18.dp))
+                      if (isDownloadingAudio) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                      } else {
+                        Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(18.dp))
+                      }
                     }
 
                     Spacer(modifier = Modifier.width(10.dp))
@@ -416,15 +493,23 @@ fun ChatMessageItem(
 
                       Spacer(modifier = Modifier.height(4.dp))
 
-                      // Interactive Draggable / Tappable Seekbar
                       BoxWithConstraints(
                         modifier = Modifier
                           .fillMaxWidth()
                           .height(20.dp)
                           .pointerInput(totalAudioDur) {
                             detectTapGestures { offset ->
-                              preparePlayerIfNeeded()
-                              if (totalAudioDur > 0) {
+                              if (mediaPlayer == null) {
+                                loadAndPreparePlayer { player ->
+                                  mediaPlayer = player
+                                  if (player != null && totalAudioDur > 0) {
+                                    val frac = (offset.x / size.width).coerceIn(0f, 1f)
+                                    val seekMs = (frac * totalAudioDur).toInt()
+                                    currentAudioPos = seekMs
+                                    player.seekTo(seekMs)
+                                  }
+                                }
+                              } else if (totalAudioDur > 0) {
                                 val fraction = (offset.x / size.width).coerceIn(0f, 1f)
                                 val seekMs = (fraction * totalAudioDur).toInt()
                                 currentAudioPos = seekMs
@@ -436,7 +521,6 @@ fun ChatMessageItem(
                             detectHorizontalDragGestures(
                               onDragStart = { offset ->
                                 isUserSeeking = true
-                                preparePlayerIfNeeded()
                                 seekFraction = (offset.x / size.width).coerceIn(0f, 1f)
                               },
                               onHorizontalDrag = { change, _ ->
@@ -447,7 +531,16 @@ fun ChatMessageItem(
                               },
                               onDragEnd = {
                                 isUserSeeking = false
-                                if (totalAudioDur > 0) {
+                                if (mediaPlayer == null) {
+                                  loadAndPreparePlayer { player ->
+                                    mediaPlayer = player
+                                    if (player != null && totalAudioDur > 0) {
+                                      val seekMs = (seekFraction * totalAudioDur).toInt()
+                                      currentAudioPos = seekMs
+                                      player.seekTo(seekMs)
+                                    }
+                                  }
+                                } else if (totalAudioDur > 0) {
                                   val seekMs = (seekFraction * totalAudioDur).toInt()
                                   currentAudioPos = seekMs
                                   mediaPlayer?.seekTo(seekMs)
@@ -464,7 +557,6 @@ fun ChatMessageItem(
 
                         val trackColor = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100)
 
-                        // Inactive track
                         Box(
                           modifier = Modifier
                             .fillMaxWidth()
@@ -473,7 +565,6 @@ fun ChatMessageItem(
                             .background(Color.Gray.copy(alpha = 0.3f))
                         )
 
-                        // Active progress fill
                         Box(
                           modifier = Modifier
                             .fillMaxWidth(progressFraction)
@@ -482,7 +573,6 @@ fun ChatMessageItem(
                             .background(trackColor)
                         )
 
-                        // Seeking Thumb
                         val thumbOffset = ((maxWidth - 12.dp) * progressFraction)
                         Box(
                           modifier = Modifier
