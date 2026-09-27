@@ -49,9 +49,10 @@ object NotificationHelper {
     )
 
     val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+    val appIcon = context.applicationInfo.icon.takeIf { it != 0 } ?: android.R.drawable.stat_notify_chat
 
     val notification = NotificationCompat.Builder(context, CHANNEL_ID)
-      .setSmallIcon(android.R.drawable.stat_notify_chat)
+      .setSmallIcon(appIcon)
       .setContentTitle(title)
       .setContentText(content)
       .setAutoCancel(true)
