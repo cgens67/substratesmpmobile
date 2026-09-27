@@ -79,7 +79,7 @@ fun SettingsScreen(
   onNavigateProfile: () -> Unit
 ) {
   val context = LocalContext.current
-  val prefs = context.getSharedPreferences("substrate_settings_prefs", Context.MODEPRIVATE)
+  val prefs = context.getSharedPreferences("substrate_settings_prefs", Context.MODE_PRIVATE)
   val animState = remember { MutableTransitionState(false) }.apply { targetState = true }
 
   var isSearching by remember { mutableStateOf(false) }
