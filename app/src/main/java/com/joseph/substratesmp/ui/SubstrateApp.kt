@@ -64,21 +64,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.FloatingActionButtonDefaults
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
@@ -125,18 +111,7 @@ import com.joseph.substratesmp.ui.components.TypingBubble
 import com.joseph.substratesmp.ui.components.VideoCallScreen
 import com.joseph.substratesmp.ui.components.dropLastGrapheme
 import com.joseph.substratesmp.ui.components.processAndCompressImage
-import com.joseph.substratesmp.ui.theme.RoleAdminGold
-import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
-import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
-import com.joseph.substratesmp.ui.theme.WhatsAppChipUnselected
-import com.joseph.substratesmp.ui.theme.WhatsAppDivider
-import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
-import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
-import com.joseph.substratesmp.ui.theme.WhatsAppHeaderGreen
-import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
-import com.joseph.substratesmp.ui.theme.WhatsAppSearchBackground
-import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
-import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
+import com.joseph.substratesmp.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -167,6 +142,7 @@ fun SubstrateApp(
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
   val showSelectContactDialog by viewModel.showSelectContactDialog.collectAsStateWithLifecycle()
 
+  // rememberSaveable ensures the state survives screen rotations
   var currentScreen by rememberSaveable { mutableStateOf("home") }
   var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   var activeFilterChip by rememberSaveable { mutableStateOf("All") }
@@ -307,6 +283,7 @@ fun SubstrateApp(
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                         }
                       }
+                      // Live typing subtitle indicator
                       if (typingUsers.isNotEmpty()) {
                         Text(
                           text = "${typingUsers.first()} is typing...",
@@ -522,7 +499,9 @@ fun SubstrateApp(
                         showEmojiPicker = false
                       },
                       onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
-                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
+                      onBackspace = {
+                        chatInputText = dropLastGrapheme(chatInputText)
+                      }
                     )
                   }
                 }
@@ -653,11 +632,11 @@ fun SubstrateApp(
                 targetState = selectedTab,
                 transitionSpec = {
                   if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
                   } else {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
                   }
                 },
                 label = "tab_transition"
@@ -769,7 +748,7 @@ fun SubstrateApp(
                             }
                           }
 
-                          items(statuses) { status ->
+                          items(statuses, key = { it.id }) { status ->
                             val cardBg = when (status.backgroundTheme) {
                               "CRIMSON" -> Color(0xFFFF4500)
                               "END_VOID" -> Color(0xFF6A0DAD)
