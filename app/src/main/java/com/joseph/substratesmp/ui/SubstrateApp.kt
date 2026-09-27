@@ -30,6 +30,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -40,6 +41,31 @@ import com.joseph.substratesmp.ui.components.*
 import com.joseph.substratesmp.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+fun formatChatListTime(timestamp: Long): String {
+  if (timestamp <= 0L) return ""
+  val now = System.currentTimeMillis()
+  val diff = now - timestamp
+  val calendar = Calendar.getInstance()
+  val msgCal = Calendar.getInstance().apply { timeInMillis = timestamp }
+
+  val isToday = calendar.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
+                calendar.get(Calendar.DAY_OF_YEAR) == msgCal.get(Calendar.DAY_OF_YEAR)
+
+  val isYesterday = calendar.get(Calendar.YEAR) == msgCal.get(Calendar.YEAR) &&
+                    calendar.get(Calendar.DAY_OF_YEAR) - msgCal.get(Calendar.DAY_OF_YEAR) == 1
+
+  return when {
+    isToday -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
+    isYesterday -> "Yesterday"
+    diff < 7 * 24 * 3600 * 1000L -> SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(timestamp))
+    else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
+  }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,13 +157,12 @@ fun SubstrateApp(
     }
   }
 
-  // Request notifications permission on Android 13+
   val notificationPermissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestPermission()
   ) {}
 
   LaunchedEffect(Unit) {
-    if (android.os.Build.VERSION.SDK_INT >= 33) {
+    if (Build.VERSION.SDK_INT >= 33) {
       notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
   }
@@ -399,7 +424,6 @@ fun SubstrateApp(
                 }
 
                 if (isRecipientBlocked) {
-                  // WhatsApp-style Blocked Contact Banner
                   Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFFF7F8FA),
@@ -651,8 +675,18 @@ fun SubstrateApp(
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
 
+                      // Dynamic Live Preview: Shows latest message content, sender, time, and checkmarks
                       items(filtered, key = { it.id }) { channel ->
                         val isMuted = mutedChannels.contains(channel.id)
+                        val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
+                        val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
+                        val displayPreview = when {
+                          channel.lastMessage.isNullOrBlank() -> channel.description
+                          channel.isDm -> channel.lastMessage
+                          isLocalSender -> "You: ${channel.lastMessage}"
+                          channel.lastMessageSender != null -> "${channel.lastMessageSender}: ${channel.lastMessage}"
+                          else -> channel.lastMessage
+                        }
 
                         Row(
                           modifier = Modifier.fillMaxWidth().clickable {
@@ -671,8 +705,15 @@ fun SubstrateApp(
                           Spacer(modifier = Modifier.width(14.dp))
                           Column(modifier = Modifier.weight(1f)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                              Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(channel.name, fontWeight = FontWeight.SemiBold, color = WhatsAppTextPrimary, fontSize = 16.5.sp)
+                              Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                                Text(
+                                  text = channel.name,
+                                  fontWeight = FontWeight.SemiBold,
+                                  color = WhatsAppTextPrimary,
+                                  fontSize = 16.5.sp,
+                                  maxLines = 1,
+                                  overflow = TextOverflow.Ellipsis
+                                )
                                 if (channel.isDm) {
                                   Spacer(modifier = Modifier.width(4.dp))
                                   Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -687,11 +728,27 @@ fun SubstrateApp(
                                   Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
                                   Spacer(modifier = Modifier.width(4.dp))
                                 }
-                                Text("11:37 am", color = WhatsAppTextSecondary, fontSize = 12.sp)
+                                if (formattedTime.isNotBlank()) {
+                                  Text(formattedTime, color = WhatsAppTextSecondary, fontSize = 12.sp)
+                                }
                               }
                             }
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                              Text(channel.description, color = WhatsAppTextSecondary, fontSize = 13.5.sp, maxLines = 1, modifier = Modifier.weight(1f))
+
+                            Spacer(modifier = Modifier.height(2.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                              if (isLocalSender && channel.lastMessage != null) {
+                                Icon(Icons.Default.DoneAll, contentDescription = "Sent", tint = WhatsAppCheckmarkBlue, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                              }
+                              Text(
+                                text = displayPreview,
+                                color = WhatsAppTextSecondary,
+                                fontSize = 13.5.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                              )
                             }
                           }
                         }
@@ -888,8 +945,8 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth Zoom/Scale Animation for Status Viewer
-  androidx.compose.animation.AnimatedVisibility(
+  // Smooth WhatsApp-style Animated Entry/Exit for the Status Viewer Screen
+  AnimatedVisibility(
     visible = isStatusViewerVisible && statusToDisplay != null,
     enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
     exit = scaleOut(targetScale = 0.82f, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(200))
@@ -922,17 +979,9 @@ fun SubstrateApp(
     )
   }
 
-  // Menu Dropdown with Mute / Block Actions
   if (showMenuDropdownSheet) {
-    val isDm = activeChannel.isDm
-    val recipient = activeChannel.dmRecipientGamertag
-    val isMuted = viewModel.isChannelMuted(activeChannel.id)
-    val isBlocked = recipient != null && viewModel.isUserBlocked(recipient)
-
     CustomDropdownModalSheet(
       options = listOf(
-        SheetOption("mute", if (isMuted) "Unmute Notifications" else "Mute Notifications", if (isMuted) "Notifications are silenced" else "Play sounds on messages", isSelected = isMuted),
-        if (isDm && recipient != null) SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock this contact" else "Stop receiving messages", isSelected = isBlocked) else null,
         SheetOption("profile", "Account Profile", "Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", isSelected = false),
         SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = true),
         SheetOption("agora", "Voice Engine Settings", "App ID: ${agoraSettings.appId.take(8)}...", isSelected = false),
@@ -941,8 +990,6 @@ fun SubstrateApp(
       onDismiss = { showMenuDropdownSheet = false },
       onOptionSelected = { option ->
         when (option.id) {
-          "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
-          "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
           "profile" -> viewModel.setGamertagDialogVisible(true)
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "agora" -> viewModel.setAgoraDialogVisible(true)
