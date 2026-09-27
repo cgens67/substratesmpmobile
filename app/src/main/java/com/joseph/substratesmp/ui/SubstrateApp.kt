@@ -98,6 +98,7 @@ import com.joseph.substratesmp.ui.components.ServerInfoSheet
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
 import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
+import com.joseph.substratesmp.ui.theme.WhatsAppChipUnselected
 import com.joseph.substratesmp.ui.theme.WhatsAppDivider
 import com.joseph.substratesmp.ui.theme.WhatsAppGreen
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
@@ -126,14 +127,12 @@ fun SubstrateApp(
   val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
 
-  // Navigation states
-  var currentScreen by remember { mutableStateOf<String>("home") } // "home" or "chat_screen"
-  var selectedTab by remember { mutableIntStateOf(0) } // 0: Chats, 1: Updates, 2: Communities, 3: Calls
+  var currentScreen by remember { mutableStateOf<String>("home") }
+  var selectedTab by remember { mutableIntStateOf(0) }
   var activeFilterChip by remember { mutableStateOf("All") }
   var menuExpanded by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
 
-  // Permission Launcher for Agora Calls
   var pendingVoiceChannel by remember { mutableStateOf<Channel?>(null) }
   val permissionLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -167,10 +166,8 @@ fun SubstrateApp(
     }
   }
 
-  // Active Voice Bar docked overlay if connected to an Agora call
   Box(modifier = modifier.fillMaxSize().background(Color.White)) {
     if (currentScreen == "chat_screen") {
-      // SCREEN: Inside Conversation (WhatsApp Chat view matching Screenshots 2 & 3)
       Scaffold(
         topBar = {
           TopAppBar(
@@ -179,7 +176,6 @@ fun SubstrateApp(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.clickable { viewModel.setServerInfoSheetVisible(true) }
               ) {
-                // Contact / Channel avatar circle
                 Box(
                   modifier = Modifier
                     .size(38.dp)
@@ -222,7 +218,6 @@ fun SubstrateApp(
               }
             },
             actions = {
-              // Video call icon -> Agora RTC
               IconButton(
                 onClick = {
                   val voiceChannel = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
@@ -236,7 +231,6 @@ fun SubstrateApp(
                 )
               }
 
-              // Audio call icon -> Agora RTC
               IconButton(
                 onClick = {
                   val voiceChannel = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
@@ -250,7 +244,6 @@ fun SubstrateApp(
                 )
               }
 
-              // Menu
               Box {
                 IconButton(onClick = { menuExpanded = true }) {
                   Icon(
@@ -292,14 +285,12 @@ fun SubstrateApp(
           )
         }
       ) { chatPadding ->
-        // Chat Canvas with WhatsApp Cream/Beige Background & Subtle Pattern
         Box(
           modifier = Modifier
             .fillMaxSize()
             .padding(chatPadding)
             .background(WhatsAppChatBackground)
         ) {
-          // Subtle doodle texture simulation
           Canvas(modifier = Modifier.fillMaxSize()) {
             val step = 80f
             for (x in 0..(size.width.toInt()) step step.toInt()) {
@@ -314,7 +305,6 @@ fun SubstrateApp(
           }
 
           Column(modifier = Modifier.fillMaxSize()) {
-            // Message List
             Box(
               modifier = Modifier
                 .weight(1f)
@@ -346,7 +336,6 @@ fun SubstrateApp(
                     .padding(vertical = 4.dp)
                 ) {
                   item {
-                    // Date pill indicator (e.g. "Today")
                     Box(
                       modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
                       contentAlignment = Alignment.Center
@@ -377,7 +366,6 @@ fun SubstrateApp(
               }
             }
 
-            // In-call Floating Card
             AnimatedVisibility(
               visible = activeVoiceRoom != null,
               enter = slideInVertically { it },
@@ -395,7 +383,6 @@ fun SubstrateApp(
               }
             }
 
-            // Pinned Bottom WhatsApp Input Bar
             ChatInputBar(
               channelName = activeChannel.name,
               onSendMessage = { content, coords ->
@@ -406,11 +393,9 @@ fun SubstrateApp(
         }
       }
     } else {
-      // SCREEN: Main WhatsApp Tabs View (Chats | Updates | Communities | Calls)
       Scaffold(
         topBar = {
           Column(modifier = Modifier.background(Color.White)) {
-            // WhatsApp Header: Bold Green "WhatsApp" title + menu (Screenshot 1)
             Row(
               modifier = Modifier
                 .fillMaxWidth()
@@ -467,7 +452,6 @@ fun SubstrateApp(
             }
 
             if (selectedTab == 0) {
-              // WhatsApp Pill Search Bar: "Ask Meta AI or Search"
               Surface(
                 shape = RoundedCornerShape(24.dp),
                 color = WhatsAppSearchBackground,
@@ -498,7 +482,6 @@ fun SubstrateApp(
                 }
               }
 
-              // WhatsApp Horizontal Filter Chips: All | Unread | Favourites | Groups | +
               val filterChips = listOf("All", "Unread", "Favourites", "Groups")
               LazyRow(
                 modifier = Modifier
@@ -526,11 +509,12 @@ fun SubstrateApp(
                   }
                 }
                 item {
-                  Surface(
-                    shape = CircleShape,
-                    color = WhatsAppChipUnselected,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE9EDEF)),
-                    modifier = Modifier.size(30.dp),
+                  Box(
+                    modifier = Modifier
+                      .size(30.dp)
+                      .clip(CircleShape)
+                      .background(WhatsAppChipUnselected)
+                      .border(1.dp, Color(0xFFE9EDEF), CircleShape),
                     contentAlignment = Alignment.Center
                   ) {
                     Icon(
@@ -546,7 +530,6 @@ fun SubstrateApp(
           }
         },
         bottomBar = {
-          // WhatsApp 4-Tab Bottom Navigation Bar (Chats | Updates | Communities | Calls)
           NavigationBar(
             containerColor = Color.White,
             tonalElevation = 8.dp
@@ -629,7 +612,6 @@ fun SubstrateApp(
           }
         },
         floatingActionButton = {
-          // WhatsApp Signature Green Squircle Floating Action Button
           FloatingActionButton(
             onClick = {
               if (selectedTab == 3) {
@@ -659,7 +641,6 @@ fun SubstrateApp(
             .background(Color.White)
         ) {
           when (selectedTab) {
-            // TAB 0: CHATS LIST (Screenshot 1)
             0 -> {
               val textChannels = channels.filter { it.type == ChannelType.TEXT }
               LazyColumn(
@@ -667,7 +648,6 @@ fun SubstrateApp(
                   .fillMaxSize()
                   .background(Color.White)
               ) {
-                // Self User Profile Snippet (like @siang.5680 (You))
                 item {
                   Row(
                     modifier = Modifier
@@ -731,9 +711,7 @@ fun SubstrateApp(
                   HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                 }
 
-                // Chat Channels list
                 items(textChannels) { channel ->
-                  val isCurrent = channel.id == activeChannel.id
                   Row(
                     modifier = Modifier
                       .fillMaxWidth()
@@ -744,7 +722,6 @@ fun SubstrateApp(
                       .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                   ) {
-                    // Circular Avatar with vibrant initials
                     Box(
                       modifier = Modifier
                         .size(52.dp)
@@ -812,7 +789,6 @@ fun SubstrateApp(
               }
             }
 
-            // TAB 1: UPDATES & STATUS (Screenshot 6)
             1 -> {
               LazyColumn(
                 modifier = Modifier
@@ -830,9 +806,7 @@ fun SubstrateApp(
                   )
                   Spacer(modifier = Modifier.height(12.dp))
 
-                  // Story Cards Row
                   Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    // "Add Status" Card
                     Card(
                       shape = RoundedCornerShape(16.dp),
                       colors = CardDefaults.cardColors(containerColor = Color(0xFFF7F8FA)),
@@ -872,7 +846,6 @@ fun SubstrateApp(
                       }
                     }
 
-                    // Minecraft Status Story Card
                     Card(
                       shape = RoundedCornerShape(16.dp),
                       colors = CardDefaults.cardColors(containerColor = WhatsAppNavSelectedPill),
@@ -905,7 +878,6 @@ fun SubstrateApp(
                   Spacer(modifier = Modifier.height(10.dp))
                 }
 
-                // Official Announcements Channel preview
                 item {
                   Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -939,14 +911,12 @@ fun SubstrateApp(
               }
             }
 
-            // TAB 2: COMMUNITIES / REALM DETAILS
             2 -> {
               Box(modifier = Modifier.fillMaxSize()) {
                 ServerInfoSheet(onDismiss = {})
               }
             }
 
-            // TAB 3: CALLS LIST (Screenshot 5)
             3 -> {
               val voiceChannels = channels.filter { it.type == ChannelType.VOICE }
               LazyColumn(
@@ -955,7 +925,6 @@ fun SubstrateApp(
                   .background(Color.White)
                   .padding(horizontal = 16.dp, vertical = 10.dp)
               ) {
-                // Top Circular Quick Actions: Call | Schedule | Keypad | Favourites
                 item {
                   Row(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -1013,7 +982,6 @@ fun SubstrateApp(
                   Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Voice Channels list with phone & video call buttons
                 items(voiceChannels) { channel ->
                   val isCurrent = activeVoiceRoom?.channelId == channel.id
                   Row(
@@ -1087,7 +1055,6 @@ fun SubstrateApp(
     }
   }
 
-  // Setup & Gamertag Registration Dialog
   if (showGamertagDialog || userState.needsGamertagSetup) {
     GamertagDialog(
       currentGamertag = userState.gamertag,
