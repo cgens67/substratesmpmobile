@@ -13,10 +13,12 @@ data class Channel(
   val description: String = "",
   val unreadCount: Int = 0,
   val activeUsersCount: Int = 0,
-  val allowedRolesToSend: List<String> = listOf("ALL")
+  val allowedRolesToSend: List<String> = listOf("ALL"),
+  val isDm: Boolean = false,
+  val dmRecipientGamertag: String? = null
 ) {
   val isRestrictedToAdmin: Boolean
-    get() = id == "announcements" || (allowedRolesToSend.contains("ADMIN") && !allowedRolesToSend.contains("ALL"))
+    get() = !isDm && (id == "announcements" || (allowedRolesToSend.contains("ADMIN") && !allowedRolesToSend.contains("ALL")))
 }
 
 val DefaultChannels = listOf(
