@@ -28,6 +28,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   val userState = authRepository.userState
   val messages = chatRepository.messagesFlow
+  val mutedChannels = chatRepository.mutedChannels
+  val blockedUsers = chatRepository.blockedUsers
+
   val activeVoiceRoom = voiceManager.voiceRoomState
   val agoraSettings = voiceManager.settings
 
@@ -46,7 +49,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _members = MutableStateFlow<List<AdminMember>>(emptyList())
   val members: StateFlow<List<AdminMember>> = _members.asStateFlow()
 
-  // Real-time live typers in current channel
   private val _typingUsers = MutableStateFlow<List<String>>(emptyList())
   val typingUsers: StateFlow<List<String>> = _typingUsers.asStateFlow()
   private var typingListener: ListenerRegistration? = null
@@ -85,6 +87,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
+  fun toggleMuteChannel(channelId: String): Boolean = chatRepository.toggleMuteChannel(channelId)
+  fun isChannelMuted(channelId: String): Boolean = chatRepository.isChannelMuted(channelId)
+
+  fun toggleBlockUser(gamertag: String): Boolean = chatRepository.toggleBlockUser(gamertag)
+  fun isUserBlocked(gamertag: String): Boolean = chatRepository.isUserBlocked(gamertag)
+
   private fun listenToTyping(channelId: String) {
     typingListener?.remove()
     typingListener = firestore.collection("channels")
@@ -108,11 +116,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     val channelId = _activeChannel.value.id
     if (myTag.isBlank() || channelId.isBlank()) return
 
-    val docRef = firestore.collection("channels")
-      .document(channelId)
-      .collection("typing")
-      .document(myTag)
-
+    val docRef = firestore.collection("channels").document(channelId).collection("typing").document(myTag)
     if (isTyping) {
       docRef.set(mapOf("gamertag" to myTag, "timestamp" to System.currentTimeMillis()))
     } else {
@@ -164,12 +168,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val isDm = doc.getBoolean("isDm") ?: false
               val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
 
-              // Filter out private DMs not addressed to me
               if (isDm && parts != null && myTag.isNotBlank() && !parts.contains(myTag)) {
                 return@mapNotNull null
               }
 
-              // In a DM, the channel name for me is the OTHER person's gamertag
               val rawName = doc.getString("name") ?: id
               val name = if (isDm && parts != null) {
                 parts.find { it != myTag } ?: rawName
@@ -202,18 +204,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               remote.find { it.id == _activeChannel.value.id }?.let {
                 _activeChannel.value = it
               }
-            }
-          } else {
-            DefaultChannels.forEach { ch ->
-              firestore.collection("channels").document(ch.id).set(
-                hashMapOf(
-                  "name" to ch.name,
-                  "type" to ch.type.name,
-                  "category" to ch.category,
-                  "description" to ch.description,
-                  "allowedRolesToSend" to ch.allowedRolesToSend
-                )
-              )
             }
           }
         }
@@ -274,7 +264,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       firestore.collection("users")
         .addSnapshotListener { snapshot, _ ->
           if (snapshot != null) {
-            // Deduplicate members by lowercase gamertag to solve duplicate Siang5680 records
             val rawList = snapshot.documents.mapNotNull { doc ->
               val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
               val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
@@ -325,8 +314,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("statuses").document(statusId).delete()
   }
 
+  // Calls recursive subcollection deletion
   fun deleteMessage(channelId: String, messageId: String) {
-    firestore.collection("channels").document(channelId).collection("messages").document(messageId).delete()
+    chatRepository.deleteMessage(channelId, messageId)
   }
 
   fun reactToStatus(statusId: String, emoji: String) {
@@ -384,32 +374,18 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     val member = _members.value.find { it.id == userId } ?: return
     val cleanTag = member.gamertag.lowercase().trim()
 
-    // 1. Update user document with merge
     firestore.collection("users").document(userId).set(
-      mapOf(
-        "role" to newRole,
-        "isAdmin" to isAdmin
-      ),
+      mapOf("role" to newRole, "isAdmin" to isAdmin),
       SetOptions.merge()
     )
-
-    // 2. Update gamertags index
     firestore.collection("gamertags").document(cleanTag).set(
-      mapOf(
-        "role" to newRole,
-        "isAdmin" to isAdmin
-      ),
+      mapOf("role" to newRole, "isAdmin" to isAdmin),
       SetOptions.merge()
     )
-
-    // 3. Update any duplicate documents under the same gamertag
     firestore.collection("users").whereEqualTo("gamertag", member.gamertag).get()
       .addOnSuccessListener { query ->
         for (doc in query.documents) {
-          doc.reference.set(
-            mapOf("role" to newRole, "isAdmin" to isAdmin),
-            SetOptions.merge()
-          )
+          doc.reference.set(mapOf("role" to newRole, "isAdmin" to isAdmin), SetOptions.merge())
         }
       }
   }
@@ -437,12 +413,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("users").document(userId).delete()
     if (member != null) {
       firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
-      // Remove any duplicate records
       firestore.collection("users").whereEqualTo("gamertag", member.gamertag).get()
         .addOnSuccessListener { query ->
-          for (doc in query.documents) {
-            doc.reference.delete()
-          }
+          for (doc in query.documents) doc.reference.delete()
         }
     }
   }
@@ -487,9 +460,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       _showGamertagDialog.value = true
       return
     }
-    if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) {
-      return
-    }
+    if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) return
     if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
 
     setTyping(false)
