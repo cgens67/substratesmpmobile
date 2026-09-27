@@ -98,7 +98,6 @@ fun ActiveVoiceBar(
         .fillMaxWidth()
         .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
-      // WhatsApp Call Header
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -128,7 +127,6 @@ fun ActiveVoiceBar(
           }
         }
 
-        // WhatsApp signature red call hangup button
         FilledIconButton(
           onClick = onDisconnect,
           modifier = Modifier
@@ -149,7 +147,6 @@ fun ActiveVoiceBar(
 
       Spacer(modifier = Modifier.height(12.dp))
 
-      // Real Gamertag Participant Avatars
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -162,7 +159,6 @@ fun ActiveVoiceBar(
 
       Spacer(modifier = Modifier.height(12.dp))
 
-      // Call Control Buttons (Mute, Speaker, Video, Deafen)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -325,7 +321,6 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
           }
         }
 
-        // Live Audio level bar
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(2.dp),
