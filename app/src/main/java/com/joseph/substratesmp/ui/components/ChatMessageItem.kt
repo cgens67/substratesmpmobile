@@ -4,6 +4,7 @@ import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.util.Base64
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -32,7 +33,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
@@ -80,7 +80,6 @@ import com.joseph.substratesmp.ui.theme.WhatsAppIncomingBubble
 import com.joseph.substratesmp.ui.theme.WhatsAppOutgoingBubble
 import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
@@ -119,12 +118,8 @@ fun ChatMessageItem(
         val raw = message.imageUrl.substringAfter("base64,")
         val bytes = Base64.decode(raw, Base64.NO_WRAP)
         BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-      } else {
-        null
-      }
-    } catch (_: Exception) {
-      null
-    }
+      } else null
+    } catch (_: Exception) { null }
   }
 
   val offsetX = remember { Animatable(0f) }
@@ -135,7 +130,6 @@ fun ChatMessageItem(
     RoundedCornerShape(topStart = 4.dp, topEnd = 14.dp, bottomEnd = 14.dp, bottomStart = 14.dp)
   }
 
-  // Smooth Dissolve Animation on Message Delete
   AnimatedVisibility(
     visible = isMessageVisible,
     exit = shrinkVertically(animationSpec = tween(250)) + fadeOut(animationSpec = tween(200))
@@ -144,6 +138,7 @@ fun ChatMessageItem(
       modifier = modifier
         .fillMaxWidth()
         .padding(horizontal = 10.dp, vertical = 2.dp)
+        .animateContentSize()
     ) {
       if (offsetX.value > 15f) {
         Box(
@@ -170,10 +165,8 @@ fun ChatMessageItem(
                 scope.launch { offsetX.snapTo(newOffset) }
               },
               onDragEnd = {
-                if (offsetX.value > 45f) {
-                  onReply(message)
-                }
-                scope.launch { offsetX.animateTo(0f, spring()) }
+                if (offsetX.value > 45f) onReply(message)
+                scope.launch { offsetX.animateTo(0f, spring(stiffness = 500f)) }
               },
               onDragCancel = {
                 scope.launch { offsetX.animateTo(0f, spring()) }
@@ -184,7 +177,6 @@ fun ChatMessageItem(
         verticalAlignment = Alignment.Top
       ) {
         if (message.isSticker && imageBitmap != null) {
-          // WhatsApp Sticker Display (No Bubble Card Background, pure floating sticker)
           Column(
             horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
             modifier = Modifier.combinedClickable(onClick = {}, onLongClick = { if (canDelete) showDeleteDialog = true })
@@ -207,7 +199,6 @@ fun ChatMessageItem(
             }
           }
         } else {
-          // Regular Chat Bubble Card
           Card(
             shape = bubbleShape,
             colors = CardDefaults.cardColors(
@@ -218,46 +209,29 @@ fun ChatMessageItem(
               .widthIn(min = 90.dp, max = 320.dp)
               .combinedClickable(
                 onClick = {},
-                onLongClick = {
-                  if (canDelete) {
-                    showDeleteDialog = true
-                  }
-                }
+                onLongClick = { if (canDelete) showDeleteDialog = true }
               )
           ) {
             Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
-              Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                if (!isLocal) {
-                  Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
-                    Text(
-                      text = message.senderName,
-                      style = MaterialTheme.typography.labelMedium,
-                      color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
-                      fontWeight = FontWeight.Bold,
-                      fontSize = 12.5.sp
-                    )
-                    if (isSenderAdmin) {
-                      Spacer(modifier = Modifier.width(4.dp))
-                      Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGoldContainer) {
-                        Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-                          Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(9.dp))
-                          Spacer(modifier = Modifier.width(2.dp))
-                          Text("ADMIN", color = RoleAdminGold, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
-                        }
+              // ONLY render the sender name header if it's an incoming message
+              if (!isLocal) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                  Text(
+                    text = message.senderName,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.5.sp
+                  )
+                  if (isSenderAdmin) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGoldContainer) {
+                      Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(9.dp))
+                        Spacer(modifier = Modifier.width(2.dp))
+                        Text("ADMIN", color = RoleAdminGold, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
                       }
                     }
-                  }
-                } else {
-                  Spacer(modifier = Modifier.width(1.dp))
-                }
-
-                if (canDelete) {
-                  IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(20.dp)) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete Message", tint = Color.Gray.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
                   }
                 }
               }
@@ -375,7 +349,7 @@ fun ChatMessageItem(
               }
 
               Row(
-                modifier = Modifier.align(Alignment.End).padding(top = 1.dp),
+                modifier = Modifier.align(Alignment.End).padding(top = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
               ) {
                 Text(message.formattedTime, style = MaterialTheme.typography.labelSmall, color = WhatsAppTextSecondary, fontSize = 10.sp)
@@ -395,14 +369,14 @@ fun ChatMessageItem(
     AlertDialog(
       onDismissRequest = { showDeleteDialog = false },
       title = { Text("Delete message?") },
-      text = { Text("Are you sure you want to remove this message for everyone in #${message.channelId}?") },
+      text = { Text("Are you sure you want to remove this message for everyone?") },
       confirmButton = {
         Button(
           onClick = {
             scope.launch {
               showDeleteDialog = false
               isMessageVisible = false
-              delay(250L) // Wait for smooth shrink/fade animation before deleting document
+              kotlinx.coroutines.delay(250L) 
               onDeleteMessage(message)
             }
           },
