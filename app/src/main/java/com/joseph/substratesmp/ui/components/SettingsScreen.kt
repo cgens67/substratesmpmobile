@@ -73,7 +73,8 @@ fun SettingsScreen(
   isDarkMode: Boolean,
   onUpdateSetting: (String, Any) -> Unit,
   onNavigateBack: () -> Unit,
-  onNavigateProfile: () -> Unit
+  onNavigateProfile: () -> Unit,
+  onNavigatePrivacy: () -> Unit
 ) {
   val animState = remember { MutableTransitionState(false) }.apply { targetState = true }
 
@@ -160,7 +161,11 @@ fun SettingsScreen(
                   icon = setting.icon, iconBgColor = setting.iconBgColor, title = setting.title, subtitle = setting.subtitle,
                   textColor = textColor, subTextColor = subTextColor,
                   onClick = {
-                    if (setting.id == "account") onNavigateProfile() else activeDialog = setting.id
+                    when (setting.id) {
+                      "account" -> onNavigateProfile()
+                      "privacy" -> onNavigatePrivacy()
+                      else -> activeDialog = setting.id
+                    }
                   }
                 )
               }
@@ -209,27 +214,6 @@ fun SettingsScreen(
           }
         },
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Cancel", color = subTextColor) } }
-      )
-    }
-    "privacy" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
-        title = { Text("Privacy Policy", fontWeight = FontWeight.Bold) },
-        text = { 
-          Column {
-            Text("Substrate SMP uses the following trusted services to provide seamless functionality securely:", fontSize = 14.sp, color = textColor)
-            Spacer(modifier = Modifier.height(12.dp))
-            Text("🔥 Firebase", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
-            Text("Powers real-time chat, authentication, and encrypted profile data syncing.", fontSize = 13.sp, color = subTextColor)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("🖼️ ImgBB", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
-            Text("Used as a secure cloud CDN to store and process image uploads anonymously.", fontSize = 13.sp, color = subTextColor)
-            Spacer(modifier = Modifier.height(8.dp))
-            Text("📞 Agora.io", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
-            Text("Our low-latency RTC engine for peer-to-peer real-time voice and video calls with secure encryption.", fontSize = 13.sp, color = subTextColor)
-          }
-        },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Close", color = WhatsAppGreenDark) } }
       )
     }
   }
