@@ -17,10 +17,14 @@ import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
 import com.joseph.substratesmp.ui.components.AdminMember
 import com.joseph.substratesmp.voice.AgoraVoiceManager
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONObject
 
 class SubstrateViewModel(application: Application) : AndroidViewModel(application) {
   val authRepository = AuthRepository(application)
@@ -56,6 +60,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private var typingListener: ListenerRegistration? = null
   private val channelMsgListeners = mutableMapOf<String, ListenerRegistration>()
 
+  // Map of messageId to translated text
+  private val _translatedMessages = MutableStateFlow<Map<String, String>>(emptyMap())
+  val translatedMessages: StateFlow<Map<String, String>> = _translatedMessages.asStateFlow()
+
   private val _showGamertagDialog = MutableStateFlow(false)
   val showGamertagDialog: StateFlow<Boolean> = _showGamertagDialog.asStateFlow()
 
@@ -87,6 +95,35 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncLiveStickers()
       syncMembers()
       listenToTyping(_activeChannel.value.id)
+    }
+  }
+
+  fun updateProfile(bio: String, birthday: String) {
+    viewModelScope.launch {
+      authRepository.updateProfileInfo(bio, birthday)
+    }
+  }
+
+  fun translateMessage(messageId: String, text: String, targetLangCode: String) {
+    viewModelScope.launch(Dispatchers.IO) {
+      try {
+        val encodedText = java.net.URLEncoder.encode(text, "UTF-8")
+        // Using MyMemory free translation API
+        val url = "https://api.mymemory.translated.net/get?q=$encodedText&langpair=Autodetect|$targetLangCode"
+        val request = Request.Builder().url(url).build()
+        val client = OkHttpClient()
+        val response = client.newCall(request).execute()
+        val body = response.body?.string()
+        if (body != null) {
+          val json = JSONObject(body)
+          val translatedText = json.getJSONObject("responseData").getString("translatedText")
+          val currentMap = _translatedMessages.value.toMutableMap()
+          currentMap[messageId] = translatedText
+          _translatedMessages.value = currentMap
+        }
+      } catch (e: Exception) {
+        // Fallback or error handling
+      }
     }
   }
 
