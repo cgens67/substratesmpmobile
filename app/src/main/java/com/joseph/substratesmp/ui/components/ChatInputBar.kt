@@ -1,6 +1,8 @@
 package com.joseph.substratesmp.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
@@ -41,7 +43,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -75,6 +76,53 @@ import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.io.File
 
+/**
+ * Downsamples high-resolution camera/gallery photos to a max dimension of 800px
+ * and compresses them to ~35KB–60KB JPEG, well below Firestore's 1MB limit.
+ */
+fun processAndCompressImage(uri: Uri, context: Context): String? {
+  return try {
+    val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeStream(inputStream, null, options)
+    inputStream.close()
+
+    var sampleSize = 1
+    val maxDim = 800
+    while (options.outWidth / sampleSize > maxDim || options.outHeight / sampleSize > maxDim) {
+      sampleSize *= 2
+    }
+
+    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+    val secondStream = context.contentResolver.openInputStream(uri) ?: return null
+    val bitmap = BitmapFactory.decodeStream(secondStream, null, decodeOptions)
+    secondStream.close()
+    if (bitmap == null) return null
+
+    val baos = ByteArrayOutputStream()
+    bitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos)
+    val bytes = baos.toByteArray()
+    "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+  } catch (_: Exception) {
+    null
+  }
+}
+
+fun compressBitmapDirect(bitmap: Bitmap): String {
+  val baos = ByteArrayOutputStream()
+  val maxDim = 800
+  val scaled = if (bitmap.width > maxDim || bitmap.height > maxDim) {
+    val ratio = bitmap.width.toFloat() / bitmap.height.toFloat()
+    val width = if (ratio > 1) maxDim else (maxDim * ratio).toInt()
+    val height = if (ratio > 1) (maxDim / ratio).toInt() else maxDim
+    Bitmap.createScaledBitmap(bitmap, width, height, true)
+  } else {
+    bitmap
+  }
+  scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
+  return "data:image/jpeg;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+}
+
 @Composable
 fun ChatInputBar(
   channelName: String,
@@ -93,35 +141,27 @@ fun ChatInputBar(
   var showCoordinateInput by remember { mutableStateOf(false) }
   var coordText by remember { mutableStateOf("") }
 
-  // Voice recording state
   var isRecording by remember { mutableStateOf(false) }
   var recordingSeconds by remember { mutableIntStateOf(0) }
   var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
   var recordedAudioFile by remember { mutableStateOf<File?>(null) }
 
-  // Gallery Picker
   val galleryLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.GetContent()
   ) { uri: Uri? ->
     if (uri != null) {
-      try {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-          val bytes = stream.readBytes()
-          val base64Img = "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-          onSendMessage("", null, base64Img, null, 0, replyingTo)
-        }
-      } catch (_: Exception) {}
+      val base64Img = processAndCompressImage(uri, context)
+      if (base64Img != null) {
+        onSendMessage("", null, base64Img, null, 0, replyingTo)
+      }
     }
   }
 
-  // Camera Capture
   val cameraLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.TakePicturePreview()
   ) { bitmap: Bitmap? ->
     if (bitmap != null) {
-      val baos = ByteArrayOutputStream()
-      bitmap.compress(Bitmap.CompressFormat.JPEG, 85, baos)
-      val base64Img = "data:image/jpeg;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+      val base64Img = compressBitmapDirect(bitmap)
       onSendMessage("", null, base64Img, null, 0, replyingTo)
     }
   }
@@ -141,7 +181,6 @@ fun ChatInputBar(
     color = Color.Transparent
   ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
-      // Quoted Reply Banner
       if (replyingTo != null) {
         Surface(
           shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
@@ -156,7 +195,12 @@ fun ChatInputBar(
             Spacer(modifier = Modifier.width(8.dp))
             Column(modifier = Modifier.weight(1f)) {
               Text("Replying to ${replyingTo.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
-              Text(replyingTo.content.ifBlank { if (replyingTo.imageUrl != null) "📷 Photo" else "🎤 Voice note" }, color = WhatsAppTextSecondary, fontSize = 11.5.sp, maxLines = 1)
+              Text(
+                replyingTo.content.ifBlank { if (replyingTo.imageUrl != null) "📷 Photo" else "🎤 Voice note" },
+                color = WhatsAppTextSecondary,
+                fontSize = 11.5.sp,
+                maxLines = 1
+              )
             }
             IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
               Icon(Icons.Default.Close, contentDescription = "Cancel", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
@@ -165,7 +209,6 @@ fun ChatInputBar(
         }
       }
 
-      // Coordinates input bar
       AnimatedVisibility(visible = showCoordinateInput, enter = fadeIn(), exit = fadeOut()) {
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
           Icon(Icons.Default.Place, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(18.dp))
@@ -185,7 +228,6 @@ fun ChatInputBar(
         }
       }
 
-      // Attachment Tray (Gallery, Camera, Coordinates)
       AnimatedVisibility(visible = showAttachmentMenu) {
         Surface(
           shape = RoundedCornerShape(16.dp),
@@ -236,7 +278,6 @@ fun ChatInputBar(
         }
       }
 
-      // WhatsApp Chat Input Capsule & FAB
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(
           modifier = Modifier.weight(1f),
@@ -245,7 +286,6 @@ fun ChatInputBar(
           shadowElevation = 1.dp
         ) {
           if (isRecording) {
-            // Live voice note recording UI
             Row(
               modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
               verticalAlignment = Alignment.CenterVertically,
@@ -254,7 +294,7 @@ fun ChatInputBar(
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(StatusCallEndRed))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
+                Text("HD Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
               }
               Text(
                 "Cancel",
@@ -331,7 +371,6 @@ fun ChatInputBar(
         FloatingActionButton(
           onClick = {
             if (isRecording) {
-              // Finish recording and send voice message
               try {
                 recorder?.stop()
                 recorder?.release()
@@ -351,7 +390,7 @@ fun ChatInputBar(
               coordText = ""
               showCoordinateInput = false
             } else {
-              // Start voice recording
+              // High-Definition Studio Voice Recording (48kHz sample rate, 128kbps AAC bitrate)
               try {
                 val tempAudio = File(context.cacheDir, "rec_${System.currentTimeMillis()}.m4a")
                 recordedAudioFile = tempAudio
@@ -364,6 +403,8 @@ fun ChatInputBar(
                   setAudioSource(MediaRecorder.AudioSource.MIC)
                   setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                   setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                  setAudioSamplingRate(48000)
+                  setAudioEncodingBitRate(128000)
                   setOutputFile(tempAudio.absolutePath)
                   prepare()
                   start()
