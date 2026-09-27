@@ -13,13 +13,17 @@ val WhatsAppSearchBackground = Color(0xFFF0F2F5)
 val WhatsAppChatBackground = Color(0xFFEFEAE2) // WhatsApp cream chat wallpaper
 val WhatsAppOutgoingBubble = Color(0xFFD9FDD3) // WhatsApp light green outgoing bubble
 val WhatsAppIncomingBubble = Color(0xFFFFFFFF) // WhatsApp white incoming bubble
+val WhatsAppChatOutgoing = Color(0xFF005C4B) // WhatsApp dark green / call control tint
+val WhatsAppChatIncoming = Color(0xFF1F2C34)
+val WhatsAppSurfaceHigh = Color(0xFF233138)
 val WhatsAppNavSelectedPill = Color(0xFFD8FDD2)
+val WhatsAppChipUnselected = Color(0xFFFFFFFF)
 val WhatsAppTextPrimary = Color(0xFF111B21)
 val WhatsAppTextSecondary = Color(0xFF667781)
 val WhatsAppCheckmarkBlue = Color(0xFF53BDEB)
 val WhatsAppCallRed = Color(0xFFEA0038)
+val StatusCallEndRed = Color(0xFFEA0038)
 val WhatsAppDivider = Color(0xFFE9EDEF)
-val WhatsAppChipUnselected = Color(0xFFFFFFFF)
 
 // Minecraft Bedrock & Admin Role Tokens
 val RoleAdminGold = Color(0xFFD48806)
@@ -28,13 +32,15 @@ val RoleMemberGreen = Color(0xFF008069)
 val RoleModCyan = Color(0xFF00A884)
 val RoleBotViolet = Color(0xFF7C4DFF)
 val StatusOnline = Color(0xFF25D366)
+val StatusOnlineGreen = Color(0xFF25D366)
 val StatusIdle = Color(0xFFFBBF24)
 val StatusDnd = Color(0xFFEF4444)
 val StatusVoiceActive = Color(0xFF00A884)
+val StatusCallActive = Color(0xFF00A884)
 val StatusMuted = Color(0xFFEA0038)
 val BedrockGlass = Color(0x331B2333)
 
-// Dark fallback & legacy references
+// Legacy / Dark Scheme Compatibility Tokens
 val CyanPrimary = Color(0xFF00E5FF)
 val CyanOnPrimary = Color(0xFF00363D)
 val CyanPrimaryContainer = Color(0xFF004D56)
