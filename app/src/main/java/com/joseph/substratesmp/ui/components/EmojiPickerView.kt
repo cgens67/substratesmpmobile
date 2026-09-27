@@ -1,8 +1,6 @@
 package com.joseph.substratesmp.ui.components
 
-import android.graphics.BitmapFactory
 import android.util.Base64
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -41,11 +39,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
+import android.os.Build
 import com.joseph.substratesmp.data.model.ServerSticker
 import com.joseph.substratesmp.ui.theme.WhatsAppDivider
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
@@ -77,8 +80,15 @@ fun EmojiPickerView(
   onBackspace: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  val context = LocalContext.current
   var selectedCategory by remember { mutableIntStateOf(0) }
   var stickerToDelete by remember { mutableStateOf<ServerSticker?>(null) }
+
+  val imageLoader = remember {
+    ImageLoader.Builder(context).components {
+      if (Build.VERSION.SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
+    }.build()
+  }
 
   val categories = listOf(
     "Trending" to listOf(
@@ -111,53 +121,30 @@ fun EmojiPickerView(
   )
 
   Surface(
-    modifier = modifier
-      .fillMaxWidth()
-      .height(260.dp),
+    modifier = modifier.fillMaxWidth().height(260.dp),
     color = Color(0xFFF7F8FA)
   ) {
     Column(modifier = Modifier.fillMaxWidth()) {
       HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp)
 
       Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .background(Color.White)
-          .padding(horizontal = 8.dp, vertical = 2.dp),
+        modifier = Modifier.fillMaxWidth().background(Color.White).padding(horizontal = 8.dp, vertical = 2.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
           categories.forEachIndexed { index, _ ->
-            val icon = when (index) {
-              0 -> "🇲🇾"
-              1 -> "😀"
-              2 -> "🙏"
-              3 -> "🥀"
-              else -> "⛏️"
-            }
+            val icon = when (index) { 0 -> "🇲🇾"; 1 -> "😀"; 2 -> "🙏"; 3 -> "🥀"; else -> "⛏️" }
             Box(
-              modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .background(if (selectedCategory == index) WhatsAppNavSelectedPill else Color.Transparent)
-                .clickable { selectedCategory = index }
-                .padding(horizontal = 8.dp, vertical = 5.dp),
+              modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selectedCategory == index) WhatsAppNavSelectedPill else Color.Transparent).clickable { selectedCategory = index }.padding(horizontal = 8.dp, vertical = 5.dp),
               contentAlignment = Alignment.Center
-            ) {
-              Text(text = icon, fontSize = 17.sp)
-            }
+            ) { Text(text = icon, fontSize = 17.sp) }
           }
 
           Box(
-            modifier = Modifier
-              .clip(RoundedCornerShape(8.dp))
-              .background(if (selectedCategory == 99) WhatsAppNavSelectedPill else Color.Transparent)
-              .clickable { selectedCategory = 99 }
-              .padding(horizontal = 8.dp, vertical = 5.dp),
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (selectedCategory == 99) WhatsAppNavSelectedPill else Color.Transparent).clickable { selectedCategory = 99 }.padding(horizontal = 8.dp, vertical = 5.dp),
             contentAlignment = Alignment.Center
-          ) {
-            Text(text = "💟", fontSize = 17.sp)
-          }
+          ) { Text(text = "💟", fontSize = 17.sp) }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -166,15 +153,9 @@ fun EmojiPickerView(
               Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add Sticker", tint = WhatsAppGreenDark, modifier = Modifier.size(20.dp))
             }
           }
-
           if (selectedCategory != 99) {
             IconButton(onClick = onBackspace, modifier = Modifier.size(36.dp)) {
-              Icon(
-                imageVector = Icons.AutoMirrored.Filled.Backspace,
-                contentDescription = "Backspace",
-                tint = WhatsAppTextSecondary,
-                modifier = Modifier.size(20.dp)
-              )
+              Icon(Icons.AutoMirrored.Filled.Backspace, contentDescription = "Backspace", tint = WhatsAppTextSecondary, modifier = Modifier.size(20.dp))
             }
           }
         }
@@ -200,17 +181,11 @@ fun EmojiPickerView(
             verticalArrangement = Arrangement.spacedBy(8.dp)
           ) {
             items(stickers) { sticker ->
-              val stickerBitmap = remember(sticker.imageData) {
-                try {
-                  val raw = sticker.imageData.substringAfter("base64,")
-                  val bytes = Base64.decode(raw, Base64.NO_WRAP)
-                  BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                } catch (_: Exception) {
-                  null
-                }
+              val imageBytes = remember(sticker.imageData) {
+                try { Base64.decode(sticker.imageData.substringAfter("base64,"), Base64.NO_WRAP) } catch (_: Exception) { null }
               }
 
-              if (stickerBitmap != null) {
+              if (imageBytes != null) {
                 Box(
                   modifier = Modifier
                     .size(76.dp)
@@ -222,8 +197,9 @@ fun EmojiPickerView(
                     .padding(4.dp),
                   contentAlignment = Alignment.Center
                 ) {
-                  Image(
-                    bitmap = stickerBitmap,
+                  AsyncImage(
+                    model = imageBytes,
+                    imageLoader = imageLoader,
                     contentDescription = sticker.name,
                     modifier = Modifier.size(68.dp),
                     contentScale = ContentScale.Fit
@@ -237,19 +213,10 @@ fun EmojiPickerView(
         val currentEmojis = categories[selectedCategory].second
         LazyVerticalGrid(
           columns = GridCells.Fixed(7),
-          modifier = Modifier
-            .fillMaxWidth()
-            .weight(1f)
-            .padding(horizontal = 6.dp, vertical = 4.dp)
+          modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 6.dp, vertical = 4.dp)
         ) {
           items(currentEmojis) { emoji ->
-            Box(
-              modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .clickable { onEmojiSelected(emoji) },
-              contentAlignment = Alignment.Center
-            ) {
+            Box(modifier = Modifier.size(44.dp).clip(CircleShape).clickable { onEmojiSelected(emoji) }, contentAlignment = Alignment.Center) {
               Text(text = emoji, fontSize = 23.sp)
             }
           }
@@ -265,14 +232,9 @@ fun EmojiPickerView(
       text = { Text("Remove this sticker from the server? This cannot be undone.") },
       confirmButton = {
         Button(
-          onClick = {
-            onDeleteSticker(stickerToDelete!!.id)
-            stickerToDelete = null
-          },
+          onClick = { onDeleteSticker(stickerToDelete!!.id); stickerToDelete = null },
           colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA0038))
-        ) {
-          Text("Delete")
-        }
+        ) { Text("Delete") }
       },
       dismissButton = {
         TextButton(onClick = { stickerToDelete = null }) { Text("Cancel") }
