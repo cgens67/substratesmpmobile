@@ -109,6 +109,7 @@ import com.joseph.substratesmp.ui.components.StatusCreatorDialog
 import com.joseph.substratesmp.ui.components.StatusViewerScreen
 import com.joseph.substratesmp.ui.components.VideoCallScreen
 import com.joseph.substratesmp.ui.components.dropLastGrapheme
+import com.joseph.substratesmp.ui.components.processAndCompressImage
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
 import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
@@ -137,6 +138,7 @@ fun SubstrateApp(
   val userState by viewModel.userState.collectAsStateWithLifecycle()
   val messages by viewModel.messages.collectAsStateWithLifecycle()
   val statuses by viewModel.statuses.collectAsStateWithLifecycle()
+  val stickers by viewModel.stickers.collectAsStateWithLifecycle()
   val members by viewModel.members.collectAsStateWithLifecycle()
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
@@ -159,6 +161,18 @@ fun SubstrateApp(
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
+
+  // Admin Sticker Picker Launcher
+  val stickerPickerLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.GetContent()
+  ) { uri ->
+    if (uri != null) {
+      val base64 = processAndCompressImage(uri, context)
+      if (base64 != null) {
+        viewModel.addServerSticker("ServerSticker_${System.currentTimeMillis() % 1000}", base64)
+      }
+    }
+  }
 
   BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen") {
     if (showEmojiPicker) {
@@ -372,13 +386,14 @@ fun SubstrateApp(
                     channelName = activeChannel.name,
                     text = chatInputText,
                     onTextChanged = { chatInputText = it },
-                    onSendMessage = { content, coords, img, aud, dur, reply ->
+                    onSendMessage = { content, coords, img, aud, dur, isSticker, reply ->
                       viewModel.sendMessage(
                         content = content,
                         coordinates = coords,
                         imageUrl = img,
                         audioUrl = aud,
                         audioDurationSeconds = dur,
+                        isSticker = isSticker,
                         replyTo = reply
                       )
                       chatInputText = ""
@@ -402,9 +417,16 @@ fun SubstrateApp(
                     exit = shrinkVertically(animationSpec = tween(220)) + fadeOut()
                   ) {
                     EmojiPickerView(
+                      stickers = stickers,
+                      isAdmin = userState.isAdmin,
+                      onOpenCreateSticker = { stickerPickerLauncher.launch("image/*") },
                       onEmojiSelected = { emoji -> chatInputText += emoji },
+                      onStickerSelected = { st ->
+                        viewModel.sendMessage("", null, st.imageData, null, 0, true, replyingToMessage)
+                        replyingToMessage = null
+                        showEmojiPicker = false
+                      },
                       onBackspace = {
-                        // Deletes complete composite Unicode graphemes (e.g. 🏳️‍🌈 or 💅🏿) without leaving 🏳️‍?
                         chatInputText = dropLastGrapheme(chatInputText)
                       }
                     )
