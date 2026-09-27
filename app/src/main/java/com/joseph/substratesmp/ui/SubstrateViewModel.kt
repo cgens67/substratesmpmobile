@@ -206,12 +206,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             }
 
             if (remote.isNotEmpty()) {
-              // Sort channels dynamically so the newest message is always on top
               _channels.value = remote.sortedByDescending { it.lastMessageTimestamp }
               remote.find { it.id == _activeChannel.value.id }?.let {
                 _activeChannel.value = it
               }
-              // Observe latest messages for every text channel
               remote.forEach { ch ->
                 if (ch.type == ChannelType.TEXT && !channelMsgListeners.containsKey(ch.id)) {
                   attachChannelLatestMsgListener(ch.id)
@@ -223,7 +221,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     } catch (_: Exception) {}
   }
 
-  // Continuously observes the latest message in each channel to show in the chat list
   private fun attachChannelLatestMsgListener(channelId: String) {
     val listener = firestore.collection("channels").document(channelId).collection("messages")
       .orderBy("timestamp", Query.Direction.DESCENDING)
@@ -240,6 +237,13 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val coords = latest.getString("coordinates")
         val ts = latest.getLong("timestamp") ?: 0L
         val sender = latest.getString("senderName") ?: ""
+        val readByList = (latest.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+        val isRead = if (channelId.startsWith("dm_")) {
+          readByList.isNotEmpty()
+        } else {
+          readByList.any { !it.equals(sender, ignoreCase = true) }
+        }
 
         val preview = when {
           sticker -> "💟 Sticker"
@@ -252,7 +256,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
         _channels.value = _channels.value.map { ch ->
           if (ch.id == channelId) {
-            ch.copy(lastMessage = preview, lastMessageTimestamp = ts, lastMessageSender = sender)
+            ch.copy(
+              lastMessage = preview,
+              lastMessageTimestamp = ts,
+              lastMessageSender = sender,
+              lastMessageIsRead = isRead
+            )
           } else ch
         }.sortedByDescending { it.lastMessageTimestamp }
       }
@@ -532,7 +541,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       replyToContent = replyTo?.content
     )
 
-    // Update parent channel document with latest message snippet and time
     val preview = when {
       isSticker -> "💟 Sticker"
       imageUrl != null -> "📷 Photo"
