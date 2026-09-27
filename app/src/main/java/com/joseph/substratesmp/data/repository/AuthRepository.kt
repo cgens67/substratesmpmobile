@@ -7,6 +7,8 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,6 +30,8 @@ class AuthRepository(private val context: Context) {
   private val prefs: SharedPreferences =
     context.getSharedPreferences("substrate_auth_prefs", Context.MODE_PRIVATE)
 
+  private var userDocListener: ListenerRegistration? = null
+
   private val firestore: FirebaseFirestore by lazy {
     if (FirebaseApp.getApps(context).isEmpty()) {
       FirebaseApp.initializeApp(context)
@@ -46,7 +50,7 @@ class AuthRepository(private val context: Context) {
     AuthUserState(
       gamertag = prefs.getString("gamertag", "") ?: "",
       isAdmin = prefs.getBoolean("isAdmin", false),
-      role = if (prefs.getBoolean("isAdmin", false)) "ADMIN" else "MEMBER"
+      role = prefs.getString("role", "MEMBER") ?: "MEMBER"
     )
   )
   val userState: StateFlow<AuthUserState> = _userState.asStateFlow()
@@ -56,10 +60,34 @@ class AuthRepository(private val context: Context) {
     return bytes.joinToString("") { "%02x".format(it) }
   }
 
+  private fun startLiveUserListener(uid: String) {
+    userDocListener?.remove()
+    userDocListener = firestore.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
+      if (snapshot != null && snapshot.exists()) {
+        val liveRole = snapshot.getString("role") ?: "MEMBER"
+        val liveAdmin = snapshot.getBoolean("isAdmin") ?: (liveRole == "ADMIN")
+        val liveTag = snapshot.getString("gamertag") ?: _userState.value.gamertag
+
+        prefs.edit()
+          .putString("role", liveRole)
+          .putBoolean("isAdmin", liveAdmin)
+          .putString("gamertag", liveTag)
+          .apply()
+
+        _userState.value = _userState.value.copy(
+          gamertag = liveTag,
+          role = liveRole,
+          isAdmin = liveAdmin
+        )
+      }
+    }
+  }
+
   suspend fun initializeAuth() {
     var isReady = false
     var currentUid = ""
     var savedGamertag = prefs.getString("gamertag", "") ?: ""
+    var savedRole = prefs.getString("role", "MEMBER") ?: "MEMBER"
     var isAdmin = false
 
     try {
@@ -69,9 +97,11 @@ class AuthRepository(private val context: Context) {
         val userDoc = firestore.collection("users").document(currentUid).get().await()
         if (userDoc.exists()) {
           savedGamertag = userDoc.getString("gamertag") ?: savedGamertag
+          savedRole = userDoc.getString("role") ?: savedRole
         }
-        isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true)
+        isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
+        startLiveUserListener(currentUid)
       }
     } catch (e: Exception) {
       Log.w(TAG, "Auth init check: ${e.message}")
@@ -81,7 +111,7 @@ class AuthRepository(private val context: Context) {
     _userState.value = AuthUserState(
       uid = currentUid,
       gamertag = savedGamertag,
-      role = if (isAdmin) "ADMIN" else "MEMBER",
+      role = savedRole,
       isAdmin = isAdmin,
       isFirebaseReady = isReady,
       isInitialized = true,
@@ -108,6 +138,7 @@ class AuthRepository(private val context: Context) {
       val uid = authRes.user?.uid ?: "user_${System.currentTimeMillis()}"
 
       val isAdmin = cleanTag.equals("Siang5680", ignoreCase = true)
+      val initialRole = if (isAdmin) "ADMIN" else "MEMBER"
       val passHash = hashPassword(pass)
 
       firestore.collection("gamertags").document(tagLower).set(
@@ -116,6 +147,7 @@ class AuthRepository(private val context: Context) {
           "gamertag" to cleanTag,
           "passwordHash" to passHash,
           "isAdmin" to isAdmin,
+          "role" to initialRole,
           "createdAt" to System.currentTimeMillis()
         )
       ).await()
@@ -124,7 +156,7 @@ class AuthRepository(private val context: Context) {
         hashMapOf(
           "gamertag" to cleanTag,
           "isAdmin" to isAdmin,
-          "role" to if (isAdmin) "ADMIN" else "MEMBER",
+          "role" to initialRole,
           "createdAt" to System.currentTimeMillis()
         )
       ).await()
@@ -135,19 +167,21 @@ class AuthRepository(private val context: Context) {
 
       prefs.edit()
         .putString("gamertag", cleanTag)
+        .putString("role", initialRole)
         .putBoolean("isAdmin", isAdmin)
         .apply()
 
       _userState.value = AuthUserState(
         uid = uid,
         gamertag = cleanTag,
-        role = if (isAdmin) "ADMIN" else "MEMBER",
+        role = initialRole,
         isAdmin = isAdmin,
         isFirebaseReady = true,
         isInitialized = true,
         needsGamertagSetup = false
       )
 
+      startLiveUserListener(uid)
       Result.success(cleanTag)
     } catch (e: Exception) {
       Result.failure(e)
@@ -184,23 +218,27 @@ class AuthRepository(private val context: Context) {
       }
 
       val uid = auth.currentUser?.uid ?: tagDoc.getString("uid") ?: "user_recovered"
-      val isAdmin = actualTag.equals("Siang5680", ignoreCase = true)
+      val userDoc = firestore.collection("users").document(uid).get().await()
+      val actualRole = userDoc.getString("role") ?: tagDoc.getString("role") ?: "MEMBER"
+      val isAdmin = actualTag.equals("Siang5680", ignoreCase = true) || actualRole == "ADMIN"
 
       prefs.edit()
         .putString("gamertag", actualTag)
+        .putString("role", actualRole)
         .putBoolean("isAdmin", isAdmin)
         .apply()
 
       _userState.value = AuthUserState(
         uid = uid,
         gamertag = actualTag,
-        role = if (isAdmin) "ADMIN" else "MEMBER",
+        role = actualRole,
         isAdmin = isAdmin,
         isFirebaseReady = true,
         isInitialized = true,
         needsGamertagSetup = false
       )
 
+      startLiveUserListener(uid)
       Result.success(actualTag)
     } catch (e: Exception) {
       Result.failure(e)
@@ -208,6 +246,7 @@ class AuthRepository(private val context: Context) {
   }
 
   fun logout() {
+    userDocListener?.remove()
     try {
       auth.signOut()
     } catch (_: Exception) {}
