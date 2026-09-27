@@ -24,6 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -176,6 +177,11 @@ fun SubstrateApp(
   var isStatusViewerVisible by remember { mutableStateOf(false) }
   
   var viewedUser by remember { mutableStateOf<String?>(null) }
+
+  // Sync current screen to ViewModel to handle notification suppression in active view
+  LaunchedEffect(currentScreen) {
+    viewModel.setCurrentScreen(currentScreen)
+  }
 
   val isDarkMode = appSettings.isNightMode
   val bgColor = if (isDarkMode) Color(0xFF121212) else Color.White
@@ -365,16 +371,30 @@ fun SubstrateApp(
         "user_profile_screen" -> {
           val targetGamertag = viewedUser ?: "Unknown"
           val targetMember = members.find { it.gamertag.equals(targetGamertag, ignoreCase = true) }
+          val myTag = userState.gamertag.trim()
+          val dmId = "dm_" + listOf(myTag.lowercase(), targetGamertag.lowercase()).sorted().joinToString("_")
+          val isMuted = viewModel.isChannelMuted(dmId)
+          val isFav = viewModel.isFavourite(dmId)
+          val isBlocked = viewModel.isUserBlocked(targetGamertag)
+
           UserProfileScreen(
             gamertag = targetGamertag,
             role = targetMember?.role ?: "MEMBER",
             isAdmin = targetMember?.isAdmin ?: false,
+            bio = targetMember?.bio ?: "",
+            birthday = targetMember?.birthday ?: "",
+            isMuted = isMuted,
+            isFavourite = isFav,
+            isBlocked = isBlocked,
             isDarkMode = isDarkMode,
             onNavigateBack = { currentScreen = "chat_screen" },
             onMessageUser = {
                viewModel.startPrivateChat(targetGamertag)
                currentScreen = "chat_screen"
-            }
+            },
+            onToggleMute = { viewModel.toggleMuteChannel(dmId) },
+            onToggleFavourite = { viewModel.toggleFavourite(dmId) },
+            onToggleBlock = { viewModel.toggleBlockUser(targetGamertag) }
           )
         }
         
@@ -787,7 +807,7 @@ fun SubstrateApp(
                     Surface(
                       shape = RoundedCornerShape(18.dp),
                       color = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill) else surfaceColor,
-                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray.copy(alpha = 0.3f) else Color(0xFFE9EDEF)),
+                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray else Color(0xFFE9EDEF)),
                       modifier = Modifier.clickable { activeFilterChip = chip }
                     ) {
                       Text(chip, color = if (isSelected) (if (isDarkMode) Color.White else WhatsAppGreenDark) else subTextColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
