@@ -109,7 +109,7 @@ fun formatDuration(ms: Int): String {
 @Composable
 fun ChatMessageItem(
   message: ChatMessage,
-  isReadByAll: Boolean = false,
+  isRead: Boolean = false,
   canDelete: Boolean = false,
   onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
@@ -309,7 +309,12 @@ fun ChatMessageItem(
               Text(message.formattedTime, fontSize = 9.5.sp, color = WhatsAppTextSecondary)
               if (isLocal) {
                 Spacer(modifier = Modifier.width(3.dp))
-                Icon(Icons.Default.DoneAll, contentDescription = "Sent", tint = if (isReadByAll) WhatsAppCheckmarkBlue else Color.Gray, modifier = Modifier.size(12.dp))
+                Icon(
+                  Icons.Default.DoneAll,
+                  contentDescription = if (isRead) "Read" else "Delivered",
+                  tint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                  modifier = Modifier.size(13.dp)
+                )
               }
             }
           }
@@ -442,10 +447,7 @@ fun ChatMessageItem(
                 }
               }
 
-              // AUDIO & VOICE NOTE PLAYER
               if (!message.audioUrl.isNullOrBlank()) {
-                // FIXED: True voice notes recorded via mic have NO filename.
-                // Attached audio files ALWAYS have a filename (e.g. billiejean.mp3).
                 val isVoiceNote = message.fileName.isNullOrBlank()
                 val audioTitle = if (isVoiceNote) {
                   "Voice message (HD)"
@@ -494,7 +496,6 @@ fun ChatMessageItem(
                     Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                      // Row 1: Title (Truncates cleanly with ellipsis, never wraps)
                       Text(
                         text = audioTitle,
                         fontWeight = FontWeight.SemiBold,
@@ -507,7 +508,6 @@ fun ChatMessageItem(
 
                       Spacer(modifier = Modifier.height(3.dp))
 
-                      // Row 2: Seekbar
                       BoxWithConstraints(
                         modifier = Modifier
                           .fillMaxWidth()
@@ -593,7 +593,6 @@ fun ChatMessageItem(
                         )
                       }
 
-                      // Row 3: Timestamps (mm:ss)
                       Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -646,7 +645,12 @@ fun ChatMessageItem(
                 Text(message.formattedTime, style = MaterialTheme.typography.labelSmall, color = WhatsAppTextSecondary, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
-                  Icon(Icons.Default.DoneAll, contentDescription = "Sent", tint = if (isReadByAll) WhatsAppCheckmarkBlue else Color.Gray, modifier = Modifier.size(14.dp))
+                  Icon(
+                    imageVector = Icons.Default.DoneAll,
+                    contentDescription = if (isRead) "Read" else "Delivered",
+                    tint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                    modifier = Modifier.size(15.dp)
+                  )
                 }
               }
             }
