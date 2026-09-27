@@ -220,6 +220,14 @@ class AgoraVoiceManager(private val context: Context? = null) {
     }
   }
 
+  fun switchCamera() {
+    try {
+      rtcEngine?.switchCamera()
+    } catch (e: Throwable) {
+      Log.e(TAG, "switchCamera error: ${e.message}")
+    }
+  }
+
   fun joinVoiceChannel(channelId: String, channelName: String, localGamertag: String, isVideo: Boolean = false) {
     currentGamertag = localGamertag
     currentChannelId = channelId
