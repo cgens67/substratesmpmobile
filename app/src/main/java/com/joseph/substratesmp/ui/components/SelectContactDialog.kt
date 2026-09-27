@@ -27,7 +27,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,6 +43,7 @@ import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
 import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,9 +54,12 @@ fun SelectContactDialog(
   onSelectMember: (AdminMember) -> Unit
 ) {
   val availableMembers = members.filter { !it.gamertag.equals(currentGamertag, ignoreCase = true) }
+  val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+  val scope = rememberCoroutineScope()
 
   ModalBottomSheet(
     onDismissRequest = onDismiss,
+    sheetState = sheetState,
     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     containerColor = Color.White
   ) {
@@ -70,7 +76,7 @@ fun SelectContactDialog(
           Text("Select Contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = WhatsAppTextPrimary)
           Text("${availableMembers.size} Bedrock players", style = MaterialTheme.typography.bodySmall, color = WhatsAppTextSecondary)
         }
-        IconButton(onClick = onDismiss) {
+        IconButton(onClick = { scope.launch { sheetState.hide(); onDismiss() } }) {
           Icon(Icons.Default.Close, contentDescription = "Close", tint = WhatsAppTextSecondary)
         }
       }
@@ -94,8 +100,11 @@ fun SelectContactDialog(
               modifier = Modifier
                 .fillMaxWidth()
                 .clickable {
-                  onSelectMember(member)
-                  onDismiss()
+                  scope.launch {
+                    sheetState.hide()
+                    onSelectMember(member)
+                    onDismiss()
+                  }
                 }
                 .padding(vertical = 10.dp),
               verticalAlignment = Alignment.CenterVertically
