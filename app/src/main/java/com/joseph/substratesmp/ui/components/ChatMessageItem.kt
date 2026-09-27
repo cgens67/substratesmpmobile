@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -35,23 +36,30 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -110,6 +118,8 @@ fun ChatMessageItem(
 
   var isPlayingAudio by remember { mutableStateOf(false) }
   var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+  var currentAudioPos by remember { mutableIntStateOf(0) }
+  var totalAudioDur by remember { mutableIntStateOf(if (message.audioDurationSeconds > 0) message.audioDurationSeconds * 1000 else 0) }
 
   DisposableEffect(Unit) {
     onDispose {
@@ -118,20 +128,23 @@ fun ChatMessageItem(
     }
   }
 
-  // Coil ImageLoader with GIF and animated WebP support
+  LaunchedEffect(isPlayingAudio) {
+    while (isPlayingAudio) {
+      mediaPlayer?.let {
+        currentAudioPos = it.currentPosition
+        if (it.duration > 0) totalAudioDur = it.duration
+      }
+      delay(50L)
+    }
+  }
+
   val imageLoader = remember {
     ImageLoader.Builder(context)
       .components {
-        if (Build.VERSION.SDK_INT >= 28) {
-          add(ImageDecoderDecoder.Factory())
-        } else {
-          add(GifDecoder.Factory())
-        }
-      }
-      .build()
+        if (Build.VERSION.SDK_INT >= 28) add(ImageDecoderDecoder.Factory()) else add(GifDecoder.Factory())
+      }.build()
   }
 
-  // Parse direct Base64 ByteArray so Coil can animate it natively
   val imageBytes = remember(message.imageUrl) {
     try {
       if (!message.imageUrl.isNullOrBlank() && message.imageUrl.startsWith("data:")) {
@@ -140,7 +153,6 @@ fun ChatMessageItem(
     } catch (_: Exception) { null }
   }
 
-  // Detect GIF/WebP URL in text content
   val gifUrl = remember(message.content) {
     val regex = "(?i)https?://\\S+\\.(gif|webp)\\b".toRegex()
     regex.find(message.content)?.value
@@ -201,7 +213,6 @@ fun ChatMessageItem(
         verticalAlignment = Alignment.Top
       ) {
         if (message.isSticker && (imageBytes != null || !message.imageUrl.isNullOrBlank())) {
-          // STICKER BUBBLE (Transparent, No Background)
           Column(
             horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
             modifier = Modifier.combinedClickable(
@@ -228,7 +239,6 @@ fun ChatMessageItem(
             }
           }
         } else {
-          // REGULAR CHAT BUBBLE
           Card(
             shape = bubbleShape,
             colors = CardDefaults.cardColors(containerColor = if (isLocal) WhatsAppOutgoingBubble else WhatsAppIncomingBubble),
@@ -263,7 +273,6 @@ fun ChatMessageItem(
                 }
               }
 
-              // Replying Preview
               if (!message.replyToSender.isNullOrBlank()) {
                 Surface(
                   shape = RoundedCornerShape(6.dp),
@@ -281,7 +290,6 @@ fun ChatMessageItem(
                 }
               }
 
-              // Image Attachment
               if (imageBytes != null || (!message.imageUrl.isNullOrBlank() && !message.imageUrl.startsWith("data:"))) {
                 AsyncImage(
                   model = imageBytes ?: message.imageUrl,
@@ -310,7 +318,6 @@ fun ChatMessageItem(
                 )
               }
 
-              // Document/File Attachment
               if (!message.fileUrl.isNullOrBlank()) {
                 Surface(
                   shape = RoundedCornerShape(8.dp),
@@ -342,8 +349,8 @@ fun ChatMessageItem(
                 }
               }
 
-              // Audio / Voice Message Attachment
               if (!message.audioUrl.isNullOrBlank()) {
+                val isVoiceNote = message.audioDurationSeconds > 0
                 Surface(
                   shape = RoundedCornerShape(8.dp),
                   color = Color.Black.copy(alpha = 0.05f),
@@ -363,21 +370,39 @@ fun ChatMessageItem(
                               mediaPlayer = MediaPlayer().apply {
                                 setDataSource(tempFile.absolutePath)
                                 prepare()
-                                setOnCompletionListener { isPlayingAudio = false }
+                                totalAudioDur = duration
+                                setOnCompletionListener {
+                                  isPlayingAudio = false
+                                  currentAudioPos = 0
+                                }
                               }
                             }
                             mediaPlayer?.start(); isPlayingAudio = true
                           } catch (_: Exception) { isPlayingAudio = false }
                         }
                       },
-                      modifier = Modifier.size(34.dp).clip(CircleShape).background(WhatsAppGreenDark)
+                      modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100))
                     ) {
                       Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                      Text("Voice message (HD)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary)
-                      Text("${message.audioDurationSeconds}s", fontSize = 10.sp, color = WhatsAppTextSecondary)
+                    Column(modifier = Modifier.weight(1f)) {
+                      Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text(if (isVoiceNote) "Voice message" else "Audio file", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary)
+                        if (totalAudioDur > 0) {
+                          Text("${currentAudioPos / 1000}s / ${totalAudioDur / 1000}s", fontSize = 10.sp, color = WhatsAppTextSecondary)
+                        } else {
+                          Text("", fontSize = 10.sp, color = WhatsAppTextSecondary)
+                        }
+                      }
+                      Spacer(modifier = Modifier.height(4.dp))
+                      val progressVal = if (totalAudioDur > 0) currentAudioPos.toFloat() / totalAudioDur.toFloat() else 0f
+                      LinearProgressIndicator(
+                        progress = { progressVal },
+                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
+                        color = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100),
+                        trackColor = Color.Gray.copy(alpha = 0.3f)
+                      )
                     }
                   }
                 }
@@ -424,15 +449,14 @@ fun ChatMessageItem(
     }
   }
 
-  // Long-press Options Dialog (Copy, Reply, Delete)
   if (showOptionsDialog) {
     AlertDialog(
       onDismissRequest = { showOptionsDialog = false },
       title = { Text("Message Options", fontWeight = FontWeight.Bold) },
       text = {
-        Column {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
           TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
-            Text("Reply", fontSize = 16.sp)
+            Text("Reply", fontSize = 16.sp, color = WhatsAppTextPrimary)
           }
           if (message.content.isNotBlank() || !message.coordinates.isNullOrBlank()) {
             TextButton(onClick = {
@@ -440,7 +464,7 @@ fun ChatMessageItem(
               clipboardManager.setText(AnnotatedString(copyText))
               showOptionsDialog = false
             }) {
-              Text("Copy Text", fontSize = 16.sp)
+              Text("Copy Text", fontSize = 16.sp, color = WhatsAppTextPrimary)
             }
           }
           if (canDelete) {
@@ -448,11 +472,11 @@ fun ChatMessageItem(
               scope.launch {
                 showOptionsDialog = false
                 isMessageVisible = false
-                delay(250L) // Wait for smooth shrink/fade animation before deleting document
+                delay(250L) 
                 onDeleteMessage(message)
               }
             }) {
-              Text("Delete", color = Color(0xFFEA0038), fontSize = 16.sp)
+              Text("Delete for everyone", color = Color(0xFFEA0038), fontSize = 16.sp)
             }
           }
         }
