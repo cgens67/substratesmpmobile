@@ -15,7 +15,10 @@ data class Channel(
   val activeUsersCount: Int = 0,
   val allowedRolesToSend: List<String> = listOf("ALL"),
   val isDm: Boolean = false,
-  val dmRecipientGamertag: String? = null
+  val dmRecipientGamertag: String? = null,
+  val lastMessage: String? = null,
+  val lastMessageTimestamp: Long = 0L,
+  val lastMessageSender: String? = null
 ) {
   val isRestrictedToAdmin: Boolean
     get() = !isDm && (id == "announcements" || (allowedRolesToSend.contains("ADMIN") && !allowedRolesToSend.contains("ALL")))
@@ -27,7 +30,7 @@ val DefaultChannels = listOf(
     name = "announcements",
     type = ChannelType.TEXT,
     category = "TEXT CHANNELS",
-    description = "Official announcements & realm IP updates",
+    description = "Official announcements & realm server IP",
     allowedRolesToSend = listOf("ADMIN")
   ),
   Channel(
@@ -35,7 +38,7 @@ val DefaultChannels = listOf(
     name = "general-chat",
     type = ChannelType.TEXT,
     category = "TEXT CHANNELS",
-    description = "General realm banter and base coords",
+    description = "General banter, base coordinates, mega-builds",
     allowedRolesToSend = listOf("ALL")
   ),
   Channel(
