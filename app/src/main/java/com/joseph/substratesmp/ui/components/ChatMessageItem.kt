@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
@@ -56,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -74,8 +76,12 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -105,6 +111,71 @@ fun formatDuration(ms: Int): String {
   val minutes = totalSeconds / 60
   val seconds = totalSeconds % 60
   return "%d:%02d".format(minutes, seconds)
+}
+
+@Composable
+fun MessageBodyText(
+  text: String,
+  textColor: Color,
+  isDarkMode: Boolean,
+  modifier: Modifier = Modifier
+) {
+  val uriHandler = LocalUriHandler.current
+  val urlRegex = remember { "(https?://\\S+)".toRegex() }
+  val hasLinks = remember(text) { urlRegex.containsMatchIn(text) }
+
+  if (hasLinks) {
+    val linkColor = if (isDarkMode) Color(0xFF64B5F6) else Color(0xFF0277BD)
+    val annotatedString = remember(text, textColor, linkColor) {
+      buildAnnotatedString {
+        var lastIndex = 0
+        for (match in urlRegex.findAll(text)) {
+          append(text.substring(lastIndex, match.range.first))
+          pushStringAnnotation(tag = "URL", annotation = match.value)
+          withStyle(
+            style = SpanStyle(
+              color = linkColor,
+              textDecoration = TextDecoration.Underline,
+              fontWeight = FontWeight.SemiBold
+            )
+          ) {
+            append(match.value)
+          }
+          pop()
+          lastIndex = match.range.last + 1
+        }
+        if (lastIndex < text.length) {
+          append(text.substring(lastIndex))
+        }
+      }
+    }
+
+    ClickableText(
+      text = annotatedString,
+      modifier = modifier,
+      style = MaterialTheme.typography.bodyMedium.copy(
+        color = textColor,
+        lineHeight = 18.sp,
+        fontSize = 14.5.sp
+      ),
+      onClick = { offset ->
+        annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
+          .firstOrNull()?.let { annotation ->
+            try {
+              uriHandler.openUri(annotation.item)
+            } catch (_: Exception) {}
+          }
+      }
+    )
+  } else {
+    Text(
+      text = text,
+      color = textColor,
+      lineHeight = 18.sp,
+      fontSize = 14.5.sp,
+      modifier = modifier
+    )
+  }
 }
 
 @Composable
@@ -642,11 +713,10 @@ fun ChatMessageItem(
               }
 
               if (message.content.isNotBlank()) {
-                Text(
+                MessageBodyText(
                   text = message.content,
-                  color = textColor,
-                  lineHeight = 18.sp,
-                  fontSize = 14.5.sp
+                  textColor = textColor,
+                  isDarkMode = isDarkMode
                 )
               }
 
@@ -657,10 +727,10 @@ fun ChatMessageItem(
                   Spacer(modifier = Modifier.width(4.dp))
                   Text(text = "Translated", fontSize = 10.sp, color = subTextColor, fontWeight = FontWeight.Bold)
                 }
-                Text(
+                MessageBodyText(
                   text = translatedText,
-                  color = textColor,
-                  fontSize = 14.5.sp,
+                  textColor = textColor,
+                  isDarkMode = isDarkMode,
                   modifier = Modifier.padding(top = 2.dp)
                 )
               }
@@ -689,7 +759,6 @@ fun ChatMessageItem(
                 Text(message.formattedTime, color = subTextColor, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
-                  // 1 tick if unsent/undelivered, 2 ticks if delivered, 2 blue ticks if read
                   val tickIcon = when {
                     isRead -> Icons.Default.DoneAll
                     isDelivered -> Icons.Default.DoneAll
