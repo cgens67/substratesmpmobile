@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
@@ -52,6 +53,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _typingUsers = MutableStateFlow<List<String>>(emptyList())
   val typingUsers: StateFlow<List<String>> = _typingUsers.asStateFlow()
   private var typingListener: ListenerRegistration? = null
+  private val channelMsgListeners = mutableMapOf<String, ListenerRegistration>()
 
   private val _showGamertagDialog = MutableStateFlow(false)
   val showGamertagDialog: StateFlow<Boolean> = _showGamertagDialog.asStateFlow()
@@ -196,18 +198,65 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                 description = description,
                 allowedRolesToSend = allowed,
                 isDm = isDm,
-                dmRecipientGamertag = if (isDm) name else null
+                dmRecipientGamertag = if (isDm) name else null,
+                lastMessage = doc.getString("lastMessage"),
+                lastMessageTimestamp = doc.getLong("lastMessageTimestamp") ?: 0L,
+                lastMessageSender = doc.getString("lastMessageSender")
               )
             }
+
             if (remote.isNotEmpty()) {
-              _channels.value = remote
+              // Sort channels dynamically so the newest message is always on top
+              _channels.value = remote.sortedByDescending { it.lastMessageTimestamp }
               remote.find { it.id == _activeChannel.value.id }?.let {
                 _activeChannel.value = it
+              }
+              // Observe latest messages for every text channel
+              remote.forEach { ch ->
+                if (ch.type == ChannelType.TEXT && !channelMsgListeners.containsKey(ch.id)) {
+                  attachChannelLatestMsgListener(ch.id)
+                }
               }
             }
           }
         }
     } catch (_: Exception) {}
+  }
+
+  // Continuously observes the latest message in each channel to show in the chat list
+  private fun attachChannelLatestMsgListener(channelId: String) {
+    val listener = firestore.collection("channels").document(channelId).collection("messages")
+      .orderBy("timestamp", Query.Direction.DESCENDING)
+      .limit(1)
+      .addSnapshotListener { snapshot, _ ->
+        val latest = snapshot?.documents?.firstOrNull() ?: return@addSnapshotListener
+        val content = latest.getString("content") ?: ""
+        val img = latest.getString("imageUrl")
+        val aud = latest.getString("audioUrl")
+        val fil = latest.getString("fileUrl")
+        val sticker = latest.getBoolean("isSticker") ?: false
+        val fn = latest.getString("fileName")
+        val dur = latest.getLong("audioDurationSeconds")?.toInt() ?: 0
+        val coords = latest.getString("coordinates")
+        val ts = latest.getLong("timestamp") ?: 0L
+        val sender = latest.getString("senderName") ?: ""
+
+        val preview = when {
+          sticker -> "💟 Sticker"
+          img != null -> "📷 Photo"
+          aud != null -> if (dur > 0) "🎤 Voice message" else "🎵 ${fn ?: "Audio file"}"
+          fil != null -> "📄 ${fn ?: "Document"}"
+          coords != null && content.isBlank() -> "📍 $coords"
+          else -> content
+        }
+
+        _channels.value = _channels.value.map { ch ->
+          if (ch.id == channelId) {
+            ch.copy(lastMessage = preview, lastMessageTimestamp = ts, lastMessageSender = sender)
+          } else ch
+        }.sortedByDescending { it.lastMessageTimestamp }
+      }
+    channelMsgListeners[channelId] = listener
   }
 
   private fun syncLiveStatuses() {
@@ -314,7 +363,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("statuses").document(statusId).delete()
   }
 
-  // Calls recursive subcollection deletion
   fun deleteMessage(channelId: String, messageId: String) {
     chatRepository.deleteMessage(channelId, messageId)
   }
@@ -465,8 +513,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
     setTyping(false)
     val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
+    val channelId = _activeChannel.value.id
+
     chatRepository.sendMessage(
-      channelId = _activeChannel.value.id,
+      channelId = channelId,
       senderName = user.gamertag,
       senderRole = role,
       content = content.trim(),
@@ -480,6 +530,24 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       replyToId = replyTo?.id,
       replyToSender = replyTo?.senderName,
       replyToContent = replyTo?.content
+    )
+
+    // Update parent channel document with latest message snippet and time
+    val preview = when {
+      isSticker -> "💟 Sticker"
+      imageUrl != null -> "📷 Photo"
+      audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
+      fileUrl != null -> "📄 ${fileName ?: "Document"}"
+      coordinates != null && content.isBlank() -> "📍 $coordinates"
+      else -> content.trim()
+    }
+    firestore.collection("channels").document(channelId).set(
+      hashMapOf(
+        "lastMessage" to preview,
+        "lastMessageTimestamp" to System.currentTimeMillis(),
+        "lastMessageSender" to user.gamertag
+      ),
+      SetOptions.merge()
     )
   }
 
@@ -516,6 +584,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   override fun onCleared() {
     super.onCleared()
     typingListener?.remove()
+    channelMsgListeners.values.forEach { it.remove() }
+    channelMsgListeners.clear()
     voiceManager.destroy()
   }
 }
