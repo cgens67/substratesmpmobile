@@ -11,6 +11,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.*
@@ -24,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -46,6 +46,27 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+
+suspend fun LazyListState.slowSmoothScrollToBottom() {
+  val total = layoutInfo.totalItemsCount
+  if (total == 0) return
+  val targetIndex = total - 1
+  val visibleItems = layoutInfo.visibleItemsInfo
+  val lastVisible = visibleItems.lastOrNull()
+
+  if (lastVisible != null && targetIndex - lastVisible.index <= 4) {
+    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
+    val bottomOffset = lastVisible.offset + lastVisible.size
+    val delta = (bottomOffset - viewportHeight + 120).toFloat().coerceAtLeast(0f)
+    if (delta > 0f) {
+      animateScrollBy(
+        value = delta,
+        animationSpec = tween(durationMillis = 650, easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1.0f))
+      )
+    }
+  }
+  animateScrollToItem(targetIndex)
+}
 
 fun formatChatListTime(timestamp: Long): String {
   if (timestamp <= 0L) return ""
@@ -177,8 +198,8 @@ fun SubstrateApp(
   var isStatusViewerVisible by remember { mutableStateOf(false) }
   
   var viewedUser by remember { mutableStateOf<String?>(null) }
+  var shouldForceScrollToBottom by remember { mutableStateOf(false) }
 
-  // Sync current screen to ViewModel to handle notification suppression in active view
   LaunchedEffect(currentScreen) {
     viewModel.setCurrentScreen(currentScreen)
   }
@@ -225,17 +246,18 @@ fun SubstrateApp(
     }
   }
 
+  // Smooth, slow scroll when new messages arrive without conflicting animations
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
-      if (isScrolledToBottom) {
-        delay(60L)
-        val targetIndex = (messages.size + if (typingUsers.isNotEmpty()) 1 else 0)
+      if (isScrolledToBottom || shouldForceScrollToBottom) {
+        delay(80L)
         if (appSettings.smoothAnimations) {
-          listState.animateScrollToItem(targetIndex)
+          listState.slowSmoothScrollToBottom()
         } else {
-          listState.scrollToItem(targetIndex)
+          listState.scrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
         }
+        shouldForceScrollToBottom = false
       }
     }
     previousMsgCount = messages.size
@@ -535,14 +557,26 @@ fun SubstrateApp(
                         message.readBy.any { !it.equals(cleanSender, ignoreCase = true) }
                       }
 
+                      val isDelivered = if (activeChannel.isDm) {
+                        val recipient = activeChannel.dmRecipientGamertag
+                        if (!recipient.isNullOrBlank()) {
+                          message.deliveredTo.any { it.equals(recipient, ignoreCase = true) } || isRead
+                        } else {
+                          message.deliveredTo.isNotEmpty() || isRead
+                        }
+                      } else {
+                        val cleanSender = message.senderName.trim()
+                        message.deliveredTo.any { !it.equals(cleanSender, ignoreCase = true) } || isRead
+                      }
+
                       val translation = translatedMessages[message.id]
-                      val itemSpec = if (appSettings.smoothAnimations) tween<Float>(durationMillis = 600) else null
 
                       ChatMessageItem(
                         message = message,
                         translatedText = translation,
                         isDarkMode = isDarkMode,
                         isRead = isRead,
+                        isDelivered = isDelivered,
                         canDelete = userState.isAdmin || message.isLocalUser,
                         onUserClick = { name -> 
                           viewedUser = name
@@ -557,7 +591,11 @@ fun SubstrateApp(
                         },
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
-                        modifier = Modifier.animateItem(fadeInSpec = itemSpec, placementSpec = itemSpec?.let { spring(stiffness = Spring.StiffnessLow) }, fadeOutSpec = itemSpec)
+                        modifier = Modifier.animateItem(
+                          fadeInSpec = tween(350),
+                          placementSpec = tween(400, easing = FastOutSlowInEasing),
+                          fadeOutSpec = tween(250)
+                        )
                       )
                     }
 
@@ -584,12 +622,7 @@ fun SubstrateApp(
                         .size(42.dp)
                         .clickable {
                           scope.launch {
-                            val targetIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                            if (appSettings.smoothAnimations) {
-                              listState.animateScrollToItem(targetIndex)
-                            } else {
-                              listState.scrollToItem(targetIndex)
-                            }
+                            listState.slowSmoothScrollToBottom()
                           }
                         }
                     ) {
@@ -668,6 +701,7 @@ fun SubstrateApp(
                          editingMessage = null
                          chatInputText = ""
                       } else {
+                        shouldForceScrollToBottom = true
                         viewModel.sendMessage(
                           content = content,
                           coordinates = coords,
@@ -681,16 +715,6 @@ fun SubstrateApp(
                         )
                         chatInputText = ""
                         replyingToMessage = null
-
-                        scope.launch {
-                          delay(60L)
-                          val targetIndex = (messages.size + 1).coerceAtLeast(0)
-                          if (appSettings.smoothAnimations) {
-                            listState.animateScrollToItem(targetIndex)
-                          } else {
-                            listState.scrollToItem(targetIndex)
-                          }
-                        }
                       }
                     },
                     replyingTo = replyingToMessage,
@@ -721,18 +745,10 @@ fun SubstrateApp(
                       onOpenCreateSticker = { stickerPickerLauncher.launch("image/*") },
                       onEmojiSelected = { emoji -> chatInputText += emoji },
                       onStickerSelected = { st ->
+                        shouldForceScrollToBottom = true
                         viewModel.sendMessage("", null, st.imageData, null, 0, null, null, true, replyingToMessage)
                         replyingToMessage = null
                         showEmojiPicker = false
-                        scope.launch {
-                          delay(60L)
-                          val targetIndex = (messages.size + 1).coerceAtLeast(0)
-                          if (appSettings.smoothAnimations) {
-                            listState.animateScrollToItem(targetIndex)
-                          } else {
-                            listState.scrollToItem(targetIndex)
-                          }
-                        }
                       },
                       onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
                       onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
@@ -807,7 +823,7 @@ fun SubstrateApp(
                     Surface(
                       shape = RoundedCornerShape(18.dp),
                       color = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill) else surfaceColor,
-                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray else Color(0xFFE9EDEF)),
+                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray.copy(alpha = 0.3f) else Color(0xFFE9EDEF)),
                       modifier = Modifier.clickable { activeFilterChip = chip }
                     ) {
                       Text(chip, color = if (isSelected) (if (isDarkMode) Color.White else WhatsAppGreenDark) else subTextColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
@@ -927,10 +943,17 @@ fun SubstrateApp(
 
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                           if (isLocalSender && channel.lastMessage != null) {
+                            // 1 tick if sent, 2 ticks if delivered, 2 blue ticks if read
+                            val tickIcon = when {
+                              isLastMessageRead -> Icons.Default.DoneAll
+                              channel.lastMessageIsDelivered -> Icons.Default.DoneAll
+                              else -> Icons.Default.Check
+                            }
+                            val tickTint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0)
                             Icon(
-                              Icons.Default.DoneAll,
-                              contentDescription = if (isLastMessageRead) "Read" else "Sent",
-                              tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                              tickIcon,
+                              contentDescription = if (isLastMessageRead) "Read" else if (channel.lastMessageIsDelivered) "Delivered" else "Sent",
+                              tint = tickTint,
                               modifier = Modifier.size(15.dp)
                             )
                             Spacer(modifier = Modifier.width(3.dp))
