@@ -1,6 +1,7 @@
 package com.joseph.substratesmp.ui
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
@@ -26,6 +27,15 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+data class AppSettings(
+  val isNightMode: Boolean = false,
+  val smoothAnimations: Boolean = true,
+  val autoDownloadMedia: Boolean = true,
+  val powerSaving: Boolean = false,
+  val notifications: Boolean = true,
+  val language: String = "English"
+)
+
 class SubstrateViewModel(application: Application) : AndroidViewModel(application) {
   val authRepository = AuthRepository(application)
   val chatRepository = ChatRepository(application)
@@ -39,6 +49,19 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   val activeVoiceRoom = voiceManager.voiceRoomState
   val agoraSettings = voiceManager.settings
+
+  private val prefs = application.getSharedPreferences("substrate_settings_prefs", Context.MODE_PRIVATE)
+  private val _appSettings = MutableStateFlow(
+    AppSettings(
+      isNightMode = prefs.getBoolean("night_mode", false),
+      smoothAnimations = prefs.getBoolean("animations", true),
+      autoDownloadMedia = prefs.getBoolean("auto_download", true),
+      powerSaving = prefs.getBoolean("power_saving", false),
+      notifications = prefs.getBoolean("notifications", true),
+      language = prefs.getString("language", "English") ?: "English"
+    )
+  )
+  val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
 
   private val _channels = MutableStateFlow(DefaultChannels)
   val channels: StateFlow<List<Channel>> = _channels.asStateFlow()
@@ -60,7 +83,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private var typingListener: ListenerRegistration? = null
   private val channelMsgListeners = mutableMapOf<String, ListenerRegistration>()
 
-  // Map of messageId to translated text
   private val _translatedMessages = MutableStateFlow<Map<String, String>>(emptyMap())
   val translatedMessages: StateFlow<Map<String, String>> = _translatedMessages.asStateFlow()
 
@@ -98,6 +120,21 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
+  fun updateSetting(key: String, value: Any) {
+    when (value) {
+      is Boolean -> prefs.edit().putBoolean(key, value).apply()
+      is String -> prefs.edit().putString(key, value).apply()
+    }
+    _appSettings.value = AppSettings(
+      isNightMode = prefs.getBoolean("night_mode", false),
+      smoothAnimations = prefs.getBoolean("animations", true),
+      autoDownloadMedia = prefs.getBoolean("auto_download", true),
+      powerSaving = prefs.getBoolean("power_saving", false),
+      notifications = prefs.getBoolean("notifications", true),
+      language = prefs.getString("language", "English") ?: "English"
+    )
+  }
+
   fun updateProfile(bio: String, birthday: String) {
     viewModelScope.launch {
       authRepository.updateProfileInfo(bio, birthday)
@@ -108,7 +145,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     viewModelScope.launch(Dispatchers.IO) {
       try {
         val encodedText = java.net.URLEncoder.encode(text, "UTF-8")
-        // Using MyMemory free translation API
         val url = "https://api.mymemory.translated.net/get?q=$encodedText&langpair=Autodetect|$targetLangCode"
         val request = Request.Builder().url(url).build()
         val client = OkHttpClient()
@@ -121,9 +157,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           currentMap[messageId] = translatedText
           _translatedMessages.value = currentMap
         }
-      } catch (e: Exception) {
-        // Fallback or error handling
-      }
+      } catch (e: Exception) {}
     }
   }
 
@@ -411,6 +445,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun deleteStatus(statusId: String) {
     firestore.collection("statuses").document(statusId).delete()
+  }
+
+  fun editMessage(messageId: String, newContent: String) {
+    chatRepository.editMessage(_activeChannel.value.id, messageId, newContent.trim())
   }
 
   fun deleteMessage(channelId: String, messageId: String) {
