@@ -1,5 +1,6 @@
 package com.joseph.substratesmp.ui.components
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
@@ -24,17 +25,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.BatteryChargingFull
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Devices
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Language
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.VpnKey
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -65,7 +61,7 @@ import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 data class SettingItemData(
   val id: String,
   val icon: ImageVector,
-  val bgColor: Color,
+  val iconBgColor: Color,
   val title: String,
   val subtitle: String
 )
@@ -74,6 +70,7 @@ data class SettingItemData(
 fun SettingsScreen(
   userState: AuthUserState,
   appSettings: AppSettings,
+  isDarkMode: Boolean,
   onUpdateSetting: (String, Any) -> Unit,
   onNavigateBack: () -> Unit,
   onNavigateProfile: () -> Unit
@@ -84,15 +81,16 @@ fun SettingsScreen(
   var searchQuery by remember { mutableStateOf("") }
   var activeDialog by remember { mutableStateOf<String?>(null) }
 
+  // Dark Mode Colors
+  val bgColor = if (isDarkMode) Color(0xFF1E1E1E) else Color(0xFFF0F2F5)
+  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val textColor = if (isDarkMode) Color.White else Color.Black
+  val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
+
   val settingsList = listOf(
     SettingItemData("account", Icons.Default.Person, Color(0xFF1DA1F2), "Account", "Number, Username, Bio"),
-    SettingItemData("chat", Icons.Default.ChatBubble, Color(0xFFF7A23B), "Chat Settings", "Wallpaper, Night Mode, Animations"),
-    SettingItemData("privacy", Icons.Default.VpnKey, Color(0xFF27D05B), "Privacy & Security", "Last Seen, Devices, Passkeys"),
-    SettingItemData("notifications", Icons.Default.Notifications, Color(0xFFF93D3E), "Notifications", "Sounds, Calls, Badges"),
-    SettingItemData("data", Icons.Default.PieChart, Color(0xFF1DA1F2), "Data and Storage", "Media download settings"),
-    SettingItemData("folders", Icons.Default.Folder, Color(0xFF1DA1F2), "Chat Folders", "Sort chats into folders"),
-    SettingItemData("devices", Icons.Default.Devices, Color(0xFF00C6CC), "Devices", "Manage connected devices"),
-    SettingItemData("power", Icons.Default.BatteryChargingFull, Color(0xFFF7A23B), "Power Saving", "Reduce power usage on low charge"),
+    SettingItemData("appearance", Icons.Default.ChatBubble, Color(0xFFF7A23B), "Appearance", "Wallpaper, Dark Mode, Animations"),
+    SettingItemData("privacy", Icons.Default.Policy, Color(0xFF27D05B), "Privacy Policy", "Firebase, ImgBB, Agora.io"),
     SettingItemData("language", Icons.Default.Language, Color(0xFFB15DFF), "Language", appSettings.language)
   )
 
@@ -101,34 +99,35 @@ fun SettingsScreen(
   }
 
   Column(
-    modifier = Modifier.fillMaxSize().background(Color(0xFFF0F2F5)).statusBarsPadding()
+    modifier = Modifier.fillMaxSize().background(bgColor).statusBarsPadding()
   ) {
     Row(
       modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
       IconButton(onClick = onNavigateBack) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.Black)
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textColor)
       }
       if (isSearching) {
         TextField(
           value = searchQuery,
           onValueChange = { searchQuery = it },
-          placeholder = { Text("Search settings...") },
+          placeholder = { Text("Search settings...", color = subTextColor) },
           singleLine = true,
           modifier = Modifier.weight(1f),
           colors = TextFieldDefaults.colors(
+            focusedTextColor = textColor, unfocusedTextColor = textColor,
             focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
             focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent
           )
         )
         IconButton(onClick = { isSearching = false; searchQuery = "" }) {
-          Icon(Icons.Default.Close, contentDescription = "Close Search", tint = Color.Black)
+          Icon(Icons.Default.Close, contentDescription = "Close Search", tint = textColor)
         }
       } else {
         Spacer(modifier = Modifier.weight(1f))
         IconButton(onClick = { isSearching = true }) {
-          Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.Black)
+          Icon(Icons.Default.Search, contentDescription = "Search", tint = textColor)
         }
       }
     }
@@ -142,8 +141,8 @@ fun SettingsScreen(
           Text(userState.gamertag.take(1).uppercase(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Text(userState.gamertag, fontSize = 22.sp, fontWeight = FontWeight.Medium, color = Color.Black)
-        Text("Active User • @${userState.gamertag}", fontSize = 13.sp, color = Color.Gray)
+        Text(userState.gamertag, fontSize = 22.sp, fontWeight = FontWeight.Medium, color = textColor)
+        Text("Active User • @${userState.gamertag}", fontSize = 13.sp, color = subTextColor)
       }
       Spacer(modifier = Modifier.height(20.dp))
     }
@@ -154,11 +153,12 @@ fun SettingsScreen(
     ) {
       LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
         item {
-          Surface(shape = RoundedCornerShape(24.dp), color = Color.White, modifier = Modifier.fillMaxWidth()) {
+          Surface(shape = RoundedCornerShape(24.dp), color = surfaceColor, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
               filteredSettings.forEach { setting ->
                 SettingsListItem(
-                  icon = setting.icon, bgColor = setting.bgColor, title = setting.title, subtitle = setting.subtitle,
+                  icon = setting.icon, iconBgColor = setting.iconBgColor, title = setting.title, subtitle = setting.subtitle,
+                  textColor = textColor, subTextColor = subTextColor,
                   onClick = {
                     if (setting.id == "account") onNavigateProfile() else activeDialog = setting.id
                   }
@@ -173,14 +173,14 @@ fun SettingsScreen(
   }
 
   when (activeDialog) {
-    "chat" -> {
+    "appearance" -> {
       AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Chat Settings", fontWeight = FontWeight.Bold) },
+        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
+        title = { Text("Appearance Settings", fontWeight = FontWeight.Bold) },
         text = {
           Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-              Text("Night Mode")
+              Text("Dark Mode")
               Switch(checked = appSettings.isNightMode, onCheckedChange = { onUpdateSetting("night_mode", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -192,48 +192,9 @@ fun SettingsScreen(
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
       )
     }
-    "notifications" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Notifications", fontWeight = FontWeight.Bold) },
-        text = {
-          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Enable Notifications")
-            Switch(checked = appSettings.notifications, onCheckedChange = { onUpdateSetting("notifications", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
-          }
-        },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
-      )
-    }
-    "data" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Data & Storage", fontWeight = FontWeight.Bold) },
-        text = {
-          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Auto-Download Media")
-            Switch(checked = appSettings.autoDownloadMedia, onCheckedChange = { onUpdateSetting("auto_download", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
-          }
-        },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
-      )
-    }
-    "power" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Power Saving", fontWeight = FontWeight.Bold) },
-        text = {
-          Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Text("Low Power Mode")
-            Switch(checked = appSettings.powerSaving, onCheckedChange = { onUpdateSetting("power_saving", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
-          }
-        },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
-      )
-    }
     "language" -> {
       AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
+        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
         title = { Text("Select Language", fontWeight = FontWeight.Bold) },
         text = {
           Column {
@@ -242,57 +203,54 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth().clickable { onUpdateSetting("language", lang); activeDialog = null }.padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
               ) {
-                Text(lang, fontSize = 16.sp, color = if (appSettings.language == lang) WhatsAppGreenDark else Color.Black, fontWeight = if (appSettings.language == lang) FontWeight.Bold else FontWeight.Normal)
+                Text(lang, fontSize = 16.sp, color = if (appSettings.language == lang) WhatsAppGreenDark else textColor, fontWeight = if (appSettings.language == lang) FontWeight.Bold else FontWeight.Normal)
               }
             }
           }
         },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Cancel", color = Color.Gray) } }
+        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Cancel", color = subTextColor) } }
       )
     }
     "privacy" -> {
       AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Privacy & Security", fontWeight = FontWeight.Bold) },
-        text = { Text("Manage passkeys, blocked users, and device sessions securely.") },
+        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
+        title = { Text("Privacy Policy", fontWeight = FontWeight.Bold) },
+        text = { 
+          Column {
+            Text("Substrate SMP uses the following trusted services to provide seamless functionality securely:", fontSize = 14.sp, color = textColor)
+            Spacer(modifier = Modifier.height(12.dp))
+            Text("🔥 Firebase", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
+            Text("Powers real-time chat, authentication, and encrypted profile data syncing.", fontSize = 13.sp, color = subTextColor)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("🖼️ ImgBB", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
+            Text("Used as a secure cloud CDN to store and process image uploads anonymously.", fontSize = 13.sp, color = subTextColor)
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("📞 Agora.io", fontWeight = FontWeight.Bold, fontSize = 15.sp, color = textColor)
+            Text("Our low-latency RTC engine for peer-to-peer real-time voice and video calls with secure encryption.", fontSize = 13.sp, color = subTextColor)
+          }
+        },
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Close", color = WhatsAppGreenDark) } }
-      )
-    }
-    "devices" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Linked Devices", fontWeight = FontWeight.Bold) },
-        text = { Text("Current Device: Android 14 Smartphone\nLocation: Localhost") },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Close", color = WhatsAppGreenDark) } }
-      )
-    }
-    "folders" -> {
-      AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
-        title = { Text("Chat Folders", fontWeight = FontWeight.Bold) },
-        text = { Text("You can add specific chats to your Favourites for quick access from the home screen filter.") },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Got it", color = WhatsAppGreenDark) } }
       )
     }
   }
 }
 
 @Composable
-fun SettingsListItem(icon: ImageVector, bgColor: Color, title: String, subtitle: String, onClick: () -> Unit) {
+fun SettingsListItem(icon: ImageVector, iconBgColor: Color, title: String, subtitle: String, textColor: Color, subTextColor: Color, onClick: () -> Unit) {
   Row(
     modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 12.dp),
     verticalAlignment = Alignment.CenterVertically
   ) {
     Box(
-      modifier = Modifier.size(36.dp).clip(CircleShape).background(bgColor),
+      modifier = Modifier.size(36.dp).clip(CircleShape).background(iconBgColor),
       contentAlignment = Alignment.Center
     ) {
       Icon(imageVector = icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
     }
     Spacer(modifier = Modifier.width(16.dp))
     Column {
-      Text(title, fontSize = 16.sp, fontWeight = FontWeight.Normal, color = Color.Black)
-      Text(subtitle, fontSize = 13.sp, color = Color.Gray)
+      Text(title, fontSize = 16.sp, fontWeight = FontWeight.Normal, color = textColor)
+      Text(subtitle, fontSize = 13.sp, color = subTextColor)
     }
   }
 }
