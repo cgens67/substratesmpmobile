@@ -5,6 +5,7 @@ import android.util.Base64
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,14 +22,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.AddPhotoAlternate
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -67,10 +73,12 @@ fun EmojiPickerView(
   onOpenCreateSticker: () -> Unit = {},
   onEmojiSelected: (String) -> Unit,
   onStickerSelected: (ServerSticker) -> Unit = {},
+  onDeleteSticker: (String) -> Unit = {},
   onBackspace: () -> Unit,
   modifier: Modifier = Modifier
 ) {
   var selectedCategory by remember { mutableIntStateOf(0) }
+  var stickerToDelete by remember { mutableStateOf<ServerSticker?>(null) }
 
   val categories = listOf(
     "Trending" to listOf(
@@ -140,7 +148,6 @@ fun EmojiPickerView(
             }
           }
 
-          // Stickers Tab (WhatsApp style sticker icon)
           Box(
             modifier = Modifier
               .clip(RoundedCornerShape(8.dp))
@@ -208,7 +215,10 @@ fun EmojiPickerView(
                   modifier = Modifier
                     .size(76.dp)
                     .clip(RoundedCornerShape(8.dp))
-                    .clickable { onStickerSelected(sticker) }
+                    .combinedClickable(
+                      onClick = { onStickerSelected(sticker) },
+                      onLongClick = { if (isAdmin) stickerToDelete = sticker }
+                    )
                     .padding(4.dp),
                   contentAlignment = Alignment.Center
                 ) {
@@ -246,5 +256,27 @@ fun EmojiPickerView(
         }
       }
     }
+  }
+
+  if (stickerToDelete != null) {
+    AlertDialog(
+      onDismissRequest = { stickerToDelete = null },
+      title = { Text("Delete Sticker?") },
+      text = { Text("Remove this sticker from the server? This cannot be undone.") },
+      confirmButton = {
+        Button(
+          onClick = {
+            onDeleteSticker(stickerToDelete!!.id)
+            stickerToDelete = null
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA0038))
+        ) {
+          Text("Delete")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { stickerToDelete = null }) { Text("Cancel") }
+      }
+    )
   }
 }
