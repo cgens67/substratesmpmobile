@@ -519,7 +519,14 @@ fun SubstrateApp(
                   horizontalArrangement = Arrangement.SpaceBetween,
                   verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Text("WhatsApp", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = WhatsAppHeaderGreen, fontSize = 25.sp)
+                  // Updated title to Substrate SMP
+                  Text(
+                    text = "Substrate SMP",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppHeaderGreen,
+                    fontSize = 24.sp
+                  )
 
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     if (userState.isAdmin) {
@@ -777,7 +784,7 @@ fun SubstrateApp(
                                 ) {
                                   Text(userState.gamertag.take(1).ifBlank { "Y" }.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
                                   Box(
-                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreen)
+                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreenDark)
                                   ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                                   }
