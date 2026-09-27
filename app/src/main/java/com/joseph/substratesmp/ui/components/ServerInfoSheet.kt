@@ -43,15 +43,21 @@ import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServerInfoSheet(
-  onDismiss: () -> Unit
+  onDismiss: () -> Unit,
+  isDarkMode: Boolean
 ) {
   val sheetState = rememberModalBottomSheetState()
   val clipboardManager = LocalClipboardManager.current
 
+  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val textColor = if (isDarkMode) Color.White else Color(0xFF111B21)
+  val subTextColor = if (isDarkMode) Color.LightGray else Color(0xFF667781)
+  val cardBgColor = if (isDarkMode) Color(0xFF424242) else Color(0xFFF7F8FA)
+
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
-    containerColor = Color.White
+    containerColor = surfaceColor
   ) {
     Column(
       modifier = Modifier
@@ -70,7 +76,8 @@ fun ServerInfoSheet(
         Text(
           text = "Substrate SMP (Bedrock Realm)",
           style = MaterialTheme.typography.titleMedium,
-          fontWeight = FontWeight.Bold
+          fontWeight = FontWeight.Bold,
+          color = textColor
         )
       }
 
@@ -78,26 +85,32 @@ fun ServerInfoSheet(
 
       Surface(
         shape = MaterialTheme.shapes.medium,
-        color = Color(0xFFF7F8FA),
+        color = cardBgColor,
         modifier = Modifier.fillMaxWidth()
       ) {
         Column(modifier = Modifier.padding(14.dp)) {
           ServerDetailRow(
             icon = Icons.Default.Dns,
             label = "Server IP / Domain",
-            value = "mc.substratesmp.net"
+            value = "mc.substratesmp.net",
+            labelColor = subTextColor,
+            valueColor = textColor
           )
           Spacer(modifier = Modifier.height(8.dp))
           ServerDetailRow(
             icon = Icons.Default.Sensors,
             label = "Bedrock Port",
-            value = "19132"
+            value = "19132",
+            labelColor = subTextColor,
+            valueColor = textColor
           )
           Spacer(modifier = Modifier.height(8.dp))
           ServerDetailRow(
             icon = Icons.Default.Shield,
             label = "Bedrock Version",
-            value = "v1.21.x"
+            value = "v1.21.x",
+            labelColor = subTextColor,
+            valueColor = textColor
           )
         }
       }
@@ -120,7 +133,7 @@ fun ServerInfoSheet(
           modifier = Modifier.size(18.dp)
         )
         Spacer(modifier = Modifier.width(8.dp))
-        Text("Copy Server IP:Port")
+        Text("Copy Server IP:Port", color = Color.White)
       }
 
       Spacer(modifier = Modifier.height(24.dp))
@@ -132,7 +145,9 @@ fun ServerInfoSheet(
 fun ServerDetailRow(
   icon: androidx.compose.ui.graphics.vector.ImageVector,
   label: String,
-  value: String
+  value: String,
+  labelColor: Color,
+  valueColor: Color
 ) {
   Row(
     modifier = Modifier.fillMaxWidth(),
@@ -150,13 +165,13 @@ fun ServerDetailRow(
       Text(
         text = label,
         style = MaterialTheme.typography.bodySmall,
-        color = Color(0xFF667781)
+        color = labelColor
       )
     }
     Text(
       text = value,
       style = CoordinateTextStyle,
-      color = Color(0xFF111B21),
+      color = valueColor,
       fontWeight = FontWeight.SemiBold
     )
   }
