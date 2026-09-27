@@ -17,6 +17,8 @@ import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
 import com.joseph.substratesmp.ui.components.AdminMember
+import com.joseph.substratesmp.ui.components.NotificationHelper
+import com.joseph.substratesmp.ui.components.SoundHelper
 import com.joseph.substratesmp.voice.AgoraVoiceManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -33,7 +35,8 @@ data class AppSettings(
   val autoDownloadMedia: Boolean = true,
   val powerSaving: Boolean = false,
   val notifications: Boolean = true,
-  val language: String = "English"
+  val language: String = "English",
+  val autoTranslate: Boolean = false
 )
 
 class SubstrateViewModel(application: Application) : AndroidViewModel(application) {
@@ -58,7 +61,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       autoDownloadMedia = prefs.getBoolean("auto_download", true),
       powerSaving = prefs.getBoolean("power_saving", false),
       notifications = prefs.getBoolean("notifications", true),
-      language = prefs.getString("language", "English") ?: "English"
+      language = prefs.getString("language", "English") ?: "English",
+      autoTranslate = prefs.getBoolean("auto_translate", false)
     )
   )
   val appSettings: StateFlow<AppSettings> = _appSettings.asStateFlow()
@@ -82,9 +86,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   val typingUsers: StateFlow<List<String>> = _typingUsers.asStateFlow()
   private var typingListener: ListenerRegistration? = null
   private val channelMsgListeners = mutableMapOf<String, ListenerRegistration>()
+  private val channelLastKnownTs = mutableMapOf<String, Long>()
 
   private val _translatedMessages = MutableStateFlow<Map<String, String>>(emptyMap())
   val translatedMessages: StateFlow<Map<String, String>> = _translatedMessages.asStateFlow()
+
+  private val _currentScreenState = MutableStateFlow("home")
 
   private val _showGamertagDialog = MutableStateFlow(false)
   val showGamertagDialog: StateFlow<Boolean> = _showGamertagDialog.asStateFlow()
@@ -117,7 +124,30 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncLiveStickers()
       syncMembers()
       listenToTyping(_activeChannel.value.id)
+
+      // Watch for auto-translation
+      launch {
+        messages.collect { msgList ->
+          if (_appSettings.value.autoTranslate) {
+            val targetCode = when (_appSettings.value.language.lowercase()) {
+              "chinese" -> "zh"
+              "malay" -> "ms"
+              else -> "en"
+            }
+            val myTag = userState.value.gamertag.trim()
+            msgList.forEach { msg ->
+              if (msg.content.isNotBlank() && !msg.senderName.equals(myTag, ignoreCase = true) && !_translatedMessages.value.containsKey(msg.id)) {
+                translateMessage(msg.id, msg.content, targetCode)
+              }
+            }
+          }
+        }
+      }
     }
+  }
+
+  fun setCurrentScreen(screen: String) {
+    _currentScreenState.value = screen
   }
 
   fun updateSetting(key: String, value: Any) {
@@ -131,8 +161,27 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       autoDownloadMedia = prefs.getBoolean("auto_download", true),
       powerSaving = prefs.getBoolean("power_saving", false),
       notifications = prefs.getBoolean("notifications", true),
-      language = prefs.getString("language", "English") ?: "English"
+      language = prefs.getString("language", "English") ?: "English",
+      autoTranslate = prefs.getBoolean("auto_translate", false)
     )
+
+    if (key == "auto_translate" && value == true) {
+      triggerAutoTranslate()
+    }
+  }
+
+  private fun triggerAutoTranslate() {
+    val targetCode = when (_appSettings.value.language.lowercase()) {
+      "chinese" -> "zh"
+      "malay" -> "ms"
+      else -> "en"
+    }
+    val myTag = userState.value.gamertag.trim()
+    messages.value.forEach { msg ->
+      if (msg.content.isNotBlank() && !msg.senderName.equals(myTag, ignoreCase = true) && !_translatedMessages.value.containsKey(msg.id)) {
+        translateMessage(msg.id, msg.content, targetCode)
+      }
+    }
   }
 
   fun updateProfile(bio: String, birthday: String) {
@@ -157,7 +206,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           currentMap[messageId] = translatedText
           _translatedMessages.value = currentMap
         }
-      } catch (e: Exception) {}
+      } catch (_: Exception) {}
     }
   }
 
@@ -300,7 +349,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     val listener = firestore.collection("channels").document(channelId).collection("messages")
       .orderBy("timestamp", Query.Direction.DESCENDING)
       .limit(1)
-      .addSnapshotListener { snapshot, _ ->
+      .addSnapshotListener { snapshot, error ->
+        if (error != null) return@addSnapshotListener
         val latest = snapshot?.documents?.firstOrNull() ?: return@addSnapshotListener
         val content = latest.getString("content") ?: ""
         val img = latest.getString("imageUrl")
@@ -327,6 +377,27 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           fil != null -> "📄 ${fn ?: "Document"}"
           coords != null && content.isBlank() -> "📍 $coords"
           else -> content
+        }
+
+        val prevTs = channelLastKnownTs[channelId]
+        channelLastKnownTs[channelId] = ts
+
+        val myTag = userState.value.gamertag.trim()
+        val isFromMe = myTag.isNotBlank() && sender.equals(myTag, ignoreCase = true)
+        val isViewingThisChat = _currentScreenState.value == "chat_screen" && _activeChannel.value.id == channelId
+
+        // FIX: Proactively trigger notifications when message arrives in background or from other chats
+        if (prevTs != null && ts > prevTs && !isFromMe) {
+          if (!isViewingThisChat && !isChannelMuted(channelId) && !isUserBlocked(sender)) {
+            SoundHelper.playMessageSound(getApplication())
+            val notifTitle = if (channelId.startsWith("dm_")) sender else "#$channelId • $sender"
+            NotificationHelper.showMessageNotification(
+              context = getApplication(),
+              notificationId = channelId.hashCode(),
+              title = notifTitle,
+              content = preview
+            )
+          }
         }
 
         _channels.value = _channels.value.map { ch ->
@@ -401,7 +472,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
               val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
               val role = doc.getString("role") ?: if (isAdmin) "ADMIN" else "MEMBER"
-              AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin)
+              val bio = doc.getString("bio") ?: ""
+              val birthday = doc.getString("birthday") ?: ""
+              AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin, bio = bio, birthday = birthday)
             }
             _members.value = rawList.distinctBy { it.gamertag.lowercase().trim() }
           }
@@ -561,6 +634,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       _activeChannel.value = channel
       chatRepository.selectChannel(channel.id)
       listenToTyping(channel.id)
+      triggerAutoTranslate()
     } else if (channel.type == ChannelType.VOICE) {
       val gamertag = userState.value.gamertag
       if (gamertag.isBlank()) {
@@ -625,7 +699,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl != null -> "📷 Photo"
       audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
       fileUrl != null -> "📄 ${fileName ?: "Document"}"
-      coordinates != null && content.isBlank() -> "📍 $coordinates"
+      coordinates != null && content.isBlank() -> "📍 $coords"
       else -> content.trim()
     }
     firestore.collection("channels").document(channelId).set(
