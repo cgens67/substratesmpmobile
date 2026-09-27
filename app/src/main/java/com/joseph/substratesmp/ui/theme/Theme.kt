@@ -1,7 +1,6 @@
 package com.joseph.substratesmp.ui.theme
 
 import android.os.Build
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -82,8 +81,8 @@ object SubstrateTheme {
 
 @Composable
 fun SubstrateSMPTheme(
-  darkTheme: Boolean = true, // Default to immersive dark mode for Discord/gaming community
-  dynamicColor: Boolean = false, // Preserve branded Substrate Minecraft styling
+  darkTheme: Boolean = false, // WhatsApp modern light theme
+  dynamicColor: Boolean = false,
   content: @Composable () -> Unit
 ) {
   val context = LocalContext.current
