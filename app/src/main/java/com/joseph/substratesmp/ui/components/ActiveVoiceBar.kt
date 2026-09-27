@@ -21,11 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material.icons.filled.VolumeDown
@@ -99,7 +101,6 @@ fun ActiveVoiceBar(
         .fillMaxWidth()
         .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-      // 1. Voice Channel Header & Agora Status
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -110,9 +111,7 @@ fun ActiveVoiceBar(
             modifier = Modifier
               .size(10.dp)
               .clip(CircleShape)
-              .background(
-                SubstrateTheme.customColors.statusVoiceActive.copy(alpha = pulseAlpha)
-              )
+              .background(SubstrateTheme.customColors.statusVoiceActive.copy(alpha = pulseAlpha))
           )
           Spacer(modifier = Modifier.width(8.dp))
           Column {
@@ -123,7 +122,7 @@ fun ActiveVoiceBar(
               color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-              text = if (voiceRoom.isConnecting) "Connecting to Agora RTC..." else "Agora.io RTC • Low-Latency Voice Engine",
+              text = if (voiceRoom.isConnecting) "Connecting to Agora RTC..." else "Agora.io RTC • Token Authenticated",
               style = MaterialTheme.typography.labelSmall,
               color = SubstrateTheme.customColors.statusVoiceActive,
               fontSize = 10.sp
@@ -131,7 +130,6 @@ fun ActiveVoiceBar(
           }
         }
 
-        // Disconnect Call Button
         FilledIconButton(
           onClick = onDisconnect,
           modifier = Modifier
@@ -152,7 +150,6 @@ fun ActiveVoiceBar(
 
       Spacer(modifier = Modifier.height(10.dp))
 
-      // 2. Active Speakers Row with Dynamic Voice Visualizers
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -165,13 +162,11 @@ fun ActiveVoiceBar(
 
       Spacer(modifier = Modifier.height(10.dp))
 
-      // 3. Agora Audio & Video Controls (Mute, Speakerphone, Deafen, Camera)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        // Mute / Unmute Button (muteLocalAudioStream)
         val isMuted = voiceRoom.isMuted
         val micBg by animateColorAsState(
           targetValue = if (isMuted) SubstrateTheme.customColors.statusMuted.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainer,
@@ -200,7 +195,6 @@ fun ActiveVoiceBar(
           }
         }
 
-        // Speakerphone Toggle (setEnableSpeakerphone)
         val isSpeaker = voiceRoom.isSpeakerOn
         val speakerBg by animateColorAsState(
           targetValue = if (isSpeaker) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
@@ -229,7 +223,6 @@ fun ActiveVoiceBar(
           }
         }
 
-        // Deafen / Undeafen Button (muteAllRemoteAudioStreams)
         val isDeaf = voiceRoom.isDeafened
         val deafBg by animateColorAsState(
           targetValue = if (isDeaf) SubstrateTheme.customColors.statusMuted.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainer,
@@ -258,7 +251,6 @@ fun ActiveVoiceBar(
           }
         }
 
-        // Camera Toggle Button
         val isCam = voiceRoom.isCameraOn
         val camBg by animateColorAsState(
           targetValue = if (isCam) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
@@ -290,8 +282,14 @@ fun ActiveVoiceBar(
 @Composable
 fun SpeakerAvatarPill(participant: VoiceParticipant) {
   val isSpeaking = participant.isSpeaking
+  val isAdmin = participant.isAdmin || participant.name.contains("Siang5680", ignoreCase = true)
+
   val borderColor by animateColorAsState(
-    targetValue = if (isSpeaking) SubstrateTheme.customColors.statusVoiceActive else Color.Transparent,
+    targetValue = when {
+      isSpeaking -> SubstrateTheme.customColors.statusVoiceActive
+      isAdmin -> SubstrateTheme.customColors.adminGold.copy(alpha = 0.5f)
+      else -> Color.Transparent
+    },
     label = "border_color"
   )
 
@@ -300,7 +298,7 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
     color = MaterialTheme.colorScheme.surfaceContainer,
     border = androidx.compose.foundation.BorderStroke(
       width = if (isSpeaking) 2.dp else 1.dp,
-      color = if (isSpeaking) borderColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+      color = if (isSpeaking || isAdmin) borderColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     )
   ) {
     Row(
@@ -311,13 +309,16 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
         modifier = Modifier
           .size(26.dp)
           .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.primaryContainer),
+          .background(
+            if (isAdmin) SubstrateTheme.customColors.adminGold.copy(alpha = 0.25f)
+            else MaterialTheme.colorScheme.primaryContainer
+          ),
         contentAlignment = Alignment.Center
       ) {
         Text(
           text = participant.name.take(1).uppercase(),
           style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onPrimaryContainer,
+          color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onPrimaryContainer,
           fontWeight = FontWeight.Bold
         )
       }
@@ -325,15 +326,45 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
       Spacer(modifier = Modifier.width(6.dp))
 
       Column {
-        Text(
-          text = participant.name,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurface,
-          fontWeight = if (isSpeaking) FontWeight.Bold else FontWeight.Normal,
-          maxLines = 1
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(
+            text = participant.name,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onSurface,
+            fontWeight = if (isSpeaking || isAdmin) FontWeight.Bold else FontWeight.Normal,
+            maxLines = 1
+          )
 
-        // Dynamic Waveform Audio Level Bars
+          // Distinct Admin Badge next to Siang5680 in voice room user lists
+          if (isAdmin) {
+            Spacer(modifier = Modifier.width(4.dp))
+            Surface(
+              shape = RoundedCornerShape(3.dp),
+              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f)
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Shield,
+                  contentDescription = null,
+                  tint = SubstrateTheme.customColors.adminGold,
+                  modifier = Modifier.size(9.dp)
+                )
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                  text = "ADMIN",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = SubstrateTheme.customColors.adminGold,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 8.sp
+                )
+              }
+            }
+          }
+        }
+
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(2.dp),
