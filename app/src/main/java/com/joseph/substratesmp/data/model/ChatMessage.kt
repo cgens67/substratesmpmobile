@@ -22,7 +22,8 @@ data class ChatMessage(
   val replyToId: String? = null,
   val replyToSender: String? = null,
   val replyToContent: String? = null,
-  val readBy: List<String> = emptyList() // Tracks who has seen this message
+  val readBy: List<String> = emptyList(),
+  val isEdited: Boolean = false
 ) {
   val isAdmin: Boolean
     get() = senderRole == "ADMIN" || senderName.equals("Siang5680", ignoreCase = true)
