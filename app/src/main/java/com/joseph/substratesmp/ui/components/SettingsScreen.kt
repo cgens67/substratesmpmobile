@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Switch
@@ -82,7 +83,6 @@ fun SettingsScreen(
   var searchQuery by remember { mutableStateOf("") }
   var activeDialog by remember { mutableStateOf<String?>(null) }
 
-  // Dark Mode Colors
   val bgColor = if (isDarkMode) Color(0xFF1E1E1E) else Color(0xFFF0F2F5)
   val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
   val textColor = if (isDarkMode) Color.White else Color.Black
@@ -185,11 +185,11 @@ fun SettingsScreen(
         text = {
           Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-              Text("Dark Mode")
+              Text("Dark Mode", color = textColor)
               Switch(checked = appSettings.isNightMode, onCheckedChange = { onUpdateSetting("night_mode", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-              Text("Smooth Animations")
+              Text("Smooth Animations", color = textColor)
               Switch(checked = appSettings.smoothAnimations, onCheckedChange = { onUpdateSetting("animations", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
             }
           }
@@ -200,9 +200,31 @@ fun SettingsScreen(
     "language" -> {
       AlertDialog(
         onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
-        title = { Text("Select Language", fontWeight = FontWeight.Bold) },
+        title = { Text("Language & Translation", fontWeight = FontWeight.Bold) },
         text = {
           Column {
+            Row(
+              modifier = Modifier.fillMaxWidth(),
+              horizontalArrangement = Arrangement.SpaceBetween,
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Auto-Translate Messages", fontWeight = FontWeight.Bold, color = textColor, fontSize = 15.sp)
+                Text("Automatically translate incoming messages to your language", fontSize = 12.sp, color = subTextColor)
+              }
+              Switch(
+                checked = appSettings.autoTranslate,
+                onCheckedChange = { onUpdateSetting("auto_translate", it) },
+                colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark)
+              )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            HorizontalDivider(color = subTextColor.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text("Select App Language", fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = subTextColor)
+
             listOf("English", "Chinese", "Malay").forEach { lang ->
               Row(
                 modifier = Modifier.fillMaxWidth().clickable { onUpdateSetting("language", lang); activeDialog = null }.padding(vertical = 12.dp),
@@ -213,7 +235,7 @@ fun SettingsScreen(
             }
           }
         },
-        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Cancel", color = subTextColor) } }
+        confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
       )
     }
   }
