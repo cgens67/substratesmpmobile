@@ -108,6 +108,7 @@ import com.joseph.substratesmp.ui.components.SheetOption
 import com.joseph.substratesmp.ui.components.StatusCreatorDialog
 import com.joseph.substratesmp.ui.components.StatusViewerScreen
 import com.joseph.substratesmp.ui.components.VideoCallScreen
+import com.joseph.substratesmp.ui.components.dropLastGrapheme
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
 import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
@@ -320,6 +321,10 @@ fun SubstrateApp(
                       items(messages, key = { it.id }) { message ->
                         ChatMessageItem(
                           message = message,
+                          canDelete = userState.isAdmin || message.isLocalUser,
+                          onDeleteMessage = { msg ->
+                            viewModel.deleteMessage(msg.channelId, msg.id)
+                          },
                           onReply = { msg -> replyingToMessage = msg },
                           modifier = Modifier.animateItem()
                         )
@@ -398,7 +403,10 @@ fun SubstrateApp(
                   ) {
                     EmojiPickerView(
                       onEmojiSelected = { emoji -> chatInputText += emoji },
-                      onBackspace = { if (chatInputText.isNotEmpty()) chatInputText = chatInputText.dropLast(1) }
+                      onBackspace = {
+                        // Deletes complete composite Unicode graphemes (e.g. 🏳️‍🌈 or 💅🏿) without leaving 🏳️‍?
+                        chatInputText = dropLastGrapheme(chatInputText)
+                      }
                     )
                   }
                 }
