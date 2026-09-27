@@ -43,13 +43,20 @@ data class SheetOption(
 @Composable
 fun CustomDropdownModalSheet(
   options: List<SheetOption>,
+  isDarkMode: Boolean,
   onDismiss: () -> Unit,
   onOptionSelected: (SheetOption) -> Unit
 ) {
+  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color(0xFFFBFBFB)
+  val textColor = if (isDarkMode) Color.White else WhatsAppTextPrimary
+  val subTextColor = if (isDarkMode) Color.LightGray else WhatsAppTextSecondary
+  val selectedBgColor = if (isDarkMode) Color(0xFF424242) else Color(0xFFEDEDED)
+  val checkmarkColor = if (isDarkMode) Color.White else Color.Black
+
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-    containerColor = Color(0xFFFBFBFB)
+    containerColor = surfaceColor
   ) {
     Column(
       modifier = Modifier
@@ -60,7 +67,7 @@ fun CustomDropdownModalSheet(
         val isSelected = option.isSelected
         Surface(
           shape = RoundedCornerShape(18.dp),
-          color = if (isSelected) Color(0xFFEDEDED) else Color.Transparent,
+          color = if (isSelected) selectedBgColor else Color.Transparent,
           modifier = Modifier
             .fillMaxWidth()
             .clickable {
@@ -79,7 +86,7 @@ fun CustomDropdownModalSheet(
               Icon(
                 imageVector = Icons.Default.Check,
                 contentDescription = "Selected",
-                tint = Color.Black,
+                tint = checkmarkColor,
                 modifier = Modifier.size(20.dp)
               )
               Spacer(modifier = Modifier.width(16.dp))
@@ -92,13 +99,13 @@ fun CustomDropdownModalSheet(
                 text = option.title,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = WhatsAppTextPrimary,
+                color = textColor,
                 fontSize = 17.sp
               )
               Text(
                 text = option.subtitle,
                 style = MaterialTheme.typography.bodySmall,
-                color = WhatsAppTextSecondary,
+                color = subTextColor,
                 fontSize = 13.sp
               )
             }
