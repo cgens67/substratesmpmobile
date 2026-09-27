@@ -37,6 +37,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ServerSticker
@@ -175,7 +176,6 @@ fun EmojiPickerView(
       HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp)
 
       if (selectedCategory == 99) {
-        // WhatsApp Stickers Grid
         if (stickers.isEmpty()) {
           Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
