@@ -6,5 +6,8 @@ data class StatusUpdate(
   val content: String = "",
   val timestamp: Long = System.currentTimeMillis(),
   val isAdmin: Boolean = false,
-  val emoji: String = "⛏️"
+  val activityTag: String = "Mining",
+  val backgroundTheme: String = "EMERALD", // EMERALD, CRIMSON, END_VOID, DIAMOND, GOLDEN, OBSIDIAN
+  val coordinates: String? = null,
+  val reactionCounts: Map<String, Int> = emptyMap()
 )
