@@ -3,6 +3,7 @@ package com.joseph.substratesmp.ui
 import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -162,7 +163,7 @@ fun SubstrateApp(
   ) {}
 
   LaunchedEffect(Unit) {
-    if (Build.VERSION.SDK_INT >= 33) {
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
       notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
   }
@@ -675,7 +676,6 @@ fun SubstrateApp(
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
 
-                      // Dynamic Live Preview: Shows latest message content, sender, time, and checkmarks
                       items(filtered, key = { it.id }) { channel ->
                         val isMuted = mutedChannels.contains(channel.id)
                         val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
@@ -946,7 +946,7 @@ fun SubstrateApp(
   }
 
   // Smooth WhatsApp-style Animated Entry/Exit for the Status Viewer Screen
-  AnimatedVisibility(
+  androidx.compose.animation.AnimatedVisibility(
     visible = isStatusViewerVisible && statusToDisplay != null,
     enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
     exit = scaleOut(targetScale = 0.82f, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(200))
