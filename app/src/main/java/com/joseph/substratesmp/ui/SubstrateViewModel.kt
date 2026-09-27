@@ -125,7 +125,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncMembers()
       listenToTyping(_activeChannel.value.id)
 
-      // Watch for auto-translation
       launch {
         messages.collect { msgList ->
           if (_appSettings.value.autoTranslate) {
@@ -386,7 +385,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val isFromMe = myTag.isNotBlank() && sender.equals(myTag, ignoreCase = true)
         val isViewingThisChat = _currentScreenState.value == "chat_screen" && _activeChannel.value.id == channelId
 
-        // Proactively trigger notifications when message arrives in background or from other chats
         if (prevTs != null && ts > prevTs && !isFromMe) {
           if (!isViewingThisChat && !isChannelMuted(channelId) && !isUserBlocked(sender)) {
             SoundHelper.playMessageSound(getApplication())
@@ -560,6 +558,18 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     if (type == ChannelType.TEXT) {
       selectChannel(newChannel)
     }
+  }
+
+  fun updateChannelInfo(channelId: String, newName: String, newDescription: String) {
+    val cleanName = newName.trim()
+    if (cleanName.isBlank()) return
+    firestore.collection("channels").document(channelId).set(
+      mapOf(
+        "name" to cleanName,
+        "description" to newDescription.trim()
+      ),
+      SetOptions.merge()
+    )
   }
 
   fun deleteChannel(channelId: String) {
