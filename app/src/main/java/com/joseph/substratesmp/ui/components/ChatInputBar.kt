@@ -39,6 +39,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Image
@@ -85,8 +86,22 @@ import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.io.File
 
+/**
+ * Checks for GIF/WebP and preserves original bytes for animation/transparency.
+ * Otherwise, compresses standard images to save bandwidth.
+ */
 fun processAndCompressImage(uri: Uri, context: Context): String? {
   return try {
+    val mimeType = context.contentResolver.getType(uri) ?: ""
+    if (mimeType.contains("gif") || mimeType.contains("webp")) {
+      val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+      if (bytes.size > 1500 * 1024) {
+        Toast.makeText(context, "GIF/WebP too large (Max 1.5MB)", Toast.LENGTH_SHORT).show()
+        return null
+      }
+      return "data:$mimeType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+    }
+
     val inputStream = context.contentResolver.openInputStream(uri) ?: return null
     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeStream(inputStream, null, options)
@@ -176,13 +191,31 @@ fun ChatInputBar(
     if (uri != null) {
       try {
         context.contentResolver.openInputStream(uri)?.use { stream ->
-          if (stream.available() > 800 * 1024) {
-            Toast.makeText(context, "File too large (Max 800KB)", Toast.LENGTH_SHORT).show()
+          if (stream.available() > 1000 * 1024) {
+            Toast.makeText(context, "File too large (Max 1MB)", Toast.LENGTH_SHORT).show()
           } else {
             val bytes = stream.readBytes()
             val fileName = getFileName(context, uri)
             val base64File = "data:application/octet-stream;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
             onSendMessage("", null, null, null, 0, base64File, fileName, false, replyingTo)
+          }
+        }
+      } catch (_: Exception) {}
+    }
+  }
+
+  // New Audio Picker Launcher
+  val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    if (uri != null) {
+      try {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+          if (stream.available() > 1500 * 1024) {
+            Toast.makeText(context, "Audio file too large (Max 1.5MB)", Toast.LENGTH_SHORT).show()
+          } else {
+            val bytes = stream.readBytes()
+            val base64Audio = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            // Send as an audio file so it renders in the MediaPlayer bubble
+            onSendMessage("", null, null, base64Audio, 0, null, null, false, replyingTo)
           }
         }
       } catch (_: Exception) {}
@@ -239,7 +272,7 @@ fun ChatInputBar(
           OutlinedTextField(
             value = coordText,
             onValueChange = { coordText = it },
-            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64)", style = CoordinateTextStyle, color = WhatsAppTextSecondary) },
+            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64, Z: 540)", style = CoordinateTextStyle, color = WhatsAppTextSecondary) },
             textStyle = CoordinateTextStyle,
             modifier = Modifier.weight(1f).height(46.dp),
             singleLine = true,
@@ -266,6 +299,14 @@ fun ChatInputBar(
               Spacer(modifier = Modifier.height(4.dp))
               Text("Document", fontSize = 12.sp, color = WhatsAppTextPrimary)
             }
+            
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; audioLauncher.launch("audio/*") }) {
+              Surface(shape = CircleShape, color = Color(0xFFE65100), modifier = Modifier.size(46.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AudioFile, contentDescription = "Audio", tint = Color.White) }
+              }
+              Spacer(modifier = Modifier.height(4.dp))
+              Text("Audio", fontSize = 12.sp, color = WhatsAppTextPrimary)
+            }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE91E63), modifier = Modifier.size(46.dp)) {
@@ -273,14 +314,6 @@ fun ChatInputBar(
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text("Gallery", fontSize = 12.sp, color = WhatsAppTextPrimary)
-            }
-
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
-              Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White) }
-              }
-              Spacer(modifier = Modifier.height(4.dp))
-              Text("Camera", fontSize = 12.sp, color = WhatsAppTextPrimary)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
