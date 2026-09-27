@@ -99,7 +99,8 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 object ImgBbUploader {
-  const val IMGBB_API_KEY = "5b4e28f296eafdcb8c4ddd3cb78492c8"
+  // Configured with your ImgBB v1 API key
+  const val IMGBB_API_KEY = "0925de674792b45903b6bbcf57fbd976"
 
   private val client = OkHttpClient.Builder()
     .connectTimeout(25, TimeUnit.SECONDS)
@@ -211,8 +212,8 @@ fun processAndCompressImage(uri: Uri, context: Context): String? {
     val mimeType = context.contentResolver.getType(uri) ?: ""
     if (mimeType.contains("gif") || mimeType.contains("webp")) {
       val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
-      if (bytes.size > 1500 * 1024) {
-        Toast.makeText(context, "GIF/WebP too large (Max 1.5MB)", Toast.LENGTH_SHORT).show()
+      if (bytes.size > 2000 * 1024) {
+        Toast.makeText(context, "GIF/WebP too large (Max 2MB)", Toast.LENGTH_SHORT).show()
         return null
       }
       return "data:$mimeType;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
@@ -342,35 +343,51 @@ fun ChatInputBar(
 
   val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
-      try {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-          if (stream.available() > 1000 * 1024) {
-            Toast.makeText(context, "File too large (Max 1MB for Firestore)", Toast.LENGTH_SHORT).show()
-          } else {
+      scope.launch {
+        try {
+          isUploadingImage = true
+          val fileName = getFileName(context, uri)
+          context.contentResolver.openInputStream(uri)?.use { stream ->
             val bytes = stream.readBytes()
-            val fileName = getFileName(context, uri)
+            if (bytes.size > 6 * 1024 * 1024) {
+              Toast.makeText(context, "File exceeds max 6MB limit", Toast.LENGTH_SHORT).show()
+              return@launch
+            }
             val base64File = "data:application/octet-stream;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
             onSendMessage("", null, null, null, 0, base64File, fileName, false, replyingTo)
           }
+        } catch (e: Exception) {
+          Toast.makeText(context, "Error reading file: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+          isUploadingImage = false
         }
-      } catch (_: Exception) {}
+      }
     }
   }
 
+  // Audio picker allowing files up to 6MB (including your 1.18MB audio)
   val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
-      try {
-        context.contentResolver.openInputStream(uri)?.use { stream ->
-          if (stream.available() > 1500 * 1024) {
-            Toast.makeText(context, "Audio file too large (Max 1.5MB)", Toast.LENGTH_SHORT).show()
-          } else {
+      scope.launch {
+        try {
+          isUploadingImage = true
+          val fileName = getFileName(context, uri)
+          Toast.makeText(context, "Processing $fileName...", Toast.LENGTH_SHORT).show()
+          context.contentResolver.openInputStream(uri)?.use { stream ->
             val bytes = stream.readBytes()
-            val fileName = getFileName(context, uri)
+            if (bytes.size > 6 * 1024 * 1024) {
+              Toast.makeText(context, "Audio exceeds max 6MB limit", Toast.LENGTH_SHORT).show()
+              return@launch
+            }
             val base64Audio = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
             onSendMessage("", null, null, base64Audio, 0, null, fileName, false, replyingTo)
           }
+        } catch (e: Exception) {
+          Toast.makeText(context, "Failed to read audio: ${e.message}", Toast.LENGTH_SHORT).show()
+        } finally {
+          isUploadingImage = false
         }
-      } catch (_: Exception) {}
+      }
     }
   }
 
