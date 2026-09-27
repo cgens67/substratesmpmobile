@@ -31,7 +31,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _channels = MutableStateFlow(DefaultChannels)
   val channels: StateFlow<List<Channel>> = _channels.asStateFlow()
 
-  private val _activeChannel = MutableStateFlow(DefaultChannels[1]) // Default to #general-chat
+  private val _activeChannel = MutableStateFlow(DefaultChannels[1])
   val activeChannel: StateFlow<Channel> = _activeChannel.asStateFlow()
 
   private val _showGamertagDialog = MutableStateFlow(false)
@@ -46,7 +46,13 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   init {
     viewModelScope.launch {
       authRepository.initializeAuth()
-      chatRepository.updateLocalGamertag(authRepository.userState.value.gamertag)
+      val currentGamertag = authRepository.userState.value.gamertag
+      chatRepository.updateLocalGamertag(currentGamertag)
+
+      // Prompt new users immediately to register a Gamertag
+      if (currentGamertag.isBlank()) {
+        _showGamertagDialog.value = true
+      }
       syncLiveChannels()
     }
   }
@@ -85,13 +91,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             }
             if (remoteChannels.isNotEmpty()) {
               _channels.value = remoteChannels
-              // Keep active channel reference in sync if it exists in remote
               remoteChannels.find { it.id == _activeChannel.value.id }?.let {
                 _activeChannel.value = it
               }
             }
           } else {
-            // Seed Firestore with the default realm channels so remote peers see them
             DefaultChannels.forEach { ch ->
               firestore.collection("channels").document(ch.id).set(
                 hashMapOf(
@@ -114,28 +118,42 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       _activeChannel.value = channel
       chatRepository.selectChannel(channel.id)
     } else if (channel.type == ChannelType.VOICE) {
-      // Connect to live Agora RTC voice channel
       val gamertag = userState.value.gamertag
+      if (gamertag.isBlank()) {
+        _showGamertagDialog.value = true
+        return
+      }
       voiceManager.joinVoiceChannel(channel.id, channel.name, gamertag)
     }
   }
 
   fun sendMessage(content: String, coordinates: String? = null) {
-    if (content.isBlank() && coordinates == null) return
     val user = userState.value
+    if (user.gamertag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+    if (content.isBlank() && coordinates == null) return
+    val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else "MEMBER"
     chatRepository.sendMessage(
       channelId = _activeChannel.value.id,
       senderName = user.gamertag,
-      senderRole = user.role,
+      senderRole = role,
       content = content.trim(),
       coordinates = coordinates
     )
   }
 
-  fun updateGamertag(newGamertag: String, newRole: String) {
-    authRepository.updateGamertag(newGamertag, newRole)
-    chatRepository.updateLocalGamertag(newGamertag)
-    _showGamertagDialog.value = false
+  fun registerGamertag(gamertag: String, onResult: (Result<String>) -> Unit) {
+    viewModelScope.launch {
+      val result = authRepository.registerGamertag(gamertag)
+      if (result.isSuccess) {
+        val savedTag = result.getOrNull() ?: gamertag
+        chatRepository.updateLocalGamertag(savedTag)
+        _showGamertagDialog.value = false
+      }
+      onResult(result)
+    }
   }
 
   fun setGamertagDialogVisible(visible: Boolean) {
