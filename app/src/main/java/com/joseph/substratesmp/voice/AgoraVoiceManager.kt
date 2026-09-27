@@ -3,6 +3,9 @@ package com.joseph.substratesmp.voice
 import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
+import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.joseph.substratesmp.SubstrateApplication
 import com.joseph.substratesmp.data.model.ActiveVoiceRoom
 import com.joseph.substratesmp.data.model.VoiceParticipant
@@ -37,6 +40,11 @@ class AgoraVoiceManager(private val context: Context? = null) {
   private var rtcEngine: RtcEngine? = null
   private var currentGamertag: String = ""
   private var activeNumericUid: Int = 0
+  private var currentChannelId: String = ""
+  private var voiceMembersListener: ListenerRegistration? = null
+
+  // In-memory mapping of numeric UID -> Gamertag and Admin flag
+  private val uidToUserMap = mutableMapOf<Int, Pair<String, Boolean>>()
 
   private fun getSafeContext(): Context? {
     val ctx = context?.applicationContext ?: context
@@ -46,6 +54,14 @@ class AgoraVoiceManager(private val context: Context? = null) {
 
   private fun getPrefs(): SharedPreferences? {
     return getSafeContext()?.getSharedPreferences("substrate_agora_prefs", Context.MODE_PRIVATE)
+  }
+
+  private val firestore: FirebaseFirestore by lazy {
+    val safeCtx = getSafeContext()
+    if (safeCtx != null && FirebaseApp.getApps(safeCtx).isEmpty()) {
+      FirebaseApp.initializeApp(safeCtx)
+    }
+    FirebaseFirestore.getInstance()
   }
 
   private val _voiceRoomState = MutableStateFlow<ActiveVoiceRoom?>(null)
@@ -62,7 +78,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
 
   private val rtcEventHandler = object : IRtcEngineEventHandler() {
     override fun onJoinChannelSuccess(channel: String?, uid: Int, elapsed: Int) {
-      Log.i(TAG, "Live Agora onJoinChannelSuccess: channel=$channel, uid=$uid, elapsed=${elapsed}ms")
+      Log.i(TAG, "Live Agora onJoinChannelSuccess: channel=$channel, uid=$uid")
       scope.launch {
         val current = _voiceRoomState.value ?: return@launch
         val isAdmin = currentGamertag.equals("Siang5680", ignoreCase = true)
@@ -79,23 +95,24 @@ class AgoraVoiceManager(private val context: Context? = null) {
         _voiceRoomState.value = current.copy(
           isConnected = true,
           isConnecting = false,
-          statusMessage = "Connected to live Agora channel: $channel",
+          statusMessage = "Connected • WhatsApp Call Audio Quality",
           participants = listOf(localUser) + remoteExisting
         )
       }
     }
 
     override fun onUserJoined(uid: Int, elapsed: Int) {
-      Log.i(TAG, "Live Agora remote user joined: uid=$uid, elapsed=${elapsed}ms")
+      Log.i(TAG, "Live Agora remote user joined: uid=$uid")
       scope.launch {
         val current = _voiceRoomState.value ?: return@launch
+        val resolved = resolveGamertag(uid)
         val newParticipant = VoiceParticipant(
           id = "remote_$uid",
-          name = "Player_$uid",
+          name = resolved.first,
           isSpeaking = false,
           isMuted = false,
           isLocal = false,
-          isAdmin = false,
+          isAdmin = resolved.second,
           audioLevel = 0.0f
         )
         if (current.participants.none { it.id == newParticipant.id }) {
@@ -117,7 +134,6 @@ class AgoraVoiceManager(private val context: Context? = null) {
     }
 
     override fun onUserMuteAudio(uid: Int, muted: Boolean) {
-      Log.i(TAG, "Live Agora remote user audio mute changed: uid=$uid, muted=$muted")
       scope.launch {
         val current = _voiceRoomState.value ?: return@launch
         _voiceRoomState.value = current.copy(
@@ -138,8 +154,8 @@ class AgoraVoiceManager(private val context: Context? = null) {
             if (participant.isLocal) sp.uid == 0 || sp.uid == activeNumericUid
             else participant.id == "remote_${sp.uid}"
           }
-          if (speakerMatch != null && speakerMatch.volume > 5) {
-            val normalizedLevel = (speakerMatch.volume / 255.0f).coerceIn(0.1f, 1.0f)
+          if (speakerMatch != null && speakerMatch.volume > 4) {
+            val normalizedLevel = (speakerMatch.volume / 255.0f).coerceIn(0.15f, 1.0f)
             participant.copy(
               isSpeaking = true,
               audioLevel = normalizedLevel
@@ -156,17 +172,16 @@ class AgoraVoiceManager(private val context: Context? = null) {
     }
 
     override fun onLeaveChannel(stats: RtcStats?) {
-      Log.i(TAG, "Live Agora onLeaveChannel: totalDuration=${stats?.totalDuration ?: 0}")
       scope.launch {
         _voiceRoomState.value = null
       }
     }
 
     override fun onError(err: Int) {
-      Log.e(TAG, "Live Agora onError: code=$err")
+      Log.e(TAG, "Agora error: code=$err")
       scope.launch {
         _voiceRoomState.value = _voiceRoomState.value?.copy(
-          statusMessage = "Agora error: code $err"
+          statusMessage = "Agora call issue (code $err)"
         )
       }
     }
@@ -179,15 +194,10 @@ class AgoraVoiceManager(private val context: Context? = null) {
   fun initAgoraEngine() {
     if (rtcEngine != null) return
 
-    val validContext = getSafeContext()
-    if (validContext == null) {
-      Log.w(TAG, "Cannot initialize Agora RtcEngine: Context is not ready yet")
-      return
-    }
+    val validContext = getSafeContext() ?: return
 
     try {
       val appContext = validContext.applicationContext ?: validContext
-
       try {
         io.agora.base.internal.ContextUtils.initialize(appContext)
       } catch (_: Throwable) {}
@@ -201,7 +211,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
       rtcEngine = RtcEngine.create(config)
       rtcEngine?.enableAudio()
       rtcEngine?.enableAudioVolumeIndication(200, 3, true)
-      Log.i(TAG, "Agora RtcEngine initialized successfully with App ID: ${_settings.value.appId}")
+      Log.i(TAG, "Agora RtcEngine initialized with App ID: ${_settings.value.appId}")
     } catch (e: Throwable) {
       Log.w(TAG, "Agora RtcEngine initialization fallback: ${e.message}")
     }
@@ -226,6 +236,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
 
   fun joinVoiceChannel(channelId: String, channelName: String, localGamertag: String) {
     currentGamertag = localGamertag
+    currentChannelId = channelId
 
     if (rtcEngine == null) {
       initAgoraEngine()
@@ -236,9 +247,15 @@ class AgoraVoiceManager(private val context: Context? = null) {
     } catch (_: Throwable) {}
 
     val isAdmin = localGamertag.equals("Siang5680", ignoreCase = true)
-    // Derive a stable positive 32-bit integer UID from localGamertag
     val numericUid = (localGamertag.hashCode().toLong() and 0x7FFFFFFFL).toInt().let { if (it <= 0) 10001 else it }
     activeNumericUid = numericUid
+
+    uidToUserMap[numericUid] = Pair(localGamertag, isAdmin)
+
+    // Publish local user presence to Firestore channel voice members
+    syncVoicePresenceToFirestore(channelId, numericUid, localGamertag, isAdmin)
+    // Listen to all voice members in real-time so other users' Gamertags resolve instantly
+    startVoiceMembersListener(channelId)
 
     val pendingLocalUser = VoiceParticipant(
       id = "local_$numericUid",
@@ -261,14 +278,12 @@ class AgoraVoiceManager(private val context: Context? = null) {
       isCameraOn = false,
       participants = listOf(pendingLocalUser),
       appId = _settings.value.appId,
-      statusMessage = "Connecting to Agora RTC channel: $channelId..."
+      statusMessage = "Connecting to $channelName..."
     )
 
     val sanitizedChannel = channelId.replace("-", "_")
-    val expirationSeconds = 24 * 3600
-    val privilegeTs = ((System.currentTimeMillis() / 1000) + expirationSeconds).toInt()
+    val privilegeTs = ((System.currentTimeMillis() / 1000) + 24 * 3600).toInt()
 
-    // 1. Generate client-side token locally using RtcTokenBuilder if no custom token was provided
     val token = if (_settings.value.token.isNotBlank()) {
       _settings.value.token
     } else {
@@ -282,24 +297,85 @@ class AgoraVoiceManager(private val context: Context? = null) {
           privilegeTs = privilegeTs
         )
       } catch (e: Throwable) {
-        Log.e(TAG, "Error generating Agora token client-side: ${e.message}", e)
+        Log.e(TAG, "Error generating Agora token: ${e.message}", e)
         ""
       }
     }
 
-    // 2. Pass generated token, sanitized channel, and numeric UID to joinChannel
     try {
       rtcEngine?.setEnableSpeakerphone(true)
       rtcEngine?.muteLocalAudioStream(false)
       val joinCode = rtcEngine?.joinChannel(token, sanitizedChannel, "", numericUid)
-      Log.i(TAG, "Live Agora joinChannel($sanitizedChannel, uid=$numericUid) returned code: $joinCode")
+      Log.i(TAG, "Agora joinChannel($sanitizedChannel, uid=$numericUid) returned code: $joinCode")
     } catch (e: Throwable) {
-      Log.e(TAG, "Live Agora joinChannel error: ${e.message}", e)
+      Log.e(TAG, "Agora joinChannel error: ${e.message}", e)
       _voiceRoomState.value = _voiceRoomState.value?.copy(
         isConnecting = false,
-        statusMessage = "Connection failed: ${e.message}"
+        statusMessage = "Call failed: ${e.message}"
       )
     }
+  }
+
+  private fun syncVoicePresenceToFirestore(channelId: String, uid: Int, gamertag: String, isAdmin: Boolean) {
+    try {
+      val docData = hashMapOf(
+        "uid" to uid,
+        "gamertag" to gamertag,
+        "isAdmin" to isAdmin,
+        "joinedAt" to System.currentTimeMillis()
+      )
+      firestore.collection("channels")
+        .document(channelId)
+        .collection("voiceMembers")
+        .document(uid.toString())
+        .set(docData)
+        .addOnSuccessListener {
+          Log.d(TAG, "Voice member $gamertag ($uid) registered in Firestore")
+        }
+    } catch (e: Exception) {
+      Log.w(TAG, "Failed syncing voice presence: ${e.message}")
+    }
+  }
+
+  private fun startVoiceMembersListener(channelId: String) {
+    voiceMembersListener?.remove()
+    voiceMembersListener = firestore.collection("channels")
+      .document(channelId)
+      .collection("voiceMembers")
+      .addSnapshotListener { snapshot, _ ->
+        if (snapshot != null) {
+          for (doc in snapshot.documents) {
+            val uid = doc.getLong("uid")?.toInt() ?: continue
+            val gamertag = doc.getString("gamertag") ?: continue
+            val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
+            uidToUserMap[uid] = Pair(gamertag, isAdmin)
+          }
+
+          // Refresh current participant list with real Gamertags
+          val current = _voiceRoomState.value ?: return@addSnapshotListener
+          val updated = current.participants.map { participant ->
+            if (participant.isLocal) {
+              participant
+            } else {
+              val rawUid = participant.id.removePrefix("remote_").toIntOrNull()
+              if (rawUid != null && uidToUserMap.containsKey(rawUid)) {
+                val (name, admin) = uidToUserMap[rawUid]!!
+                participant.copy(name = name, isAdmin = admin)
+              } else {
+                participant
+              }
+            }
+          }
+          _voiceRoomState.value = current.copy(participants = updated)
+        }
+      }
+  }
+
+  private fun resolveGamertag(uid: Int): Pair<String, Boolean> {
+    if (uidToUserMap.containsKey(uid)) {
+      return uidToUserMap[uid]!!
+    }
+    return Pair("User_$uid", false)
   }
 
   fun toggleMute() {
@@ -374,6 +450,19 @@ class AgoraVoiceManager(private val context: Context? = null) {
   }
 
   fun disconnect() {
+    try {
+      if (currentChannelId.isNotBlank() && activeNumericUid != 0) {
+        firestore.collection("channels")
+          .document(currentChannelId)
+          .collection("voiceMembers")
+          .document(activeNumericUid.toString())
+          .delete()
+      }
+    } catch (_: Exception) {}
+
+    voiceMembersListener?.remove()
+    voiceMembersListener = null
+
     try {
       rtcEngine?.leaveChannel()
     } catch (e: Throwable) {
