@@ -62,7 +62,6 @@ class ChatRepository(private val context: Context) {
               val isLocal = currentGamertag.isNotBlank() && sender.equals(currentGamertag, ignoreCase = true)
               val readByList = (doc.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
-              // Auto-mark as read if it's not my message and I haven't read it yet
               if (!isLocal && currentGamertag.isNotBlank() && !readByList.contains(currentGamertag)) {
                 doc.reference.update("readBy", FieldValue.arrayUnion(currentGamertag))
               }
@@ -121,26 +120,61 @@ class ChatRepository(private val context: Context) {
     if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
     if (senderName.isBlank()) return
 
+    val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
     val docRef = firestore.collection("channels").document(channelId).collection("messages").document()
-    docRef.set(
-      hashMapOf(
-        "channelId" to channelId,
-        "senderName" to senderName,
-        "senderRole" to if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole,
-        "content" to content,
-        "timestamp" to System.currentTimeMillis(),
-        "coordinates" to coordinates,
-        "imageUrl" to imageUrl,
-        "audioUrl" to audioUrl,
-        "audioDurationSeconds" to audioDurationSeconds,
-        "fileUrl" to fileUrl,
-        "fileName" to fileName,
-        "isSticker" to isSticker,
-        "replyToId" to replyToId,
-        "replyToSender" to replyToSender,
-        "replyToContent" to replyToContent,
-        "readBy" to emptyList<String>()
-      )
+
+    // Subcollection chunking: If payload > 600KB (e.g. your 1.18MB audio file), chunk it to bypass Firestore 1MB doc limit
+    val CHUNK_LIMIT = 500_000
+    var finalAudioUrl = audioUrl
+    var isAudioChunked = false
+    var audioChunks = emptyList<String>()
+
+    if (audioUrl != null && audioUrl.length > CHUNK_LIMIT) {
+      isAudioChunked = true
+      audioChunks = audioUrl.chunked(CHUNK_LIMIT)
+      finalAudioUrl = "chunked:${audioChunks.size}"
+    }
+
+    var finalFileUrl = fileUrl
+    var isFileChunked = false
+    var fileChunks = emptyList<String>()
+
+    if (fileUrl != null && fileUrl.length > CHUNK_LIMIT) {
+      isFileChunked = true
+      fileChunks = fileUrl.chunked(CHUNK_LIMIT)
+      finalFileUrl = "chunked:${fileChunks.size}"
+    }
+
+    val docData = hashMapOf(
+      "channelId" to channelId,
+      "senderName" to senderName,
+      "senderRole" to effectiveRole,
+      "content" to content,
+      "timestamp" to System.currentTimeMillis(),
+      "coordinates" to coordinates,
+      "imageUrl" to imageUrl,
+      "audioUrl" to finalAudioUrl,
+      "audioDurationSeconds" to audioDurationSeconds,
+      "fileUrl" to finalFileUrl,
+      "fileName" to fileName,
+      "isSticker" to isSticker,
+      "replyToId" to replyToId,
+      "replyToSender" to replyToSender,
+      "replyToContent" to replyToContent,
+      "readBy" to emptyList<String>()
     )
+
+    docRef.set(docData).addOnSuccessListener {
+      if (isAudioChunked) {
+        audioChunks.forEachIndexed { idx, chunk ->
+          docRef.collection("audioChunks").document(String.format("%03d", idx)).set(mapOf("data" to chunk))
+        }
+      }
+      if (isFileChunked) {
+        fileChunks.forEachIndexed { idx, chunk ->
+          docRef.collection("fileChunks").document(String.format("%03d", idx)).set(mapOf("data" to chunk))
+        }
+      }
+    }
   }
 }
