@@ -3,6 +3,7 @@ package com.joseph.substratesmp.ui.components
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
@@ -99,7 +100,6 @@ import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 object ImgBbUploader {
-  // Configured with your ImgBB v1 API key
   const val IMGBB_API_KEY = "0925de674792b45903b6bbcf57fbd976"
 
   private val client = OkHttpClient.Builder()
@@ -269,6 +269,19 @@ fun getFileName(context: Context, uri: Uri): String {
   return name
 }
 
+fun getAudioDurationSeconds(context: Context, uri: Uri): Int {
+  return try {
+    val retriever = MediaMetadataRetriever()
+    retriever.setDataSource(context, uri)
+    val timeStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+    retriever.release()
+    val ms = timeStr?.toLongOrNull() ?: 0L
+    (ms / 1000).toInt()
+  } catch (_: Exception) {
+    0
+  }
+}
+
 @Composable
 fun ChatInputBar(
   channelName: String,
@@ -365,14 +378,16 @@ fun ChatInputBar(
     }
   }
 
-  // Audio picker allowing files up to 6MB (including your 1.18MB audio)
+  // Audio picker extracting true duration
   val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       scope.launch {
         try {
           isUploadingImage = true
           val fileName = getFileName(context, uri)
+          val durSec = getAudioDurationSeconds(context, uri)
           Toast.makeText(context, "Processing $fileName...", Toast.LENGTH_SHORT).show()
+
           context.contentResolver.openInputStream(uri)?.use { stream ->
             val bytes = stream.readBytes()
             if (bytes.size > 6 * 1024 * 1024) {
@@ -380,7 +395,7 @@ fun ChatInputBar(
               return@launch
             }
             val base64Audio = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-            onSendMessage("", null, null, base64Audio, 0, null, fileName, false, replyingTo)
+            onSendMessage("", null, null, base64Audio, durSec, null, fileName, false, replyingTo)
           }
         } catch (e: Exception) {
           Toast.makeText(context, "Failed to read audio: ${e.message}", Toast.LENGTH_SHORT).show()
