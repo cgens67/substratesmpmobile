@@ -7,19 +7,88 @@ import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.shape.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.*
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DonutLarge
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,9 +104,39 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.joseph.substratesmp.data.model.*
-import com.joseph.substratesmp.ui.components.*
-import com.joseph.substratesmp.ui.theme.*
+import com.joseph.substratesmp.data.model.Channel
+import com.joseph.substratesmp.data.model.ChannelType
+import com.joseph.substratesmp.data.model.ChatMessage
+import com.joseph.substratesmp.data.model.StatusUpdate
+import com.joseph.substratesmp.ui.components.ActiveVoiceBar
+import com.joseph.substratesmp.ui.components.AdminControlSheet
+import com.joseph.substratesmp.ui.components.AgoraSettingsDialog
+import com.joseph.substratesmp.ui.components.ChatInputBar
+import com.joseph.substratesmp.ui.components.ChatMessageItem
+import com.joseph.substratesmp.ui.components.CustomDropdownModalSheet
+import com.joseph.substratesmp.ui.components.EmojiPickerView
+import com.joseph.substratesmp.ui.components.GamertagDialog
+import com.joseph.substratesmp.ui.components.SelectContactDialog
+import com.joseph.substratesmp.ui.components.ServerInfoSheet
+import com.joseph.substratesmp.ui.components.SheetOption
+import com.joseph.substratesmp.ui.components.StatusCreatorDialog
+import com.joseph.substratesmp.ui.components.StatusViewerScreen
+import com.joseph.substratesmp.ui.components.TypingBubble
+import com.joseph.substratesmp.ui.components.VideoCallScreen
+import com.joseph.substratesmp.ui.components.dropLastGrapheme
+import com.joseph.substratesmp.ui.components.processAndCompressImage
+import com.joseph.substratesmp.ui.theme.RoleAdminGold
+import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
+import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
+import com.joseph.substratesmp.ui.theme.WhatsAppChipUnselected
+import com.joseph.substratesmp.ui.theme.WhatsAppDivider
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
+import com.joseph.substratesmp.ui.theme.WhatsAppHeaderGreen
+import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
+import com.joseph.substratesmp.ui.theme.WhatsAppSearchBackground
+import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
+import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -422,9 +521,8 @@ fun SubstrateApp(
                         replyingToMessage = null
                         showEmojiPicker = false
                       },
-                      onBackspace = {
-                        chatInputText = dropLastGrapheme(chatInputText)
-                      }
+                      onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
+                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
                     )
                   }
                 }
@@ -671,7 +769,7 @@ fun SubstrateApp(
                             }
                           }
 
-                          items(statuses, key = { it.id }) { status ->
+                          items(statuses) { status ->
                             val cardBg = when (status.backgroundTheme) {
                               "CRIMSON" -> Color(0xFFFF4500)
                               "END_VOID" -> Color(0xFF6A0DAD)
