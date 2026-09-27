@@ -88,6 +88,7 @@ fun SubstrateApp(
   val typingUsers by viewModel.typingUsers.collectAsStateWithLifecycle()
   val mutedChannels by viewModel.mutedChannels.collectAsStateWithLifecycle()
   val blockedUsers by viewModel.blockedUsers.collectAsStateWithLifecycle()
+  val favouriteChannels by viewModel.favouriteChannels.collectAsStateWithLifecycle()
 
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
@@ -106,6 +107,7 @@ fun SubstrateApp(
 
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var showCreateStatusDialog by remember { mutableStateOf(false) }
+  var longPressedChannel by remember { mutableStateOf<Channel?>(null) }
   
   var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
   var isStatusViewerVisible by remember { mutableStateOf(false) }
@@ -137,27 +139,28 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth Auto-Scroll on Initial Chat Load
+  // Smooth scroll to bottom upon entering chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
-      delay(50L)
-      val lastIndex = (messages.size + (if (typingUsers.isNotEmpty()) 1 else 0)).coerceAtLeast(0)
-      listState.scrollToItem(lastIndex)
+      delay(80L)
+      listState.scrollToItem(messages.size)
     }
   }
 
-  // Smooth Auto-Scroll on New Messages (Only if sent by you, OR already at the bottom)
-  LaunchedEffect(messages.size, typingUsers.size) {
-    if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
-      val isSentByMe = messages.lastOrNull()?.isLocalUser == true
-      if (isSentByMe || isScrolledToBottom) {
-        delay(50L)
-        val lastIndex = (messages.size + (if (typingUsers.isNotEmpty()) 1 else 0)).coerceAtLeast(0)
-        listState.animateScrollToItem(lastIndex)
+  // Smooth scroll when a new incoming message arrives while already viewing near bottom
+  var previousMsgCount by remember { mutableIntStateOf(0) }
+  LaunchedEffect(messages.size) {
+    if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
+      if (isScrolledToBottom) {
+        delay(60L)
+        val targetIndex = (messages.size + if (typingUsers.isNotEmpty()) 1 else 0)
+        listState.animateScrollToItem(targetIndex)
       }
     }
+    previousMsgCount = messages.size
   }
 
+  // Typing state update (does NOT scroll)
   LaunchedEffect(chatInputText) {
     if (chatInputText.isNotBlank()) {
       viewModel.setTyping(true)
@@ -263,7 +266,10 @@ fun SubstrateApp(
                 title = {
                   Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { viewModel.setServerInfoSheetVisible(true) }
+                    modifier = Modifier.clickable {
+                      // Tapping contact/channel header toggles info & mute/block options
+                      showMenuDropdownSheet = true
+                    }
                   ) {
                     Box(
                       modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFFE9EDEF)),
@@ -293,7 +299,7 @@ fun SubstrateApp(
                         )
                       } else {
                         Text(
-                          text = if (activeChannel.isDm) "Direct Message" else "mc.substratesmp.net",
+                          text = if (activeChannel.isDm) "Direct Message • Tap for info" else "mc.substratesmp.net • Tap for info",
                           color = WhatsAppTextSecondary,
                           fontSize = 11.5.sp
                         )
@@ -344,47 +350,47 @@ fun SubstrateApp(
             Box(modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)) {
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                  if (messages.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                      Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.9f)) {
-                        Text(
-                          "Messages in #${activeChannel.name} are synchronized in real-time.",
-                          color = WhatsAppTextSecondary,
-                          style = MaterialTheme.typography.labelSmall,
-                          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                  LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+                    item {
+                      Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
+                          Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                        }
                       }
                     }
-                  } else {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+
+                    items(messages, key = { it.id }) { message ->
+                      val isRead = if (activeChannel.isDm) {
+                        val recipient = activeChannel.dmRecipientGamertag
+                        if (!recipient.isNullOrBlank()) {
+                          message.readBy.any { it.equals(recipient, ignoreCase = true) }
+                        } else {
+                          message.readBy.isNotEmpty()
+                        }
+                      } else {
+                        val cleanSender = message.senderName.trim()
+                        message.readBy.any { !it.equals(cleanSender, ignoreCase = true) }
+                      }
+
+                      ChatMessageItem(
+                        message = message,
+                        isRead = isRead,
+                        canDelete = userState.isAdmin || message.isLocalUser,
+                        onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
+                        onReply = { msg -> replyingToMessage = msg },
+                        onImageClick = { url -> viewedImageUrl = url },
+                        modifier = Modifier.animateItem()
+                      )
+                    }
+
+                    if (typingUsers.isNotEmpty()) {
                       item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                          Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
-                            Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
-                          }
-                        }
-                      }
-
-                      items(messages, key = { it.id }) { message ->
-                        ChatMessageItem(
-                          message = message,
-                          isReadByAll = message.readBy.size >= (members.size - 1),
-                          canDelete = userState.isAdmin || message.isLocalUser,
-                          onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
-                          onReply = { msg -> replyingToMessage = msg },
-                          onImageClick = { url -> viewedImageUrl = url },
-                          modifier = Modifier.animateItem()
-                        )
-                      }
-
-                      if (typingUsers.isNotEmpty()) {
-                        item {
-                          TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
-                        }
+                        TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
                       }
                     }
                   }
 
+                  // Floating scroll-to-bottom button
                   androidx.compose.animation.AnimatedVisibility(
                     visible = !isScrolledToBottom,
                     enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
@@ -488,6 +494,13 @@ fun SubstrateApp(
                       )
                       chatInputText = ""
                       replyingToMessage = null
+
+                      // SMOOTH SCROLL ONLY ON SEND
+                      scope.launch {
+                        delay(60L)
+                        val targetIndex = (messages.size + 1).coerceAtLeast(0)
+                        listState.animateScrollToItem(targetIndex)
+                      }
                     },
                     replyingTo = replyingToMessage,
                     onCancelReply = { replyingToMessage = null },
@@ -515,11 +528,13 @@ fun SubstrateApp(
                         viewModel.sendMessage("", null, st.imageData, null, 0, null, null, true, replyingToMessage)
                         replyingToMessage = null
                         showEmojiPicker = false
+                        scope.launch {
+                          delay(60L)
+                          listState.animateScrollToItem((messages.size + 1).coerceAtLeast(0))
+                        }
                       },
                       onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
-                      onBackspace = {
-                        chatInputText = dropLastGrapheme(chatInputText)
-                      }
+                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
                     )
                   }
                 }
@@ -537,7 +552,13 @@ fun SubstrateApp(
                   horizontalArrangement = Arrangement.SpaceBetween,
                   verticalAlignment = Alignment.CenterVertically
                 ) {
-                  Text("WhatsApp", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = WhatsAppHeaderGreen, fontSize = 25.sp)
+                  Text(
+                    text = "Substrate SMP",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = WhatsAppHeaderGreen,
+                    fontSize = 24.sp
+                  )
 
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     if (userState.isAdmin) {
@@ -579,6 +600,7 @@ fun SubstrateApp(
                     }
                   }
 
+                  // ACTIVE & WORKING FILTER CHIPS: All | Unread | Favourites | Groups
                   val filterChips = listOf("All", "Unread", "Favourites", "Groups")
                   LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(filterChips) { chip ->
@@ -661,17 +683,28 @@ fun SubstrateApp(
               ) { tabIndex ->
                 when (tabIndex) {
                   0 -> {
-                    // Filters the chats based on the active chip
-                    val filtered = channels.filter { it.type == ChannelType.TEXT }.filter { ch ->
-                      when (activeFilterChip) {
-                        "Unread" -> !ch.lastMessageIsRead && !ch.lastMessage.isNullOrBlank() && !ch.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
-                        "Favourites" -> ch.id == "general-chat" || ch.id == "announcements"
-                        "Groups" -> !ch.isDm
-                        else -> true // "All"
+                    // DYNAMIC FILTERING LOGIC FOR ALL 4 CHIPS
+                    val filtered = channels.filter { it.type == ChannelType.TEXT }
+                      .filter { ch ->
+                        when (activeFilterChip) {
+                          "Unread" -> {
+                            val isLocalSender = ch.lastMessageSender != null && ch.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
+                            val hasUnreadIncoming = !ch.lastMessageIsRead && !isLocalSender && ch.lastMessage != null
+                            ch.unreadCount > 0 || hasUnreadIncoming
+                          }
+                          "Favourites" -> {
+                            favouriteChannels.contains(ch.id) || ch.id == "announcements" || ch.id == "general-chat"
+                          }
+                          "Groups" -> {
+                            !ch.isDm // Shows only groups, filters out 1-on-1 private messages
+                          }
+                          else -> true // "All"
+                        }
                       }
-                    }.filter { ch ->
-                      if (searchQuery.isBlank()) true else ch.name.contains(searchQuery, true) || ch.description.contains(searchQuery, true)
-                    }
+                      .filter { ch ->
+                        if (searchQuery.isBlank()) true
+                        else ch.name.contains(searchQuery, true) || ch.description.contains(searchQuery, true) || (ch.lastMessage?.contains(searchQuery, true) == true)
+                      }
 
                     LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White)) {
                       item {
@@ -702,90 +735,116 @@ fun SubstrateApp(
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
 
-                      items(filtered, key = { it.id }) { channel ->
-                        val isMuted = mutedChannels.contains(channel.id)
-                        val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
-                        val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
-                        val isLastMessageRead = channel.lastMessageIsRead
-
-                        val displayPreview = when {
-                          channel.lastMessage.isNullOrBlank() -> channel.description
-                          channel.isDm -> channel.lastMessage
-                          isLocalSender -> "You: ${channel.lastMessage}"
-                          channel.lastMessageSender != null -> "${channel.lastMessageSender}: ${channel.lastMessage}"
-                          else -> channel.lastMessage
-                        }
-
-                        Row(
-                          modifier = Modifier.fillMaxWidth().clickable {
-                            viewModel.selectChannel(channel)
-                            currentScreen = "chat_screen"
-                          }.padding(horizontal = 16.dp, vertical = 12.dp)
-                          .animateItem(),
-                          verticalAlignment = Alignment.CenterVertically
-                        ) {
-                          Box(
-                            modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else WhatsAppNavSelectedPill),
-                            contentAlignment = Alignment.Center
-                          ) {
-                            Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                      if (filtered.isEmpty()) {
+                        item {
+                          Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
+                            Text(
+                              text = when (activeFilterChip) {
+                                "Unread" -> "No unread chats"
+                                "Favourites" -> "No favourite chats yet. Long-press any chat to star it."
+                                "Groups" -> "No group channels found"
+                                else -> "No chats found"
+                              },
+                              color = WhatsAppTextSecondary,
+                              fontSize = 14.sp
+                            )
                           }
-                          Spacer(modifier = Modifier.width(14.dp))
-                          Column(modifier = Modifier.weight(1f)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                              Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
-                                Text(
-                                  text = channel.name,
-                                  fontWeight = FontWeight.SemiBold,
-                                  color = WhatsAppTextPrimary,
-                                  fontSize = 16.5.sp,
-                                  maxLines = 1,
-                                  overflow = TextOverflow.Ellipsis
-                                )
-                                if (channel.isDm) {
-                                  Spacer(modifier = Modifier.width(4.dp))
-                                  Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                }
-                                if (channel.isRestrictedToAdmin) {
-                                  Spacer(modifier = Modifier.width(4.dp))
-                                  Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
-                                }
-                              }
-                              Row(verticalAlignment = Alignment.CenterVertically) {
-                                if (isMuted) {
-                                  Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
-                                  Spacer(modifier = Modifier.width(4.dp))
-                                }
-                                if (formattedTime.isNotBlank()) {
-                                  Text(formattedTime, color = if (!isLastMessageRead && !isLocalSender) WhatsAppGreenDark else WhatsAppTextSecondary, fontSize = 12.sp)
-                                }
-                              }
-                            }
+                        }
+                      } else {
+                        items(filtered, key = { it.id }) { channel ->
+                          val isMuted = mutedChannels.contains(channel.id)
+                          val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
+                          val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
+                          val isLastMessageRead = channel.lastMessageIsRead
 
-                            Spacer(modifier = Modifier.height(2.dp))
+                          val displayPreview = when {
+                            channel.lastMessage.isNullOrBlank() -> channel.description
+                            channel.isDm -> channel.lastMessage
+                            isLocalSender -> "You: ${channel.lastMessage}"
+                            channel.lastMessageSender != null -> "${channel.lastMessageSender}: ${channel.lastMessage}"
+                            else -> channel.lastMessage
+                          }
 
-                            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                              if (isLocalSender && channel.lastMessage != null) {
-                                Icon(
-                                  Icons.Default.DoneAll,
-                                  contentDescription = if (isLastMessageRead) "Read" else "Sent",
-                                  tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
-                                  modifier = Modifier.size(15.dp)
-                                )
-                                Spacer(modifier = Modifier.width(3.dp))
-                              }
-                              Text(
-                                text = displayPreview,
-                                color = WhatsAppTextSecondary,
-                                fontSize = 13.5.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
+                          Row(
+                            modifier = Modifier
+                              .fillMaxWidth()
+                              .combinedClickable(
+                                onClick = {
+                                  viewModel.selectChannel(channel)
+                                  currentScreen = "chat_screen"
+                                },
+                                onLongClick = {
+                                  // Long-press opens quick menu for Mute, Star, Block
+                                  longPressedChannel = channel
+                                }
                               )
+                              .padding(horizontal = 16.dp, vertical = 12.dp)
+                              .animateItem(),
+                            verticalAlignment = Alignment.CenterVertically
+                          ) {
+                            Box(
+                              modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else WhatsAppNavSelectedPill),
+                              contentAlignment = Alignment.Center
+                            ) {
+                              Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                            }
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                              Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f, fill = false)) {
+                                  Text(
+                                    text = channel.name,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = WhatsAppTextPrimary,
+                                    fontSize = 16.5.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                  )
+                                  if (channel.isDm) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                  }
+                                  if (channel.isRestrictedToAdmin) {
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
+                                  }
+                                }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                  if (isMuted) {
+                                    Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                  }
+                                  if (formattedTime.isNotBlank()) {
+                                    Text(formattedTime, color = if (isLastMessageRead) WhatsAppTextSecondary else WhatsAppGreenDark, fontSize = 12.sp)
+                                  }
+                                }
+                              }
+
+                              Spacer(modifier = Modifier.height(2.dp))
+
+                              Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                if (isLocalSender && channel.lastMessage != null) {
+                                  Icon(
+                                    Icons.Default.DoneAll,
+                                    contentDescription = if (isLastMessageRead) "Read" else "Sent",
+                                    tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                                    modifier = Modifier.size(15.dp)
+                                  )
+                                  Spacer(modifier = Modifier.width(3.dp))
+                                }
+                                Text(
+                                  text = displayPreview,
+                                  color = WhatsAppTextSecondary,
+                                  fontSize = 13.5.sp,
+                                  maxLines = 1,
+                                  overflow = TextOverflow.Ellipsis,
+                                  modifier = Modifier.weight(1f)
+                                )
+                              }
                             }
                           }
+                          HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                         }
-                        HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
                     }
                   }
@@ -810,8 +869,7 @@ fun SubstrateApp(
                                 ) {
                                   Text(userState.gamertag.take(1).ifBlank { "Y" }.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
                                   Box(
-                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreen),
-                                    contentAlignment = Alignment.Center
+                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreenDark)
                                   ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                                   }
@@ -1001,6 +1059,32 @@ fun SubstrateApp(
     }
   }
 
+  // Long-press Context Sheet for Chats in Home List (Mute, Star, Block)
+  if (longPressedChannel != null) {
+    val ch = longPressedChannel!!
+    val isMuted = viewModel.isChannelMuted(ch.id)
+    val isFav = viewModel.isFavourite(ch.id)
+    val isBlocked = ch.isDm && ch.dmRecipientGamertag != null && viewModel.isUserBlocked(ch.dmRecipientGamertag!!)
+
+    CustomDropdownModalSheet(
+      options = listOf(
+        SheetOption("mute", if (isMuted) "Unmute notifications" else "Mute notifications", if (isMuted) "Turn sound back on" else "Silence alerts for this chat", isSelected = isMuted),
+        SheetOption("fav", if (isFav) "Remove from Favourites" else "Add to Favourites", if (isFav) "Remove star" else "Keep at top of Favourites filter", isSelected = isFav),
+        if (ch.isDm && ch.dmRecipientGamertag != null) {
+          SheetOption("block", if (isBlocked) "Unblock ${ch.dmRecipientGamertag}" else "Block ${ch.dmRecipientGamertag}", if (isBlocked) "Allow messages" else "Stop receiving messages", isSelected = isBlocked)
+        } else null
+      ).filterNotNull(),
+      onDismiss = { longPressedChannel = null },
+      onOptionSelected = { opt ->
+        when (opt.id) {
+          "mute" -> viewModel.toggleMuteChannel(ch.id)
+          "fav" -> viewModel.toggleFavourite(ch.id)
+          "block" -> ch.dmRecipientGamertag?.let { viewModel.toggleBlockUser(it) }
+        }
+      }
+    )
+  }
+
   if (showSelectContactDialog) {
     SelectContactDialog(
       members = members,
@@ -1013,33 +1097,29 @@ fun SubstrateApp(
     )
   }
 
-  // Mute / Block / Admin Panel Modal Sheet
+  // Header & 3-Dots Dropdown with Mute, Block, Server Info
   if (showMenuDropdownSheet) {
-    val isMuted = mutedChannels.contains(activeChannel.id)
     val isDm = activeChannel.isDm
     val recipient = activeChannel.dmRecipientGamertag
-    val isBlocked = recipient != null && blockedUsers.contains(recipient.lowercase().trim())
-
-    val menuOptions = mutableListOf<SheetOption>()
-    if (currentScreen == "chat_screen") {
-      menuOptions.add(SheetOption("mute", if (isMuted) "Unmute Notifications" else "Mute Notifications", if (isMuted) "Notifications are silenced" else "Play sounds on messages", isSelected = isMuted))
-      if (isDm && recipient != null) {
-        menuOptions.add(SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock this contact" else "Stop receiving messages", isSelected = isBlocked))
-      }
-    }
-    menuOptions.add(SheetOption("profile", "Account Profile", "Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", isSelected = false))
-    menuOptions.add(SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = true))
-    menuOptions.add(SheetOption("agora", "Voice Engine Settings", "App ID: ${agoraSettings.appId.take(8)}...", isSelected = false))
-    if (userState.isAdmin) {
-      menuOptions.add(SheetOption("admin", "Admin Control Console", "Manage channels and player roles", isSelected = false))
-    }
+    val isMuted = viewModel.isChannelMuted(activeChannel.id)
+    val isFav = viewModel.isFavourite(activeChannel.id)
+    val isBlocked = recipient != null && viewModel.isUserBlocked(recipient)
 
     CustomDropdownModalSheet(
-      options = menuOptions,
+      options = listOf(
+        if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) "Unmute notifications" else "Mute notifications", if (isMuted) "Turn sound back on" else "Silence alerts for this chat", isSelected = isMuted) else null,
+        if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) "Remove from Favourites" else "Add to Favourites", if (isFav) "Remove star" else "Keep in Favourites filter", isSelected = isFav) else null,
+        if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock" else "Stop receiving messages", isSelected = isBlocked) else null,
+        SheetOption("profile", "Account Profile", "Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", isSelected = false),
+        SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = true),
+        SheetOption("agora", "Voice Engine Settings", "App ID: ${agoraSettings.appId.take(8)}...", isSelected = false),
+        if (userState.isAdmin) SheetOption("admin", "Admin Control Console", "Manage channels and player roles", isSelected = false) else null
+      ).filterNotNull(),
       onDismiss = { showMenuDropdownSheet = false },
       onOptionSelected = { option ->
         when (option.id) {
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
+          "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
           "profile" -> viewModel.setGamertagDialogVisible(true)
           "server" -> viewModel.setServerInfoSheetVisible(true)
