@@ -1,6 +1,5 @@
 package com.joseph.substratesmp.ui.components
 
-import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
@@ -21,7 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -57,11 +55,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.repository.AuthUserState
+import com.joseph.substratesmp.ui.AppSettings
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 
 data class SettingItemData(
@@ -75,27 +73,16 @@ data class SettingItemData(
 @Composable
 fun SettingsScreen(
   userState: AuthUserState,
+  appSettings: AppSettings,
+  onUpdateSetting: (String, Any) -> Unit,
   onNavigateBack: () -> Unit,
   onNavigateProfile: () -> Unit
 ) {
-  val context = LocalContext.current
-  val prefs = context.getSharedPreferences("substrate_settings_prefs", Context.MODE_PRIVATE)
   val animState = remember { MutableTransitionState(false) }.apply { targetState = true }
 
   var isSearching by remember { mutableStateOf(false) }
   var searchQuery by remember { mutableStateOf("") }
   var activeDialog by remember { mutableStateOf<String?>(null) }
-
-  // Persistent States
-  var isNightMode by remember { mutableStateOf(prefs.getBoolean("night_mode", false)) }
-  var isAnimations by remember { mutableStateOf(prefs.getBoolean("animations", true)) }
-  var isNotifications by remember { mutableStateOf(prefs.getBoolean("notifications", true)) }
-  var isAutoDownload by remember { mutableStateOf(prefs.getBoolean("auto_download", true)) }
-  var isPowerSaving by remember { mutableStateOf(prefs.getBoolean("power_saving", false)) }
-  var selectedLang by remember { mutableStateOf(prefs.getString("language", "English") ?: "English") }
-
-  fun savePref(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply() }
-  fun savePref(key: String, value: String) { prefs.edit().putString(key, value).apply() }
 
   val settingsList = listOf(
     SettingItemData("account", Icons.Default.Person, Color(0xFF1DA1F2), "Account", "Number, Username, Bio"),
@@ -106,7 +93,7 @@ fun SettingsScreen(
     SettingItemData("folders", Icons.Default.Folder, Color(0xFF1DA1F2), "Chat Folders", "Sort chats into folders"),
     SettingItemData("devices", Icons.Default.Devices, Color(0xFF00C6CC), "Devices", "Manage connected devices"),
     SettingItemData("power", Icons.Default.BatteryChargingFull, Color(0xFFF7A23B), "Power Saving", "Reduce power usage on low charge"),
-    SettingItemData("language", Icons.Default.Language, Color(0xFFB15DFF), "Language", selectedLang)
+    SettingItemData("language", Icons.Default.Language, Color(0xFFB15DFF), "Language", appSettings.language)
   )
 
   val filteredSettings = settingsList.filter { 
@@ -179,13 +166,12 @@ fun SettingsScreen(
               }
             }
           }
-          Spacer(modifier = Modifier.height(120.dp)) // padding for floating bar
+          Spacer(modifier = Modifier.height(120.dp))
         }
       }
     }
   }
 
-  // Functional Dialogs
   when (activeDialog) {
     "chat" -> {
       AlertDialog(
@@ -195,11 +181,11 @@ fun SettingsScreen(
           Column {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
               Text("Night Mode")
-              Switch(checked = isNightMode, onCheckedChange = { isNightMode = it; savePref("night_mode", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
+              Switch(checked = appSettings.isNightMode, onCheckedChange = { onUpdateSetting("night_mode", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
               Text("Smooth Animations")
-              Switch(checked = isAnimations, onCheckedChange = { isAnimations = it; savePref("animations", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
+              Switch(checked = appSettings.smoothAnimations, onCheckedChange = { onUpdateSetting("animations", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
             }
           }
         },
@@ -213,7 +199,7 @@ fun SettingsScreen(
         text = {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Enable Notifications")
-            Switch(checked = isNotifications, onCheckedChange = { isNotifications = it; savePref("notifications", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
+            Switch(checked = appSettings.notifications, onCheckedChange = { onUpdateSetting("notifications", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
           }
         },
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
@@ -226,7 +212,7 @@ fun SettingsScreen(
         text = {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Auto-Download Media")
-            Switch(checked = isAutoDownload, onCheckedChange = { isAutoDownload = it; savePref("auto_download", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
+            Switch(checked = appSettings.autoDownloadMedia, onCheckedChange = { onUpdateSetting("auto_download", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
           }
         },
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
@@ -239,7 +225,7 @@ fun SettingsScreen(
         text = {
           Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Text("Low Power Mode")
-            Switch(checked = isPowerSaving, onCheckedChange = { isPowerSaving = it; savePref("power_saving", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
+            Switch(checked = appSettings.powerSaving, onCheckedChange = { onUpdateSetting("power_saving", it) }, colors = SwitchDefaults.colors(checkedTrackColor = WhatsAppGreenDark))
           }
         },
         confirmButton = { TextButton(onClick = { activeDialog = null }) { Text("Done", color = WhatsAppGreenDark) } }
@@ -253,10 +239,10 @@ fun SettingsScreen(
           Column {
             listOf("English", "Chinese", "Malay").forEach { lang ->
               Row(
-                modifier = Modifier.fillMaxWidth().clickable { selectedLang = lang; savePref("language", lang); activeDialog = null }.padding(vertical = 12.dp),
+                modifier = Modifier.fillMaxWidth().clickable { onUpdateSetting("language", lang); activeDialog = null }.padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
               ) {
-                Text(lang, fontSize = 16.sp, color = if (selectedLang == lang) WhatsAppGreenDark else Color.Black, fontWeight = if (selectedLang == lang) FontWeight.Bold else FontWeight.Normal)
+                Text(lang, fontSize = 16.sp, color = if (appSettings.language == lang) WhatsAppGreenDark else Color.Black, fontWeight = if (appSettings.language == lang) FontWeight.Bold else FontWeight.Normal)
               }
             }
           }
