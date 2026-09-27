@@ -22,7 +22,6 @@ class ChatRepository(private val context: Context) {
   private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
   val messagesFlow: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
 
-  // Sets of Muted Channels and Blocked Users (Stored in SharedPreferences for 0-cost instant access)
   private val _mutedChannels = MutableStateFlow<Set<String>>(prefs.getStringSet("muted_channels", emptySet()) ?: emptySet())
   val mutedChannels: StateFlow<Set<String>> = _mutedChannels.asStateFlow()
 
@@ -78,9 +77,9 @@ class ChatRepository(private val context: Context) {
   }
 
   fun updateLocalGamertag(gamertag: String) {
-    currentGamertag = gamertag
+    currentGamertag = gamertag.trim()
     _messagesFlow.value = _messagesFlow.value.map { msg ->
-      msg.copy(isLocalUser = gamertag.isNotBlank() && msg.senderName.equals(gamertag, ignoreCase = true))
+      msg.copy(isLocalUser = currentGamertag.isNotBlank() && msg.senderName.equals(currentGamertag, ignoreCase = true))
     }
   }
 
@@ -101,13 +100,17 @@ class ChatRepository(private val context: Context) {
 
           if (snapshot != null) {
             val previousCount = _messagesFlow.value.size
+            val cleanMyTag = currentGamertag.trim()
+
             val liveMessages = snapshot.documents.mapNotNull { doc ->
               val sender = doc.getString("senderName") ?: "Player"
-              val isLocal = currentGamertag.isNotBlank() && sender.equals(currentGamertag, ignoreCase = true)
+              val isLocal = cleanMyTag.isNotBlank() && sender.equals(cleanMyTag, ignoreCase = true)
               val readByList = (doc.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
-              if (!isLocal && currentGamertag.isNotBlank() && !readByList.contains(currentGamertag)) {
-                doc.reference.update("readBy", FieldValue.arrayUnion(currentGamertag))
+              // Case-insensitive check: marks message as read when incoming
+              val hasAlreadyRead = readByList.any { it.equals(cleanMyTag, ignoreCase = true) }
+              if (!isLocal && cleanMyTag.isNotBlank() && !hasAlreadyRead) {
+                doc.reference.update("readBy", FieldValue.arrayUnion(cleanMyTag))
               }
 
               ChatMessage(
@@ -136,7 +139,6 @@ class ChatRepository(private val context: Context) {
               val newest = liveMessages.lastOrNull()
               if (newest != null && !newest.isLocalUser) {
                 val senderClean = newest.senderName.lowercase().trim()
-                // Do not notify if channel is muted or sender is blocked
                 if (!isChannelMuted(channelId) && !isUserBlocked(senderClean)) {
                   SoundHelper.playMessageSound(context)
 
@@ -240,10 +242,6 @@ class ChatRepository(private val context: Context) {
     }
   }
 
-  /**
-   * RECURSIVE DELETION:
-   * Actually purges all chunked documents in subcollections so 0 bytes remain in Firebase.
-   */
   fun deleteMessage(channelId: String, messageId: String) {
     val docRef = firestore.collection("channels").document(channelId).collection("messages").document(messageId)
     docRef.collection("audioChunks").get().addOnSuccessListener { snapshot ->
