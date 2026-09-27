@@ -36,6 +36,24 @@ import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.ui.theme.WhatsAppDivider
 import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
+import java.text.BreakIterator
+
+/**
+ * Correctly deletes a complete Unicode grapheme cluster (e.g. 🏳️‍🌈, 💅🏿, 👨‍👩‍👧‍👦)
+ * instead of dropping a single 16-bit Char, preventing 🏳️‍? surrogate corruption.
+ */
+fun dropLastGrapheme(str: String): String {
+  if (str.isEmpty()) return ""
+  val boundary = BreakIterator.getCharacterInstance()
+  boundary.setText(str)
+  val last = boundary.last()
+  val previous = boundary.previous()
+  return if (previous != BreakIterator.DONE) {
+    str.substring(0, previous)
+  } else {
+    ""
+  }
+}
 
 @Composable
 fun EmojiPickerView(
