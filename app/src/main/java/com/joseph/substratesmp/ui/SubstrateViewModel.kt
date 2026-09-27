@@ -4,6 +4,8 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.SetOptions
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
 import com.joseph.substratesmp.data.model.ChatMessage
@@ -44,6 +46,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _members = MutableStateFlow<List<AdminMember>>(emptyList())
   val members: StateFlow<List<AdminMember>> = _members.asStateFlow()
 
+  // Real-time live typers in current channel
+  private val _typingUsers = MutableStateFlow<List<String>>(emptyList())
+  val typingUsers: StateFlow<List<String>> = _typingUsers.asStateFlow()
+  private var typingListener: ListenerRegistration? = null
+
   private val _showGamertagDialog = MutableStateFlow(false)
   val showGamertagDialog: StateFlow<Boolean> = _showGamertagDialog.asStateFlow()
 
@@ -55,6 +62,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   private val _showAdminConsole = MutableStateFlow(false)
   val showAdminConsole: StateFlow<Boolean> = _showAdminConsole.asStateFlow()
+
+  private val _showSelectContactDialog = MutableStateFlow(false)
+  val showSelectContactDialog: StateFlow<Boolean> = _showSelectContactDialog.asStateFlow()
 
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
@@ -71,7 +81,75 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncLiveStatuses()
       syncLiveStickers()
       syncMembers()
+      listenToTyping(_activeChannel.value.id)
     }
+  }
+
+  private fun listenToTyping(channelId: String) {
+    typingListener?.remove()
+    typingListener = firestore.collection("channels")
+      .document(channelId)
+      .collection("typing")
+      .addSnapshotListener { snapshot, _ ->
+        if (snapshot != null) {
+          val now = System.currentTimeMillis()
+          val typers = snapshot.documents.mapNotNull { doc ->
+            val tag = doc.getString("gamertag") ?: return@mapNotNull null
+            val ts = doc.getLong("timestamp") ?: 0L
+            if (tag != userState.value.gamertag && (now - ts) < 4000) tag else null
+          }
+          _typingUsers.value = typers
+        }
+      }
+  }
+
+  fun setTyping(isTyping: Boolean) {
+    val myTag = userState.value.gamertag
+    val channelId = _activeChannel.value.id
+    if (myTag.isBlank() || channelId.isBlank()) return
+
+    val docRef = firestore.collection("channels")
+      .document(channelId)
+      .collection("typing")
+      .document(myTag)
+
+    if (isTyping) {
+      docRef.set(mapOf("gamertag" to myTag, "timestamp" to System.currentTimeMillis()))
+    } else {
+      docRef.delete()
+    }
+  }
+
+  fun startPrivateChat(recipientGamertag: String) {
+    val myTag = userState.value.gamertag
+    if (myTag.isBlank() || recipientGamertag.isBlank() || myTag.equals(recipientGamertag, ignoreCase = true)) return
+
+    val dmId = "dm_" + listOf(myTag.lowercase().trim(), recipientGamertag.lowercase().trim()).sorted().joinToString("_")
+    val dmChannel = Channel(
+      id = dmId,
+      name = recipientGamertag,
+      type = ChannelType.TEXT,
+      category = "DIRECT MESSAGES",
+      description = "Private chat with $recipientGamertag",
+      allowedRolesToSend = listOf("ALL"),
+      isDm = true,
+      dmRecipientGamertag = recipientGamertag
+    )
+
+    firestore.collection("channels").document(dmId).set(
+      mapOf(
+        "name" to recipientGamertag,
+        "type" to "TEXT",
+        "category" to "DIRECT MESSAGES",
+        "description" to "Private chat with $recipientGamertag",
+        "allowedRolesToSend" to listOf("ALL"),
+        "isDm" to true,
+        "participants" to listOf(myTag.lowercase().trim(), recipientGamertag.lowercase().trim())
+      ),
+      SetOptions.merge()
+    )
+
+    selectChannel(dmChannel)
   }
 
   private fun syncLiveChannels() {
@@ -80,8 +158,17 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         .addSnapshotListener { snapshot, error ->
           if (error != null) return@addSnapshotListener
           if (snapshot != null && !snapshot.isEmpty) {
+            val myTag = userState.value.gamertag.lowercase().trim()
             val remote = snapshot.documents.mapNotNull { doc ->
               val id = doc.id
+              val isDm = doc.getBoolean("isDm") ?: false
+              val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
+
+              // Filter out private DMs not addressed to me
+              if (isDm && parts != null && myTag.isNotBlank() && !parts.contains(myTag)) {
+                return@mapNotNull null
+              }
+
               val name = doc.getString("name") ?: id
               val typeStr = doc.getString("type") ?: "TEXT"
               val category = doc.getString("category") ?: "CHANNELS"
@@ -93,13 +180,16 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               } catch (_: Exception) {
                 ChannelType.TEXT
               }
+
               Channel(
                 id = id,
                 name = name,
                 type = type,
                 category = category,
                 description = description,
-                allowedRolesToSend = allowed
+                allowedRolesToSend = allowed,
+                isDm = isDm,
+                dmRecipientGamertag = if (isDm) name else null
               )
             }
             if (remote.isNotEmpty()) {
@@ -282,28 +372,44 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun updateMemberRole(userId: String, newRole: String) {
     val isAdmin = newRole.equals("ADMIN", ignoreCase = true)
-    firestore.collection("users").document(userId).update(
+    val member = _members.value.find { it.id == userId } ?: return
+    val cleanTag = member.gamertag.lowercase().trim()
+
+    // 1. Update user document with merge
+    firestore.collection("users").document(userId).set(
       mapOf(
         "role" to newRole,
         "isAdmin" to isAdmin
-      )
+      ),
+      SetOptions.merge()
     )
-    val member = _members.value.find { it.id == userId }
-    if (member != null) {
-      firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).update(
-        mapOf(
-          "role" to newRole,
-          "isAdmin" to isAdmin
-        )
-      )
-    }
+
+    // 2. Update gamertags index
+    firestore.collection("gamertags").document(cleanTag).set(
+      mapOf(
+        "role" to newRole,
+        "isAdmin" to isAdmin
+      ),
+      SetOptions.merge()
+    )
+
+    // 3. Update any duplicate documents under the same gamertag
+    firestore.collection("users").whereEqualTo("gamertag", member.gamertag).get()
+      .addOnSuccessListener { query ->
+        for (doc in query.documents) {
+          doc.reference.set(
+            mapOf("role" to newRole, "isAdmin" to isAdmin),
+            SetOptions.merge()
+          )
+        }
+      }
   }
 
   fun updateMemberGamertag(userId: String, newName: String) {
     val cleanName = newName.trim()
     if (cleanName.isBlank()) return
     val member = _members.value.find { it.id == userId }
-    firestore.collection("users").document(userId).update("gamertag", cleanName)
+    firestore.collection("users").document(userId).set(mapOf("gamertag" to cleanName), SetOptions.merge())
     if (member != null) {
       firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
       firestore.collection("gamertags").document(cleanName.lowercase()).set(
@@ -322,6 +428,13 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("users").document(userId).delete()
     if (member != null) {
       firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
+      // Remove any duplicate records
+      firestore.collection("users").whereEqualTo("gamertag", member.gamertag).get()
+        .addOnSuccessListener { query ->
+          for (doc in query.documents) {
+            doc.reference.delete()
+          }
+        }
     }
   }
 
@@ -329,6 +442,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     if (channel.type == ChannelType.TEXT) {
       _activeChannel.value = channel
       chatRepository.selectChannel(channel.id)
+      listenToTyping(channel.id)
     } else if (channel.type == ChannelType.VOICE) {
       val gamertag = userState.value.gamertag
       if (gamertag.isBlank()) {
@@ -367,6 +481,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
     if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null) return
 
+    setTyping(false)
     val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
     chatRepository.sendMessage(
       channelId = _activeChannel.value.id,
@@ -412,9 +527,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   fun setAgoraDialogVisible(v: Boolean) { _showAgoraDialog.value = v }
   fun setServerInfoSheetVisible(v: Boolean) { _showServerInfoSheet.value = v }
   fun setAdminConsoleVisible(v: Boolean) { _showAdminConsole.value = v }
+  fun setSelectContactDialogVisible(v: Boolean) { _showSelectContactDialog.value = v }
 
   override fun onCleared() {
     super.onCleared()
+    typingListener?.remove()
     voiceManager.destroy()
   }
 }
