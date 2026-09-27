@@ -19,7 +19,7 @@ class ChatRepository(private val context: Context) {
 
   private var activeChannelId: String = "general-chat"
   private var firestoreListener: ListenerRegistration? = null
-  private var currentGamertag: String = "DiamondMiner42"
+  private var currentGamertag: String = ""
 
   private val firestore: FirebaseFirestore by lazy {
     if (FirebaseApp.getApps(context).isEmpty()) {
@@ -34,9 +34,8 @@ class ChatRepository(private val context: Context) {
 
   fun updateLocalGamertag(gamertag: String) {
     currentGamertag = gamertag
-    // Re-evaluate isLocalUser flag on current message snapshot
     _messagesFlow.value = _messagesFlow.value.map { msg ->
-      msg.copy(isLocalUser = msg.senderName == gamertag)
+      msg.copy(isLocalUser = gamertag.isNotBlank() && msg.senderName.equals(gamertag, ignoreCase = true))
     }
   }
 
@@ -45,7 +44,6 @@ class ChatRepository(private val context: Context) {
     firestoreListener?.remove()
     firestoreListener = null
 
-    // Reset messages for the new channel while fetching from Firestore
     _messagesFlow.value = emptyList()
 
     try {
@@ -65,11 +63,13 @@ class ChatRepository(private val context: Context) {
               val id = doc.id
               val chId = doc.getString("channelId") ?: channelId
               val sender = doc.getString("senderName") ?: "Player"
-              val role = doc.getString("senderRole") ?: "MEMBER"
+              val rawRole = doc.getString("senderRole") ?: "MEMBER"
+              // Ensure Siang5680 always displays ADMIN
+              val role = if (sender.equals("Siang5680", ignoreCase = true)) "ADMIN" else rawRole
               val content = doc.getString("content") ?: ""
               val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
               val coords = doc.getString("coordinates")
-              val isLocal = sender == currentGamertag
+              val isLocal = currentGamertag.isNotBlank() && sender.equals(currentGamertag, ignoreCase = true)
 
               ChatMessage(
                 id = id,
@@ -99,7 +99,9 @@ class ChatRepository(private val context: Context) {
     coordinates: String? = null
   ) {
     if (content.isBlank() && coordinates == null) return
+    if (senderName.isBlank()) return
 
+    val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
     val docRef = firestore.collection("channels")
       .document(channelId)
       .collection("messages")
@@ -108,7 +110,7 @@ class ChatRepository(private val context: Context) {
     val docData = hashMapOf(
       "channelId" to channelId,
       "senderName" to senderName,
-      "senderRole" to senderRole,
+      "senderRole" to effectiveRole,
       "content" to content,
       "timestamp" to System.currentTimeMillis(),
       "coordinates" to coordinates
