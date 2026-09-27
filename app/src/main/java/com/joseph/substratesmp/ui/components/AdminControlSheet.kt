@@ -1,6 +1,5 @@
 package com.joseph.substratesmp.ui.components
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,16 +79,14 @@ fun AdminControlSheet(
   onUpdateMemberGamertag: (userId: String, newName: String) -> Unit,
   onRemoveMember: (userId: String) -> Unit
 ) {
-  var selectedTab by remember { mutableIntStateOf(0) } // 0: Channels, 1: Members
+  var selectedTab by remember { mutableIntStateOf(0) }
 
-  // Channel Creation State
   var showNewChannelDialog by remember { mutableStateOf(false) }
   var newChannelName by remember { mutableStateOf("") }
   var newChannelDesc by remember { mutableStateOf("") }
   var newChannelType by remember { mutableStateOf(ChannelType.TEXT) }
   var newChannelAdminOnly by remember { mutableStateOf(false) }
 
-  // Member Edit State
   var memberToEdit by remember { mutableStateOf<AdminMember?>(null) }
   var editGamertagInput by remember { mutableStateOf("") }
   var editRoleInput by remember { mutableStateOf("MEMBER") }
@@ -99,24 +96,14 @@ fun AdminControlSheet(
     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
     containerColor = Color.White
   ) {
-    Column(
-      modifier = Modifier
-        .fillMaxWidth()
-        .padding(horizontal = 16.dp, vertical = 8.dp)
-    ) {
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(22.dp))
-          Spacer(modifier = Modifier.width(8.dp))
-          Text("Admin Control Console", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
+    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(24.dp))
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Admin Control Console", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(10.dp))
 
       PrimaryTabRow(
         selectedTabIndex = selectedTab,
@@ -135,34 +122,33 @@ fun AdminControlSheet(
         )
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
       if (selectedTab == 0) {
-        // CHANNELS TAB
         Row(
           modifier = Modifier.fillMaxWidth(),
           horizontalArrangement = Arrangement.SpaceBetween,
           verticalAlignment = Alignment.CenterVertically
         ) {
-          Text("Server Channels", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+          Text("Manage Channels", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
           Button(
-            onClick = { showNewChannelDialog = true },
+            onClick = { showNewChannelDialog = !showNewChannelDialog },
             colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
             shape = RoundedCornerShape(12.dp)
           ) {
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(modifier = Modifier.width(4.dp))
-            Text("Create Channel")
+            Text("Create")
           }
         }
 
         if (showNewChannelDialog) {
           Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             color = Color(0xFFF7F8FA),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
           ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
               Text("New Channel", fontWeight = FontWeight.Bold)
               Spacer(modifier = Modifier.height(6.dp))
               OutlinedTextField(
@@ -180,27 +166,19 @@ fun AdminControlSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
               )
-              Spacer(modifier = Modifier.height(8.dp))
+              Spacer(modifier = Modifier.height(6.dp))
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                  selected = newChannelType == ChannelType.TEXT,
-                  onClick = { newChannelType = ChannelType.TEXT },
-                  label = { Text("Text Channel") }
-                )
-                FilterChip(
-                  selected = newChannelType == ChannelType.VOICE,
-                  onClick = { newChannelType = ChannelType.VOICE },
-                  label = { Text("Voice Channel") }
-                )
+                FilterChip(selected = newChannelType == ChannelType.TEXT, onClick = { newChannelType = ChannelType.TEXT }, label = { Text("Text") })
+                FilterChip(selected = newChannelType == ChannelType.VOICE, onClick = { newChannelType = ChannelType.VOICE }, label = { Text("Voice") })
               }
               if (newChannelType == ChannelType.TEXT) {
                 Row(
                   verticalAlignment = Alignment.CenterVertically,
-                  modifier = Modifier.clickable { newChannelAdminOnly = !newChannelAdminOnly }.padding(vertical = 6.dp)
+                  modifier = Modifier.clickable { newChannelAdminOnly = !newChannelAdminOnly }.padding(vertical = 4.dp)
                 ) {
-                  Icon(if (newChannelAdminOnly) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null, tint = RoleAdminGold)
-                  Spacer(modifier = Modifier.width(8.dp))
-                  Text("Restrict sending to Admins only (Announcements)", style = MaterialTheme.typography.bodySmall)
+                  Icon(if (newChannelAdminOnly) Icons.Default.Lock else Icons.Default.LockOpen, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(18.dp))
+                  Spacer(modifier = Modifier.width(6.dp))
+                  Text("Admins Only Can Send Messages", fontSize = 12.sp)
                 }
               }
               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
@@ -215,14 +193,14 @@ fun AdminControlSheet(
                   },
                   colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark)
                 ) {
-                  Text("Add Channel")
+                  Text("Add")
                 }
               }
             }
           }
         }
 
-        LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxWidth().height(300.dp)) {
           items(channels) { channel ->
             Row(
               modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -235,7 +213,7 @@ fun AdminControlSheet(
                   if (channel.isRestrictedToAdmin) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGold.copy(alpha = 0.2f)) {
-                      Text("ADMINS ONLY", color = RoleAdminGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp))
+                      Text("ADMINS ONLY", color = RoleAdminGold, fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold, modifier = Modifier.padding(horizontal = 4.dp))
                     }
                   }
                 }
@@ -247,13 +225,15 @@ fun AdminControlSheet(
                   IconButton(onClick = { onToggleChannelPermission(channel) }) {
                     Icon(
                       imageVector = if (channel.isRestrictedToAdmin) Icons.Default.Lock else Icons.Default.LockOpen,
-                      contentDescription = "Toggle Permission",
+                      contentDescription = "Toggle Lock",
                       tint = if (channel.isRestrictedToAdmin) RoleAdminGold else WhatsAppTextSecondary
                     )
                   }
                 }
-                IconButton(onClick = { onDeleteChannel(channel.id) }) {
-                  Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEA0038))
+                if (channel.id != "general-chat") {
+                  IconButton(onClick = { onDeleteChannel(channel.id) }) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color(0xFFEA0038))
+                  }
                 }
               }
             }
@@ -261,16 +241,15 @@ fun AdminControlSheet(
           }
         }
       } else {
-        // MEMBERS TAB
-        Text("Registered Members", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Text("Manage Members", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
         if (memberToEdit != null) {
           Surface(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             color = Color(0xFFF7F8FA),
-            modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp)
+            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
           ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
               Text("Edit Member: ${memberToEdit?.gamertag}", fontWeight = FontWeight.Bold)
               Spacer(modifier = Modifier.height(6.dp))
               OutlinedTextField(
@@ -280,18 +259,18 @@ fun AdminControlSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
               )
-              Spacer(modifier = Modifier.height(8.dp))
-              Text("Assign Role:", style = MaterialTheme.typography.labelMedium)
+              Spacer(modifier = Modifier.height(6.dp))
+              Text("Role:", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
               Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("MEMBER", "BUILDER", "MOD", "ADMIN").forEach { role ->
                   FilterChip(
                     selected = editRoleInput == role,
                     onClick = { editRoleInput = role },
-                    label = { Text(role) }
+                    label = { Text(role, fontSize = 11.sp) }
                   )
                 }
               }
-              Spacer(modifier = Modifier.height(8.dp))
+              Spacer(modifier = Modifier.height(6.dp))
               Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                 Button(
                   onClick = {
@@ -311,7 +290,7 @@ fun AdminControlSheet(
           }
         }
 
-        LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+        LazyColumn(modifier = Modifier.fillMaxWidth().height(300.dp)) {
           items(members) { member ->
             Row(
               modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
@@ -328,18 +307,16 @@ fun AdminControlSheet(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                   Text(member.gamertag, fontWeight = FontWeight.Bold, color = WhatsAppTextPrimary)
-                  Text("Role: ${member.role}", color = WhatsAppTextSecondary, fontSize = 12.sp)
+                  Text("Role: ${member.role}", color = WhatsAppTextSecondary, fontSize = 11.5.sp)
                 }
               }
 
               Row {
-                IconButton(
-                  onClick = {
-                    memberToEdit = member
-                    editGamertagInput = member.gamertag
-                    editRoleInput = member.role
-                  }
-                ) {
+                IconButton(onClick = {
+                  memberToEdit = member
+                  editGamertagInput = member.gamertag
+                  editRoleInput = member.role
+                }) {
                   Icon(Icons.Default.Edit, contentDescription = "Edit", tint = WhatsAppTextSecondary)
                 }
                 if (!member.gamertag.equals("Siang5680", ignoreCase = true)) {
