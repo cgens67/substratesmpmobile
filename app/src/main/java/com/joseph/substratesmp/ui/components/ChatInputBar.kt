@@ -20,8 +20,12 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
@@ -38,15 +42,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
-import com.joseph.substratesmp.ui.theme.WhatsAppChatIncoming
-import com.joseph.substratesmp.ui.theme.WhatsAppGreenPrimary
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
+import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 
 @Composable
@@ -69,7 +73,7 @@ fun ChatInputBar(
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 8.dp, vertical = 6.dp)
+        .padding(horizontal = 6.dp, vertical = 5.dp)
     ) {
       AnimatedVisibility(
         visible = showCoordinateInput,
@@ -85,7 +89,7 @@ fun ChatInputBar(
           Icon(
             imageVector = Icons.Default.Place,
             contentDescription = null,
-            tint = WhatsAppGreenPrimary,
+            tint = WhatsAppGreenDark,
             modifier = Modifier.size(18.dp)
           )
           Spacer(modifier = Modifier.width(6.dp))
@@ -98,15 +102,15 @@ fun ChatInputBar(
             textStyle = CoordinateTextStyle,
             modifier = Modifier
               .weight(1f)
-              .height(48.dp)
+              .height(46.dp)
               .testTag("coordinates_text_field"),
             singleLine = true,
             shape = RoundedCornerShape(12.dp),
             colors = OutlinedTextFieldDefaults.colors(
-              focusedContainerColor = WhatsAppChatIncoming,
-              unfocusedContainerColor = WhatsAppChatIncoming,
-              focusedBorderColor = WhatsAppGreenPrimary,
-              unfocusedBorderColor = Color.Transparent
+              focusedContainerColor = Color.White,
+              unfocusedContainerColor = Color.White,
+              focusedBorderColor = WhatsAppGreenDark,
+              unfocusedBorderColor = Color(0xFFE9EDEF)
             )
           )
           IconButton(
@@ -130,29 +134,23 @@ fun ChatInputBar(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
       ) {
-        // WhatsApp Rounded Text Input Capsule
+        // WhatsApp White Rounded Capsule
         Surface(
           modifier = Modifier.weight(1f),
           shape = RoundedCornerShape(26.dp),
-          color = WhatsAppChatIncoming
+          color = Color.White,
+          shadowElevation = 1.dp
         ) {
           Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 2.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
-            IconButton(
-              onClick = { showCoordinateInput = !showCoordinateInput },
-              modifier = Modifier
-                .size(36.dp)
-                .testTag("toggle_coords_button")
-            ) {
-              Icon(
-                imageVector = Icons.Default.Place,
-                contentDescription = "Attach Coordinates",
-                tint = if (showCoordinateInput) WhatsAppGreenPrimary else WhatsAppTextSecondary,
-                modifier = Modifier.size(20.dp)
-              )
-            }
+            Icon(
+              imageVector = Icons.Default.SentimentSatisfied,
+              contentDescription = "Emoji",
+              tint = WhatsAppTextSecondary,
+              modifier = Modifier.size(24.dp).padding(start = 2.dp)
+            )
 
             OutlinedTextField(
               value = text,
@@ -162,16 +160,19 @@ fun ChatInputBar(
                 .testTag("chat_text_input"),
               placeholder = {
                 Text(
-                  text = "Message #$channelName",
+                  text = "Message",
                   style = MaterialTheme.typography.bodyMedium,
-                  color = WhatsAppTextSecondary
+                  color = WhatsAppTextSecondary,
+                  fontSize = 15.sp
                 )
               },
               colors = OutlinedTextFieldDefaults.colors(
                 focusedContainerColor = Color.Transparent,
                 unfocusedContainerColor = Color.Transparent,
                 focusedBorderColor = Color.Transparent,
-                unfocusedBorderColor = Color.Transparent
+                unfocusedBorderColor = Color.Transparent,
+                focusedTextColor = WhatsAppTextPrimary,
+                unfocusedTextColor = WhatsAppTextPrimary
               ),
               keyboardOptions = KeyboardOptions.Default.copy(
                 imeAction = ImeAction.Send
@@ -189,12 +190,33 @@ fun ChatInputBar(
               ),
               maxLines = 4
             )
+
+            // Paperclip for coordinates
+            IconButton(
+              onClick = { showCoordinateInput = !showCoordinateInput },
+              modifier = Modifier.size(34.dp).testTag("toggle_coords_button")
+            ) {
+              Icon(
+                imageVector = Icons.Default.AttachFile,
+                contentDescription = "Attach Coordinates",
+                tint = if (showCoordinateInput) WhatsAppGreenDark else WhatsAppTextSecondary,
+                modifier = Modifier.size(22.dp)
+              )
+            }
+
+            // Camera icon
+            Icon(
+              imageVector = Icons.Default.CameraAlt,
+              contentDescription = "Camera",
+              tint = WhatsAppTextSecondary,
+              modifier = Modifier.size(22.dp).padding(end = 4.dp)
+            )
           }
         }
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // WhatsApp Floating Circular Send Button
+        // WhatsApp Circular Action FAB (Send or Mic)
         val canSend = text.isNotBlank() || coordText.isNotBlank()
         FloatingActionButton(
           onClick = {
@@ -210,14 +232,14 @@ fun ChatInputBar(
             .size(48.dp)
             .testTag("chat_send_button"),
           shape = CircleShape,
-          containerColor = WhatsAppGreenPrimary,
+          containerColor = WhatsAppGreenTeal,
           contentColor = Color.White,
           elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp)
         ) {
           Icon(
-            imageVector = Icons.AutoMirrored.Filled.Send,
-            contentDescription = "Send",
-            modifier = Modifier.size(20.dp)
+            imageVector = if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
+            contentDescription = if (canSend) "Send" else "Voice Note",
+            modifier = Modifier.size(22.dp)
           )
         }
       }
