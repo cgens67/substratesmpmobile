@@ -10,7 +10,7 @@ plugins {
 
 android {
   namespace = "com.joseph.substratesmp"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.joseph.substratesmp"
@@ -20,6 +20,11 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Reduce APK size from 224MB to ~40-60MB by only packaging ARM architectures
+    ndk {
+      abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
+    }
   }
 
   buildTypes {
@@ -46,7 +51,6 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
 secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
@@ -63,7 +67,6 @@ dependencies {
   implementation(platform(libs.androidx.compose.bom))
   implementation(platform(libs.firebase.bom))
 
-  // Material Design 3 Expressive (Explicit alpha version per prompt specification)
   implementation("androidx.compose.material3:material3:1.5.0-alpha29")
 
   implementation(libs.accompanist.permissions)
@@ -80,14 +83,12 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.coil.compose)
 
-  // Firebase Realtime DB & Auth (Firestore + Firebase Auth)
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
 
-  // Agora.io RTC Full Android SDK
   implementation("io.agora.rtc:full-sdk:4.3.0")
 
   implementation(libs.kotlinx.coroutines.android)
