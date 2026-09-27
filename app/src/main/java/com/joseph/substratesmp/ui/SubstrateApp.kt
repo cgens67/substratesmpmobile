@@ -7,7 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -63,6 +64,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -83,6 +85,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -160,21 +163,21 @@ fun SubstrateApp(
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
   val showSelectContactDialog by viewModel.showSelectContactDialog.collectAsStateWithLifecycle()
 
-  var currentScreen by remember { mutableStateOf("home") }
-  var selectedTab by remember { mutableIntStateOf(0) }
-  var activeFilterChip by remember { mutableStateOf("All") }
-  var searchQuery by remember { mutableStateOf("") }
-  var showMenuDropdownSheet by remember { mutableStateOf(false) }
+  // rememberSaveable ensures the state survives screen rotations!
+  var currentScreen by rememberSaveable { mutableStateOf("home") }
+  var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+  var activeFilterChip by rememberSaveable { mutableStateOf("All") }
+  var searchQuery by rememberSaveable { mutableStateOf("") }
+  var chatInputText by rememberSaveable { mutableStateOf("") }
 
+  var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var showCreateStatusDialog by remember { mutableStateOf(false) }
   var viewedStatus by remember { mutableStateOf<StatusUpdate?>(null) }
-
-  var chatInputText by remember { mutableStateOf("") }
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
+  
   val listState = rememberLazyListState()
 
-  // Track if user is scrolled away from bottom to show "New Message" pill button
   val isScrolledToBottom by remember {
     derivedStateOf {
       val layoutInfo = listState.layoutInfo
@@ -187,11 +190,13 @@ fun SubstrateApp(
     }
   }
 
-  // Trigger typing indicator when input text changes
+  // FIXED TYPING LOGIC: Instantly sets typing to false when text is blank
   LaunchedEffect(chatInputText) {
     if (chatInputText.isNotBlank()) {
       viewModel.setTyping(true)
       delay(3000L)
+      viewModel.setTyping(false)
+    } else {
       viewModel.setTyping(false)
     }
   }
@@ -250,11 +255,11 @@ fun SubstrateApp(
       targetState = currentScreen,
       transitionSpec = {
         if (targetState == "chat_screen" || targetState == "video_call_screen") {
-          (slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it } + fadeIn())
-            .togetherWith(slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut())
+          (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+            .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else {
-          (slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 3 } + fadeIn())
-            .togetherWith(slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it } + fadeOut())
+          (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeIn())
+            .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
         }
       },
       label = "screen_transition"
@@ -297,7 +302,6 @@ fun SubstrateApp(
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                         }
                       }
-                      // Live typing subtitle indicator (WhatsApp green)
                       if (typingUsers.isNotEmpty()) {
                         Text(
                           text = "${typingUsers.first()} is typing...",
@@ -358,34 +362,45 @@ fun SubstrateApp(
             Box(modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)) {
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                  LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
-                    item {
-                      Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
-                          Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
-                        }
+                  if (messages.isEmpty()) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                      Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.9f)) {
+                        Text(
+                          "Messages in #${activeChannel.name} are synchronized in real-time.",
+                          color = WhatsAppTextSecondary,
+                          style = MaterialTheme.typography.labelSmall,
+                          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
                       }
                     }
-
-                    items(messages, key = { it.id }) { message ->
-                      ChatMessageItem(
-                        message = message,
-                        canDelete = userState.isAdmin || message.isLocalUser,
-                        onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
-                        onReply = { msg -> replyingToMessage = msg },
-                        modifier = Modifier.animateItem()
-                      )
-                    }
-
-                    // Live typing bubble at the bottom of the feed
-                    if (typingUsers.isNotEmpty()) {
+                  } else {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
                       item {
-                        TypingBubble(typerName = typingUsers.first())
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                          Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
+                            Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                          }
+                        }
+                      }
+
+                      items(messages, key = { it.id }) { message ->
+                        ChatMessageItem(
+                          message = message,
+                          canDelete = userState.isAdmin || message.isLocalUser,
+                          onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
+                          onReply = { msg -> replyingToMessage = msg },
+                          modifier = Modifier.animateItem()
+                        )
+                      }
+
+                      if (typingUsers.isNotEmpty()) {
+                        item {
+                          TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
+                        }
                       }
                     }
                   }
 
-                  // WhatsApp Floating Scroll-to-Bottom Button when Scrolled Up
                   androidx.compose.animation.AnimatedVisibility(
                     visible = !isScrolledToBottom,
                     enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
@@ -497,9 +512,7 @@ fun SubstrateApp(
                         replyingToMessage = null
                         showEmojiPicker = false
                       },
-                      onBackspace = {
-                        chatInputText = dropLastGrapheme(chatInputText)
-                      }
+                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
                     )
                   }
                 }
@@ -509,9 +522,10 @@ fun SubstrateApp(
         }
 
         else -> {
+          // Added statusBarsPadding() here to fix the overlapping issue shown in Screenshot 2
           Scaffold(
             topBar = {
-              Column(modifier = Modifier.background(Color.White)) {
+              Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
                 Row(
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                   horizontalArrangement = Arrangement.SpaceBetween,
@@ -630,11 +644,11 @@ fun SubstrateApp(
                 targetState = selectedTab,
                 transitionSpec = {
                   if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
                   } else {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
                   }
                 },
                 label = "tab_transition"
@@ -674,12 +688,14 @@ fun SubstrateApp(
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
 
-                      items(filtered) { channel ->
+                      // Unified Chats List (Mix of Groups and PMs)
+                      items(filtered, key = { it.id }) { channel ->
                         Row(
                           modifier = Modifier.fillMaxWidth().clickable {
                             viewModel.selectChannel(channel)
                             currentScreen = "chat_screen"
-                          }.padding(horizontal = 16.dp, vertical = 12.dp),
+                          }.padding(horizontal = 16.dp, vertical = 12.dp)
+                          .animateItem(),
                           verticalAlignment = Alignment.CenterVertically
                         ) {
                           Box(
@@ -695,7 +711,7 @@ fun SubstrateApp(
                                 Text(channel.name, fontWeight = FontWeight.SemiBold, color = WhatsAppTextPrimary, fontSize = 16.5.sp)
                                 if (channel.isDm) {
                                   Spacer(modifier = Modifier.width(4.dp))
-                                  Text("• DM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                  Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 }
                                 if (channel.isRestrictedToAdmin) {
                                   Spacer(modifier = Modifier.width(4.dp))
@@ -745,7 +761,7 @@ fun SubstrateApp(
                             }
                           }
 
-                          items(statuses) { status ->
+                          items(statuses, key = { it.id }) { status ->
                             val cardBg = when (status.backgroundTheme) {
                               "CRIMSON" -> Color(0xFFFF4500)
                               "END_VOID" -> Color(0xFF6A0DAD)
@@ -758,7 +774,7 @@ fun SubstrateApp(
                             Card(
                               shape = RoundedCornerShape(16.dp),
                               colors = CardDefaults.cardColors(containerColor = cardBg),
-                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { viewedStatus = status }
+                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { viewedStatus = status }.animateItem()
                             ) {
                               Box(modifier = Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -784,14 +800,14 @@ fun SubstrateApp(
                         Spacer(modifier = Modifier.height(14.dp))
                       }
 
-                      items(voiceChannels) { channel ->
+                      items(voiceChannels, key = { it.id }) { channel ->
                         val isCurrent = activeVoiceRoom?.channelId == channel.id
                         val participantsInRoom = if (isCurrent) activeVoiceRoom?.participants ?: emptyList() else emptyList()
 
                         Card(
                           shape = RoundedCornerShape(16.dp),
                           colors = CardDefaults.cardColors(containerColor = if (isCurrent) WhatsAppNavSelectedPill.copy(alpha = 0.5f) else Color(0xFFF7F8FA)),
-                          modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                          modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp).animateItem()
                         ) {
                           Column(modifier = Modifier.padding(14.dp)) {
                             Row(
@@ -882,7 +898,6 @@ fun SubstrateApp(
     }
   }
 
-  // Dialog to select player and start a private chat
   if (showSelectContactDialog) {
     SelectContactDialog(
       members = members,
