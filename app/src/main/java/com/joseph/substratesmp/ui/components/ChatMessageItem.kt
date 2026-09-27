@@ -37,6 +37,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
@@ -52,7 +53,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,6 +113,7 @@ fun ChatMessageItem(
   translatedText: String? = null,
   isDarkMode: Boolean,
   isRead: Boolean = false,
+  isDelivered: Boolean = false,
   canDelete: Boolean = false,
   onUserClick: (String) -> Unit = {},
   onDeleteMessage: (ChatMessage) -> Unit = {},
@@ -327,10 +328,16 @@ fun ChatMessageItem(
               Text(message.formattedTime, fontSize = 9.5.sp, color = subTextColor)
               if (isLocal) {
                 Spacer(modifier = Modifier.width(3.dp))
+                val tickIcon = when {
+                  isRead -> Icons.Default.DoneAll
+                  isDelivered -> Icons.Default.DoneAll
+                  else -> Icons.Default.Check
+                }
+                val tickTint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0)
                 Icon(
-                  Icons.Default.DoneAll,
-                  contentDescription = if (isRead) "Read" else "Delivered",
-                  tint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                  imageVector = tickIcon,
+                  contentDescription = if (isRead) "Read" else if (isDelivered) "Delivered" else "Sent",
+                  tint = tickTint,
                   modifier = Modifier.size(13.dp)
                 )
               }
@@ -682,10 +689,21 @@ fun ChatMessageItem(
                 Text(message.formattedTime, color = subTextColor, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
+                  // 1 tick if unsent/undelivered, 2 ticks if delivered, 2 blue ticks if read
+                  val tickIcon = when {
+                    isRead -> Icons.Default.DoneAll
+                    isDelivered -> Icons.Default.DoneAll
+                    else -> Icons.Default.Check
+                  }
+                  val tickTint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0)
                   Icon(
-                    imageVector = Icons.Default.DoneAll,
-                    contentDescription = if (isRead) "Read" else "Delivered",
-                    tint = if (isRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                    imageVector = tickIcon,
+                    contentDescription = when {
+                      isRead -> "Read"
+                      isDelivered -> "Delivered"
+                      else -> "Sent"
+                    },
+                    tint = tickTint,
                     modifier = Modifier.size(15.dp)
                   )
                 }
