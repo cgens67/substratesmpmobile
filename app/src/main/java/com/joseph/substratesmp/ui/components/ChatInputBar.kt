@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
@@ -300,6 +301,8 @@ fun ChatInputBar(
   ) -> Unit,
   replyingTo: ChatMessage? = null,
   onCancelReply: () -> Unit = {},
+  editingMessage: ChatMessage? = null,
+  onCancelEdit: () -> Unit = {},
   isEmojiPickerVisible: Boolean,
   onToggleEmojiPicker: () -> Unit,
   onTextFieldFocused: () -> Unit,
@@ -378,7 +381,6 @@ fun ChatInputBar(
     }
   }
 
-  // Audio picker extracting true duration
   val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       scope.launch {
@@ -443,6 +445,32 @@ fun ChatInputBar(
               }
               IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
+              }
+            }
+          }
+        }
+      }
+
+      AnimatedVisibility(
+        visible = editingMessage != null,
+        enter = slideInVertically(animationSpec = tween(220)) { it } + expandVertically(animationSpec = tween(220)) + fadeIn(),
+        exit = slideOutVertically(animationSpec = tween(200)) { it } + shrinkVertically(animationSpec = tween(200)) + fadeOut()
+      ) {
+        editingMessage?.let { editTarget ->
+          Surface(
+            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
+            color = Color(0xFFF0F2F5),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+          ) {
+            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+              Icon(Icons.Default.Edit, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(18.dp))
+              Spacer(modifier = Modifier.width(8.dp))
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Editing Message", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
+                Text(editTarget.content, color = WhatsAppTextSecondary, fontSize = 11.5.sp, maxLines = 1)
+              }
+              IconButton(onClick = onCancelEdit, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel edit", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
               }
             }
           }
