@@ -22,7 +22,9 @@ data class AuthUserState(
   val isAdmin: Boolean = false,
   val isFirebaseReady: Boolean = false,
   val isInitialized: Boolean = false,
-  val needsGamertagSetup: Boolean = false
+  val needsGamertagSetup: Boolean = false,
+  val bio: String = "",
+  val birthday: String = ""
 )
 
 class AuthRepository(private val context: Context) {
@@ -50,7 +52,9 @@ class AuthRepository(private val context: Context) {
     AuthUserState(
       gamertag = prefs.getString("gamertag", "") ?: "",
       isAdmin = prefs.getBoolean("isAdmin", false),
-      role = prefs.getString("role", "MEMBER") ?: "MEMBER"
+      role = prefs.getString("role", "MEMBER") ?: "MEMBER",
+      bio = prefs.getString("bio", "") ?: "",
+      birthday = prefs.getString("birthday", "") ?: ""
     )
   )
   val userState: StateFlow<AuthUserState> = _userState.asStateFlow()
@@ -67,17 +71,23 @@ class AuthRepository(private val context: Context) {
         val liveRole = snapshot.getString("role") ?: "MEMBER"
         val liveAdmin = snapshot.getBoolean("isAdmin") ?: (liveRole == "ADMIN")
         val liveTag = snapshot.getString("gamertag") ?: _userState.value.gamertag
+        val liveBio = snapshot.getString("bio") ?: _userState.value.bio
+        val liveBirthday = snapshot.getString("birthday") ?: _userState.value.birthday
 
         prefs.edit()
           .putString("role", liveRole)
           .putBoolean("isAdmin", liveAdmin)
           .putString("gamertag", liveTag)
+          .putString("bio", liveBio)
+          .putString("birthday", liveBirthday)
           .apply()
 
         _userState.value = _userState.value.copy(
           gamertag = liveTag,
           role = liveRole,
-          isAdmin = liveAdmin
+          isAdmin = liveAdmin,
+          bio = liveBio,
+          birthday = liveBirthday
         )
       }
     }
@@ -88,6 +98,8 @@ class AuthRepository(private val context: Context) {
     var currentUid = ""
     var savedGamertag = prefs.getString("gamertag", "") ?: ""
     var savedRole = prefs.getString("role", "MEMBER") ?: "MEMBER"
+    var savedBio = prefs.getString("bio", "") ?: ""
+    var savedBirthday = prefs.getString("birthday", "") ?: ""
     var isAdmin = false
 
     try {
@@ -98,6 +110,8 @@ class AuthRepository(private val context: Context) {
         if (userDoc.exists()) {
           savedGamertag = userDoc.getString("gamertag") ?: savedGamertag
           savedRole = userDoc.getString("role") ?: savedRole
+          savedBio = userDoc.getString("bio") ?: savedBio
+          savedBirthday = userDoc.getString("birthday") ?: savedBirthday
         }
         isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
@@ -115,8 +129,30 @@ class AuthRepository(private val context: Context) {
       isAdmin = isAdmin,
       isFirebaseReady = isReady,
       isInitialized = true,
-      needsGamertagSetup = needsSetup
+      needsGamertagSetup = needsSetup,
+      bio = savedBio,
+      birthday = savedBirthday
     )
+  }
+
+  suspend fun updateProfileInfo(bio: String, birthday: String) {
+    val uid = _userState.value.uid
+    if (uid.isBlank()) return
+    try {
+      firestore.collection("users").document(uid).set(
+        hashMapOf("bio" to bio, "birthday" to birthday),
+        SetOptions.merge()
+      ).await()
+      
+      prefs.edit()
+        .putString("bio", bio)
+        .putString("birthday", birthday)
+        .apply()
+        
+      _userState.value = _userState.value.copy(bio = bio, birthday = birthday)
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to update profile", e)
+    }
   }
 
   suspend fun registerAccount(gamertag: String, pass: String): Result<String> {
@@ -157,6 +193,8 @@ class AuthRepository(private val context: Context) {
           "gamertag" to cleanTag,
           "isAdmin" to isAdmin,
           "role" to initialRole,
+          "bio" to "",
+          "birthday" to "",
           "createdAt" to System.currentTimeMillis()
         )
       ).await()
@@ -220,12 +258,16 @@ class AuthRepository(private val context: Context) {
       val uid = auth.currentUser?.uid ?: tagDoc.getString("uid") ?: "user_recovered"
       val userDoc = firestore.collection("users").document(uid).get().await()
       val actualRole = userDoc.getString("role") ?: tagDoc.getString("role") ?: "MEMBER"
+      val actualBio = userDoc.getString("bio") ?: ""
+      val actualBirthday = userDoc.getString("birthday") ?: ""
       val isAdmin = actualTag.equals("Siang5680", ignoreCase = true) || actualRole == "ADMIN"
 
       prefs.edit()
         .putString("gamertag", actualTag)
         .putString("role", actualRole)
         .putBoolean("isAdmin", isAdmin)
+        .putString("bio", actualBio)
+        .putString("birthday", actualBirthday)
         .apply()
 
       _userState.value = AuthUserState(
@@ -235,7 +277,9 @@ class AuthRepository(private val context: Context) {
         isAdmin = isAdmin,
         isFirebaseReady = true,
         isInitialized = true,
-        needsGamertagSetup = false
+        needsGamertagSetup = false,
+        bio = actualBio,
+        birthday = actualBirthday
       )
 
       startLiveUserListener(uid)
