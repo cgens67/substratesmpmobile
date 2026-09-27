@@ -372,7 +372,7 @@ fun ProfileScreen(
             selectedDayContentColor = Color.White,
             selectedDayContainerColor = WhatsAppGreenDark,
             todayContentColor = WhatsAppGreenDark,
-            todayDateStatusColor = WhatsAppGreenDark
+            todayDateBorderColor = WhatsAppGreenDark
           )
         )
       }
