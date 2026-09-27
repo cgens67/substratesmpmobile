@@ -52,7 +52,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -86,10 +85,6 @@ import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/**
- * Checks for GIF/WebP and preserves original bytes for animation/transparency.
- * Otherwise, compresses standard images to save bandwidth.
- */
 fun processAndCompressImage(uri: Uri, context: Context): String? {
   return try {
     val mimeType = context.contentResolver.getType(uri) ?: ""
@@ -204,7 +199,7 @@ fun ChatInputBar(
     }
   }
 
-  // New Audio Picker Launcher
+  // Audio picker launcher now captures and transmits the real file name
   val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       try {
@@ -213,9 +208,9 @@ fun ChatInputBar(
             Toast.makeText(context, "Audio file too large (Max 1.5MB)", Toast.LENGTH_SHORT).show()
           } else {
             val bytes = stream.readBytes()
+            val fileName = getFileName(context, uri)
             val base64Audio = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-            // Send as an audio file so it renders in the MediaPlayer bubble
-            onSendMessage("", null, null, base64Audio, 0, null, null, false, replyingTo)
+            onSendMessage("", null, null, base64Audio, 0, null, fileName, false, replyingTo)
           }
         }
       } catch (_: Exception) {}
