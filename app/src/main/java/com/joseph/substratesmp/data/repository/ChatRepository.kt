@@ -22,11 +22,17 @@ class ChatRepository(private val context: Context) {
   private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
   val messagesFlow: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
 
+  // Sets of Muted Channels, Blocked Users, and Favourites (Stored in SharedPreferences for instant 0-cost access)
   private val _mutedChannels = MutableStateFlow<Set<String>>(prefs.getStringSet("muted_channels", emptySet()) ?: emptySet())
   val mutedChannels: StateFlow<Set<String>> = _mutedChannels.asStateFlow()
 
   private val _blockedUsers = MutableStateFlow<Set<String>>(prefs.getStringSet("blocked_users", emptySet()) ?: emptySet())
   val blockedUsers: StateFlow<Set<String>> = _blockedUsers.asStateFlow()
+
+  private val _favouriteChannels = MutableStateFlow<Set<String>>(
+    prefs.getStringSet("favourite_channels", setOf("announcements", "general-chat")) ?: setOf("announcements", "general-chat")
+  )
+  val favouriteChannels: StateFlow<Set<String>> = _favouriteChannels.asStateFlow()
 
   private var activeChannelId: String = "general-chat"
   private var firestoreListener: ListenerRegistration? = null
@@ -76,6 +82,22 @@ class ChatRepository(private val context: Context) {
     return isNowBlocked
   }
 
+  fun isFavourite(channelId: String): Boolean = _favouriteChannels.value.contains(channelId)
+
+  fun toggleFavourite(channelId: String): Boolean {
+    val current = _favouriteChannels.value.toMutableSet()
+    val isFav = if (current.contains(channelId)) {
+      current.remove(channelId)
+      false
+    } else {
+      current.add(channelId)
+      true
+    }
+    prefs.edit().putStringSet("favourite_channels", current).apply()
+    _favouriteChannels.value = current
+    return isFav
+  }
+
   fun updateLocalGamertag(gamertag: String) {
     currentGamertag = gamertag.trim()
     _messagesFlow.value = _messagesFlow.value.map { msg ->
@@ -107,7 +129,6 @@ class ChatRepository(private val context: Context) {
               val isLocal = cleanMyTag.isNotBlank() && sender.equals(cleanMyTag, ignoreCase = true)
               val readByList = (doc.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
-              // Case-insensitive check: marks message as read when incoming
               val hasAlreadyRead = readByList.any { it.equals(cleanMyTag, ignoreCase = true) }
               if (!isLocal && cleanMyTag.isNotBlank() && !hasAlreadyRead) {
                 doc.reference.update("readBy", FieldValue.arrayUnion(cleanMyTag))
