@@ -3,14 +3,11 @@ package com.joseph.substratesmp.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.SentimentSatisfied
@@ -42,6 +40,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.ImeAction
@@ -56,24 +55,27 @@ import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 @Composable
 fun ChatInputBar(
   channelName: String,
+  text: String,
+  onTextChanged: (String) -> Unit,
   onSendMessage: (content: String, coordinates: String?) -> Unit,
+  isEmojiPickerVisible: Boolean,
+  onToggleEmojiPicker: () -> Unit,
+  onTextFieldFocused: () -> Unit,
   modifier: Modifier = Modifier
 ) {
-  var text by remember { mutableStateOf("") }
   var showCoordinateInput by remember { mutableStateOf(false) }
   var coordText by remember { mutableStateOf("") }
 
   Surface(
     modifier = modifier
       .fillMaxWidth()
-      .navigationBarsPadding()
       .testTag("chat_input_bar"),
     color = Color.Transparent
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 6.dp, vertical = 5.dp)
+        .padding(horizontal = 6.dp, vertical = 4.dp)
     ) {
       AnimatedVisibility(
         visible = showCoordinateInput,
@@ -134,7 +136,7 @@ fun ChatInputBar(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
       ) {
-        // WhatsApp White Rounded Capsule
+        // WhatsApp Rounded Text Capsule
         Surface(
           modifier = Modifier.weight(1f),
           shape = RoundedCornerShape(26.dp),
@@ -145,18 +147,29 @@ fun ChatInputBar(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
-            Icon(
-              imageVector = Icons.Default.SentimentSatisfied,
-              contentDescription = "Emoji",
-              tint = WhatsAppTextSecondary,
-              modifier = Modifier.size(24.dp).padding(start = 2.dp)
-            )
+            // Emoji / Keyboard Toggle Button
+            IconButton(
+              onClick = onToggleEmojiPicker,
+              modifier = Modifier.size(34.dp)
+            ) {
+              Icon(
+                imageVector = if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied,
+                contentDescription = if (isEmojiPickerVisible) "Keyboard" else "Emoji",
+                tint = if (isEmojiPickerVisible) WhatsAppGreenDark else WhatsAppTextSecondary,
+                modifier = Modifier.size(24.dp)
+              )
+            }
 
             OutlinedTextField(
               value = text,
-              onValueChange = { text = it },
+              onValueChange = onTextChanged,
               modifier = Modifier
                 .weight(1f)
+                .onFocusChanged { focusState ->
+                  if (focusState.isFocused) {
+                    onTextFieldFocused()
+                  }
+                }
                 .testTag("chat_text_input"),
               placeholder = {
                 Text(
@@ -182,7 +195,6 @@ fun ChatInputBar(
                   if (text.isNotBlank() || coordText.isNotBlank()) {
                     val coords = if (coordText.isNotBlank()) coordText.trim() else null
                     onSendMessage(text.trim(), coords)
-                    text = ""
                     coordText = ""
                     showCoordinateInput = false
                   }
@@ -216,14 +228,13 @@ fun ChatInputBar(
 
         Spacer(modifier = Modifier.width(6.dp))
 
-        // WhatsApp Circular Action FAB (Send or Mic)
+        // WhatsApp Floating Action FAB (Send or Mic)
         val canSend = text.isNotBlank() || coordText.isNotBlank()
         FloatingActionButton(
           onClick = {
             if (canSend) {
               val coords = if (coordText.isNotBlank()) coordText.trim() else null
               onSendMessage(text.trim(), coords)
-              text = ""
               coordText = ""
               showCoordinateInput = false
             }
