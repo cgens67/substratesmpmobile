@@ -21,12 +21,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.MoreVert
@@ -47,6 +49,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -151,7 +154,7 @@ fun SubstrateApp(
     containerColor = WhatsAppBackgroundDark,
     topBar = {
       Column(modifier = Modifier.background(WhatsAppTealHeader)) {
-        // WhatsApp Brand Header
+        // Top App Header
         TopAppBar(
           title = {
             Column {
@@ -221,7 +224,7 @@ fun SubstrateApp(
           )
         )
 
-        // WhatsApp Top Navigation Tabs: Chats | Calls | Server
+        // Top Navigation Tabs: CHATS | CALLS | REALM
         PrimaryTabRow(
           selectedTabIndex = selectedTab,
           containerColor = WhatsAppTealHeader,
@@ -257,7 +260,7 @@ fun SubstrateApp(
         0 -> {
           // Channel selector chip row
           val textChannels = channels.filter { it.type == ChannelType.TEXT }
-          Row(
+          LazyRow(
             modifier = Modifier
               .fillMaxWidth()
               .background(WhatsAppTealHeader.copy(alpha = 0.6f))
@@ -265,7 +268,7 @@ fun SubstrateApp(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically
           ) {
-            textChannels.forEach { channel ->
+            items(textChannels, key = { it.id }) { channel ->
               val isSelected = channel.id == activeChannel.id
               Surface(
                 shape = RoundedCornerShape(16.dp),
@@ -344,7 +347,7 @@ fun SubstrateApp(
           )
         }
 
-        // Tab 1: WhatsApp Calls Tab (Agora Live Channels with Real Gamertags)
+        // Tab 1: Calls Tab (Agora Live Channels with Real Gamertags)
         1 -> {
           val voiceChannels = channels.filter { it.type == ChannelType.VOICE }
           LazyColumn(
