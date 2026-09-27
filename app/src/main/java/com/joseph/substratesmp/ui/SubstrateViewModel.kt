@@ -8,6 +8,7 @@ import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.data.model.DefaultChannels
+import com.joseph.substratesmp.data.model.ServerSticker
 import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
@@ -37,6 +38,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _statuses = MutableStateFlow<List<StatusUpdate>>(emptyList())
   val statuses: StateFlow<List<StatusUpdate>> = _statuses.asStateFlow()
 
+  private val _stickers = MutableStateFlow<List<ServerSticker>>(emptyList())
+  val stickers: StateFlow<List<ServerSticker>> = _stickers.asStateFlow()
+
   private val _members = MutableStateFlow<List<AdminMember>>(emptyList())
   val members: StateFlow<List<AdminMember>> = _members.asStateFlow()
 
@@ -65,6 +69,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       }
       syncLiveChannels()
       syncLiveStatuses()
+      syncLiveStickers()
       syncMembers()
     }
   }
@@ -147,21 +152,57 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     } catch (_: Exception) {}
   }
 
+  private fun syncLiveStickers() {
+    try {
+      firestore.collection("stickers")
+        .orderBy("timestamp")
+        .addSnapshotListener { snapshot, _ ->
+          if (snapshot != null) {
+            val list = snapshot.documents.mapNotNull { doc ->
+              val data = doc.getString("imageData") ?: return@mapNotNull null
+              ServerSticker(
+                id = doc.id,
+                name = doc.getString("name") ?: "Sticker",
+                imageData = data,
+                uploadedBy = doc.getString("uploadedBy") ?: "Admin",
+                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis()
+              )
+            }
+            _stickers.value = list
+          }
+        }
+    } catch (_: Exception) {}
+  }
+
   fun syncMembers() {
     try {
       firestore.collection("users")
         .addSnapshotListener { snapshot, _ ->
           if (snapshot != null) {
-            val list = snapshot.documents.mapNotNull { doc ->
+            // Deduplicate members by lowercase gamertag to solve duplicate Siang5680 records
+            val rawList = snapshot.documents.mapNotNull { doc ->
               val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
               val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
               val role = doc.getString("role") ?: if (isAdmin) "ADMIN" else "MEMBER"
               AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin)
             }
-            _members.value = list
+            _members.value = rawList.distinctBy { it.gamertag.lowercase().trim() }
           }
         }
     } catch (_: Exception) {}
+  }
+
+  fun addServerSticker(name: String, base64Image: String) {
+    if (base64Image.isBlank()) return
+    val user = userState.value
+    firestore.collection("stickers").add(
+      hashMapOf(
+        "name" to name.ifBlank { "Sticker" },
+        "imageData" to base64Image,
+        "uploadedBy" to user.gamertag,
+        "timestamp" to System.currentTimeMillis()
+      )
+    )
   }
 
   fun postStatus(content: String, theme: String, activity: String, coords: String?) {
@@ -313,6 +354,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     imageUrl: String? = null,
     audioUrl: String? = null,
     audioDurationSeconds: Int = 0,
+    isSticker: Boolean = false,
     replyTo: ChatMessage? = null
   ) {
     val user = userState.value
@@ -335,6 +377,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl = imageUrl,
       audioUrl = audioUrl,
       audioDurationSeconds = audioDurationSeconds,
+      isSticker = isSticker,
       replyToId = replyTo?.id,
       replyToSender = replyTo?.senderName,
       replyToContent = replyTo?.content
