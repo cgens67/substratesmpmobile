@@ -12,13 +12,14 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -36,20 +37,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -116,10 +113,13 @@ fun ChatMessageItem(
   var isMessageVisible by remember { mutableStateOf(true) }
   var showOptionsDialog by remember { mutableStateOf(false) }
 
+  // Audio Playback & Interactive Seeking State
   var isPlayingAudio by remember { mutableStateOf(false) }
   var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
   var currentAudioPos by remember { mutableIntStateOf(0) }
   var totalAudioDur by remember { mutableIntStateOf(if (message.audioDurationSeconds > 0) message.audioDurationSeconds * 1000 else 0) }
+  var isUserSeeking by remember { mutableStateOf(false) }
+  var seekFraction by remember { mutableFloatStateOf(0f) }
 
   DisposableEffect(Unit) {
     onDispose {
@@ -128,13 +128,34 @@ fun ChatMessageItem(
     }
   }
 
+  fun preparePlayerIfNeeded() {
+    if (mediaPlayer == null && !message.audioUrl.isNullOrBlank()) {
+      try {
+        val rawBytes = Base64.decode(message.audioUrl.substringAfter("base64,"), Base64.NO_WRAP)
+        val tempFile = File(context.cacheDir, "audio_${message.id}.m4a")
+        FileOutputStream(tempFile).use { it.write(rawBytes) }
+        mediaPlayer = MediaPlayer().apply {
+          setDataSource(tempFile.absolutePath)
+          prepare()
+          if (duration > 0) totalAudioDur = duration
+          setOnCompletionListener {
+            isPlayingAudio = false
+            currentAudioPos = 0
+          }
+        }
+      } catch (_: Exception) {}
+    }
+  }
+
   LaunchedEffect(isPlayingAudio) {
     while (isPlayingAudio) {
-      mediaPlayer?.let {
-        currentAudioPos = it.currentPosition
-        if (it.duration > 0) totalAudioDur = it.duration
+      if (!isUserSeeking) {
+        mediaPlayer?.let {
+          currentAudioPos = it.currentPosition
+          if (it.duration > 0 && totalAudioDur <= 0) totalAudioDur = it.duration
+        }
       }
-      delay(50L)
+      delay(60L)
     }
   }
 
@@ -329,7 +350,7 @@ fun ChatMessageItem(
                       val file = File(downloadsDir, message.fileName ?: "document.file")
                       FileOutputStream(file).use { it.write(bytes) }
                       Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                       Toast.makeText(context, "Failed to download file", Toast.LENGTH_SHORT).show()
                     }
                   }
@@ -349,60 +370,128 @@ fun ChatMessageItem(
                 }
               }
 
+              // Interactive Seekable Audio Player
               if (!message.audioUrl.isNullOrBlank()) {
                 val isVoiceNote = message.audioDurationSeconds > 0
+                val audioTitle = if (isVoiceNote) {
+                  "Voice message (HD)"
+                } else {
+                  message.fileName?.takeIf { it.isNotBlank() } ?: "Audio file"
+                }
+
                 Surface(
                   shape = RoundedCornerShape(8.dp),
                   color = Color.Black.copy(alpha = 0.05f),
                   modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
                 ) {
-                  Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                  Row(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                  ) {
                     IconButton(
                       onClick = {
                         if (isPlayingAudio) {
-                          mediaPlayer?.pause(); isPlayingAudio = false
+                          mediaPlayer?.pause()
+                          isPlayingAudio = false
                         } else {
-                          try {
-                            if (mediaPlayer == null) {
-                              val rawBytes = Base64.decode(message.audioUrl.substringAfter("base64,"), Base64.NO_WRAP)
-                              val tempFile = File(context.cacheDir, "audio_${message.id}.m4a")
-                              FileOutputStream(tempFile).use { it.write(rawBytes) }
-                              mediaPlayer = MediaPlayer().apply {
-                                setDataSource(tempFile.absolutePath)
-                                prepare()
-                                totalAudioDur = duration
-                                setOnCompletionListener {
-                                  isPlayingAudio = false
-                                  currentAudioPos = 0
-                                }
-                              }
-                            }
-                            mediaPlayer?.start(); isPlayingAudio = true
-                          } catch (_: Exception) { isPlayingAudio = false }
+                          preparePlayerIfNeeded()
+                          mediaPlayer?.start()
+                          isPlayingAudio = true
                         }
                       },
                       modifier = Modifier.size(36.dp).clip(CircleShape).background(if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100))
                     ) {
                       Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = "Play", tint = Color.White, modifier = Modifier.size(18.dp))
                     }
+
                     Spacer(modifier = Modifier.width(10.dp))
+
                     Column(modifier = Modifier.weight(1f)) {
                       Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(if (isVoiceNote) "Voice message" else "Audio file", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary)
-                        if (totalAudioDur > 0) {
-                          Text("${currentAudioPos / 1000}s / ${totalAudioDur / 1000}s", fontSize = 10.sp, color = WhatsAppTextSecondary)
-                        } else {
-                          Text("", fontSize = 10.sp, color = WhatsAppTextSecondary)
-                        }
+                        Text(audioTitle, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary, maxLines = 1)
+                        val curSec = currentAudioPos / 1000
+                        val durSec = totalAudioDur / 1000
+                        Text("$curSec / ${durSec}s", fontSize = 10.sp, color = WhatsAppTextSecondary)
                       }
+
                       Spacer(modifier = Modifier.height(4.dp))
-                      val progressVal = if (totalAudioDur > 0) currentAudioPos.toFloat() / totalAudioDur.toFloat() else 0f
-                      LinearProgressIndicator(
-                        progress = { progressVal },
-                        modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                        color = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100),
-                        trackColor = Color.Gray.copy(alpha = 0.3f)
-                      )
+
+                      // Interactive Draggable / Tappable Seekbar
+                      BoxWithConstraints(
+                        modifier = Modifier
+                          .fillMaxWidth()
+                          .height(20.dp)
+                          .pointerInput(totalAudioDur) {
+                            detectTapGestures { offset ->
+                              preparePlayerIfNeeded()
+                              if (totalAudioDur > 0) {
+                                val fraction = (offset.x / size.width).coerceIn(0f, 1f)
+                                val seekMs = (fraction * totalAudioDur).toInt()
+                                currentAudioPos = seekMs
+                                mediaPlayer?.seekTo(seekMs)
+                              }
+                            }
+                          }
+                          .pointerInput(totalAudioDur) {
+                            detectHorizontalDragGestures(
+                              onDragStart = { offset ->
+                                isUserSeeking = true
+                                preparePlayerIfNeeded()
+                                seekFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                              },
+                              onHorizontalDrag = { change, _ ->
+                                seekFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                                if (totalAudioDur > 0) {
+                                  currentAudioPos = (seekFraction * totalAudioDur).toInt()
+                                }
+                              },
+                              onDragEnd = {
+                                isUserSeeking = false
+                                if (totalAudioDur > 0) {
+                                  val seekMs = (seekFraction * totalAudioDur).toInt()
+                                  currentAudioPos = seekMs
+                                  mediaPlayer?.seekTo(seekMs)
+                                }
+                              },
+                              onDragCancel = { isUserSeeking = false }
+                            )
+                          },
+                        contentAlignment = Alignment.CenterStart
+                      ) {
+                        val progressFraction = if (isUserSeeking) seekFraction
+                        else if (totalAudioDur > 0) (currentAudioPos.toFloat() / totalAudioDur.toFloat()).coerceIn(0f, 1f)
+                        else 0f
+
+                        val trackColor = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100)
+
+                        // Inactive track
+                        Box(
+                          modifier = Modifier
+                            .fillMaxWidth()
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(Color.Gray.copy(alpha = 0.3f))
+                        )
+
+                        // Active progress fill
+                        Box(
+                          modifier = Modifier
+                            .fillMaxWidth(progressFraction)
+                            .height(4.dp)
+                            .clip(CircleShape)
+                            .background(trackColor)
+                        )
+
+                        // Seeking Thumb
+                        val thumbOffset = ((maxWidth - 12.dp) * progressFraction)
+                        Box(
+                          modifier = Modifier
+                            .offset(x = thumbOffset)
+                            .size(12.dp)
+                            .clip(CircleShape)
+                            .background(trackColor)
+                        )
+                      }
                     }
                   }
                 }
