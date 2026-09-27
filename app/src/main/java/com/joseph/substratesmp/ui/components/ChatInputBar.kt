@@ -98,13 +98,8 @@ import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
-/**
- * High-Resolution Cloud Hosting via ImgBB.
- * Paste your free API key from https://api.imgbb.com/ here.
- * If left blank, the app automatically falls back to local compressed Base64 so it never breaks!
- */
 object ImgBbUploader {
-  const val IMGBB_API_KEY = "YOUR_IMGBB_API_KEY_HERE"
+  const val IMGBB_API_KEY = "5b4e28f296eafdcb8c4ddd3cb78492c8"
 
   private val client = OkHttpClient.Builder()
     .connectTimeout(25, TimeUnit.SECONDS)
@@ -113,10 +108,18 @@ object ImgBbUploader {
     .build()
 
   suspend fun uploadImage(context: Context, imageUri: Uri): Result<String> = withContext(Dispatchers.IO) {
-    if (IMGBB_API_KEY.isBlank() || IMGBB_API_KEY == "YOUR_IMGBB_API_KEY_HERE") {
-      return@withContext Result.failure(Exception("No API key configured"))
+    if (IMGBB_API_KEY.isBlank()) {
+      return@withContext Result.failure(Exception("No ImgBB API key"))
     }
     try {
+      val mimeType = context.contentResolver.getType(imageUri) ?: "image/jpeg"
+      val ext = when {
+        mimeType.contains("gif") -> "gif"
+        mimeType.contains("webp") -> "webp"
+        mimeType.contains("png") -> "png"
+        else -> "jpg"
+      }
+
       val inputStream: InputStream = context.contentResolver.openInputStream(imageUri)
         ?: return@withContext Result.failure(Exception("Cannot open image stream"))
 
@@ -134,8 +137,8 @@ object ImgBbUploader {
         .setType(MultipartBody.FORM)
         .addFormDataPart(
           "image",
-          "upload_${System.currentTimeMillis()}.jpg",
-          imageBytes.toRequestBody("image/*".toMediaTypeOrNull())
+          "upload_${System.currentTimeMillis()}.$ext",
+          imageBytes.toRequestBody(mimeType.toMediaTypeOrNull())
         )
         .build()
 
@@ -157,7 +160,7 @@ object ImgBbUploader {
         val directUrl = data.getString("url")
         Result.success(directUrl)
       } else {
-        Result.failure(Exception("ImgBB response failed: $responseString"))
+        Result.failure(Exception("ImgBB error: $responseString"))
       }
     } catch (e: Exception) {
       Result.failure(e)
@@ -165,8 +168,8 @@ object ImgBbUploader {
   }
 
   suspend fun uploadBitmap(bitmap: Bitmap): Result<String> = withContext(Dispatchers.IO) {
-    if (IMGBB_API_KEY.isBlank() || IMGBB_API_KEY == "YOUR_IMGBB_API_KEY_HERE") {
-      return@withContext Result.failure(Exception("No API key configured"))
+    if (IMGBB_API_KEY.isBlank()) {
+      return@withContext Result.failure(Exception("No ImgBB API key"))
     }
     try {
       val baos = ByteArrayOutputStream()
@@ -178,7 +181,7 @@ object ImgBbUploader {
         .addFormDataPart(
           "image",
           "camera_${System.currentTimeMillis()}.jpg",
-          imageBytes.toRequestBody("image/*".toMediaTypeOrNull())
+          imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
         )
         .build()
 
@@ -203,9 +206,6 @@ object ImgBbUploader {
   }
 }
 
-/**
- * Local fallback compression preserving WebP/GIF animations and alpha channel.
- */
 fun processAndCompressImage(uri: Uri, context: Context): String? {
   return try {
     val mimeType = context.contentResolver.getType(uri) ?: ""
@@ -304,7 +304,6 @@ fun ChatInputBar(
   var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
   var recordedAudioFile by remember { mutableStateOf<File?>(null) }
 
-  // Gallery Picker with ImgBB Full-Res Cloud Upload + Base64 fallback
   val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       scope.launch {
@@ -315,7 +314,6 @@ fun ChatInputBar(
         cloudResult.onSuccess { fullResUrl ->
           onSendMessage("", null, fullResUrl, null, 0, null, null, false, replyingTo)
         }.onFailure {
-          // Transparent fallback to local compressed image if no key or offline
           val base64Img = processAndCompressImage(uri, context)
           if (base64Img != null) {
             onSendMessage("", null, base64Img, null, 0, null, null, false, replyingTo)
@@ -325,7 +323,6 @@ fun ChatInputBar(
     }
   }
 
-  // Camera Capture with ImgBB Full-Res Cloud Upload + Base64 fallback
   val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
     if (bitmap != null) {
       scope.launch {
@@ -343,7 +340,6 @@ fun ChatInputBar(
     }
   }
 
-  // Document File Picker
   val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       try {
@@ -361,7 +357,6 @@ fun ChatInputBar(
     }
   }
 
-  // Audio File Picker transmitting original filename & audioUrl
   val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       try {
@@ -391,7 +386,6 @@ fun ChatInputBar(
 
   Surface(modifier = modifier.fillMaxWidth().testTag("chat_input_bar"), color = Color.Transparent) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
-      // WhatsApp Quoted Reply Header
       AnimatedVisibility(
         visible = replyingTo != null,
         enter = slideInVertically(animationSpec = tween(220)) { it } + expandVertically(animationSpec = tween(220)) + fadeIn(),
@@ -423,7 +417,6 @@ fun ChatInputBar(
         }
       }
 
-      // Bedrock Coordinates Input Row
       AnimatedVisibility(visible = showCoordinateInput, enter = fadeIn(), exit = fadeOut()) {
         Row(modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
           Icon(Icons.Default.Place, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(18.dp))
@@ -443,7 +436,6 @@ fun ChatInputBar(
         }
       }
 
-      // Attachment Tray (Document, Audio, Gallery, Camera, Location)
       AnimatedVisibility(visible = showAttachmentMenu) {
         Surface(
           shape = RoundedCornerShape(16.dp),
@@ -495,7 +487,6 @@ fun ChatInputBar(
         }
       }
 
-      // WhatsApp Chat Input Capsule & FAB
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = Color.White, shadowElevation = 1.dp) {
           if (isRecording) {
