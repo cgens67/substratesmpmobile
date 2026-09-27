@@ -16,6 +16,7 @@ data class ChatMessage(
   val imageUrl: String? = null,
   val audioUrl: String? = null,
   val audioDurationSeconds: Int = 0,
+  val isSticker: Boolean = false,
   val replyToId: String? = null,
   val replyToSender: String? = null,
   val replyToContent: String? = null
