@@ -12,8 +12,12 @@ data class Channel(
   val category: String = "TEXT CHANNELS",
   val description: String = "",
   val unreadCount: Int = 0,
-  val activeUsersCount: Int = 0
-)
+  val activeUsersCount: Int = 0,
+  val allowedRolesToSend: List<String> = listOf("ALL") // "ALL" or "ADMIN"
+) {
+  val isRestrictedToAdmin: Boolean
+    get() = allowedRolesToSend.contains("ADMIN") && !allowedRolesToSend.contains("ALL")
+}
 
 val DefaultChannels = listOf(
   Channel(
@@ -21,27 +25,29 @@ val DefaultChannels = listOf(
     name = "announcements",
     type = ChannelType.TEXT,
     category = "TEXT CHANNELS",
-    description = "Official announcements, realm server IP updates, and patch notes"
+    description = "Official announcements & realm IP updates",
+    allowedRolesToSend = listOf("ADMIN")
   ),
   Channel(
     id = "general-chat",
     name = "general-chat",
     type = ChannelType.TEXT,
     category = "TEXT CHANNELS",
-    description = "General banter, base coordinates, mega-builds, and trades"
+    description = "General realm banter and base coords",
+    allowedRolesToSend = listOf("ALL")
   ),
   Channel(
     id = "voice-general-1",
     name = "General Voice 1",
     type = ChannelType.VOICE,
     category = "VOICE CHANNELS",
-    description = "Public voice room for builders and chill hangouts"
+    description = "Public room for hangout & building"
   ),
   Channel(
     id = "voice-mining",
     name = "Mining Expedition",
     type = ChannelType.VOICE,
     category = "VOICE CHANNELS",
-    description = "Deepslate mining, diamond hunting, and Ancient City raids"
+    description = "Ancient City raids & deepslate mining"
   )
 )
