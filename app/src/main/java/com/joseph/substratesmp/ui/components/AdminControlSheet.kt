@@ -60,6 +60,13 @@ import com.joseph.substratesmp.ui.theme.WhatsAppDivider
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
 
+data class AdminMember(
+  val id: String,
+  val gamertag: String,
+  val role: String,
+  val isAdmin: Boolean
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AdminControlSheet(
