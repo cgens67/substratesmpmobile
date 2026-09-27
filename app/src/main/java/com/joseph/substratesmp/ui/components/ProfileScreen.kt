@@ -39,7 +39,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -68,6 +67,7 @@ import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 @Composable
 fun ProfileScreen(
   userState: AuthUserState,
+  isDarkMode: Boolean,
   onNavigateSettings: () -> Unit,
   onNavigateHome: () -> Unit,
   onUpdateProfile: (String, String) -> Unit,
@@ -79,10 +79,16 @@ fun ProfileScreen(
 
   val isLoggedIn = userState.gamertag.isNotBlank()
 
+  // Dark Mode Colors
+  val bgColor = if (isDarkMode) Color(0xFF1E1E1E) else Color(0xFFF0F2F5)
+  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val textColor = if (isDarkMode) Color.White else Color.Black
+  val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
+
   Column(
     modifier = Modifier
       .fillMaxSize()
-      .background(Color(0xFFF0F2F5))
+      .background(bgColor)
       .statusBarsPadding(),
     horizontalAlignment = Alignment.CenterHorizontally
   ) {
@@ -92,11 +98,10 @@ fun ProfileScreen(
       verticalAlignment = Alignment.CenterVertically
     ) {
       if (isLoggedIn) {
-        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Black)
+        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = textColor)
       }
     }
 
-    // Profile Picture (First Letter only)
     Box(
       modifier = Modifier.size(100.dp).clip(CircleShape).background(Color(0xFF1C2228)),
       contentAlignment = Alignment.Center
@@ -115,12 +120,12 @@ fun ProfileScreen(
       text = if (isLoggedIn) userState.gamertag else "Guest Profile",
       fontSize = 22.sp,
       fontWeight = FontWeight.Medium,
-      color = Color.Black
+      color = textColor
     )
     Text(
       text = if (isLoggedIn) "online" else "offline",
       fontSize = 14.sp,
-      color = Color.Gray
+      color = subTextColor
     )
 
     Spacer(modifier = Modifier.height(20.dp))
@@ -130,9 +135,9 @@ fun ProfileScreen(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.Center
       ) {
-        ProfileActionButton(icon = Icons.Default.Edit, label = "Edit Info") { showEditDialog = true }
+        ProfileActionButton(icon = Icons.Default.Edit, label = "Edit Info", surfaceColor = surfaceColor, textColor = textColor) { showEditDialog = true }
         Spacer(modifier = Modifier.width(16.dp))
-        ProfileActionButton(icon = Icons.Default.Settings, label = "Settings") { onNavigateSettings() }
+        ProfileActionButton(icon = Icons.Default.Settings, label = "Settings", surfaceColor = surfaceColor, textColor = textColor) { onNavigateSettings() }
       }
 
       Spacer(modifier = Modifier.height(20.dp))
@@ -143,27 +148,28 @@ fun ProfileScreen(
       ) {
         Card(
           shape = RoundedCornerShape(24.dp),
-          colors = CardDefaults.cardColors(containerColor = Color.White),
+          colors = CardDefaults.cardColors(containerColor = surfaceColor),
           elevation = CardDefaults.cardElevation(0.dp),
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(24.dp))
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
         ) {
           Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            ProfileInfoRow(value = userState.bio.ifBlank { "No bio added." }, label = "Bio")
+            ProfileInfoRow(value = userState.bio.ifBlank { "No bio added." }, label = "Bio", textColor = textColor, subTextColor = subTextColor)
             Spacer(modifier = Modifier.height(16.dp))
-            ProfileInfoRow(value = "@${userState.gamertag}", label = "Username")
+            ProfileInfoRow(value = "@${userState.gamertag}", label = "Username", textColor = textColor, subTextColor = subTextColor)
             Spacer(modifier = Modifier.height(16.dp))
-            ProfileInfoRow(value = userState.birthday.ifBlank { "Not set" }, label = "Birthday")
+            ProfileInfoRow(value = userState.birthday.ifBlank { "Not set" }, label = "Birthday", textColor = textColor, subTextColor = subTextColor)
           }
         }
       }
     } else {
-      // Login / Register UI mapped seamlessly into Profile Screen
       var isLoginMode by remember { mutableStateOf(true) }
       var gamertagInput by remember { mutableStateOf("") }
       var passwordInput by remember { mutableStateOf("") }
       var isPasswordVisible by remember { mutableStateOf(false) }
       var isLoading by remember { mutableStateOf(false) }
       var errorMessage by remember { mutableStateOf<String?>(null) }
+      
+      val inputBgColor = if (isDarkMode) Color(0xFF424242) else Color(0xFFF9FAFB)
 
       AnimatedVisibility(
         visibleState = animState,
@@ -171,16 +177,16 @@ fun ProfileScreen(
       ) {
         Card(
           shape = RoundedCornerShape(24.dp),
-          colors = CardDefaults.cardColors(containerColor = Color.White),
+          colors = CardDefaults.cardColors(containerColor = surfaceColor),
           elevation = CardDefaults.cardElevation(0.dp),
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).border(1.dp, Color(0xFFE5E7EB), RoundedCornerShape(24.dp))
+          modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
         ) {
           Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
               text = if (isLoginMode) "Welcome back!" else "Create your account",
               fontSize = 18.sp,
               fontWeight = FontWeight.Bold,
-              color = Color.Black
+              color = textColor
             )
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -190,7 +196,10 @@ fun ProfileScreen(
               singleLine = true,
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier.fillMaxWidth(),
-              colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color(0xFFF9FAFB), focusedContainerColor = Color(0xFFF9FAFB))
+              colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = inputBgColor, focusedContainerColor = inputBgColor,
+                focusedTextColor = textColor, unfocusedTextColor = textColor
+              )
             )
             Spacer(modifier = Modifier.height(12.dp))
             OutlinedTextField(
@@ -207,7 +216,10 @@ fun ProfileScreen(
               keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Done),
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier.fillMaxWidth(),
-              colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = Color(0xFFF9FAFB), focusedContainerColor = Color(0xFFF9FAFB))
+              colors = OutlinedTextFieldDefaults.colors(
+                unfocusedContainerColor = inputBgColor, focusedContainerColor = inputBgColor,
+                focusedTextColor = textColor, unfocusedTextColor = textColor
+              )
             )
 
             errorMessage?.let {
@@ -233,7 +245,7 @@ fun ProfileScreen(
               colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark)
             ) {
               if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-              else Text(if (isLoginMode) "Log In" else "Register", fontSize = 16.sp)
+              else Text(if (isLoginMode) "Log In" else "Register", fontSize = 16.sp, color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -257,9 +269,9 @@ fun ProfileScreen(
 
     AlertDialog(
       onDismissRequest = { showEditDialog = false },
-      containerColor = Color.White,
-      titleContentColor = Color.Black,
-      textContentColor = Color.Black,
+      containerColor = surfaceColor,
+      titleContentColor = textColor,
+      textContentColor = textColor,
       title = { Text("Edit Profile Info", fontWeight = FontWeight.Bold) },
       text = {
         Column {
@@ -267,14 +279,16 @@ fun ProfileScreen(
             value = editBio,
             onValueChange = { editBio = it },
             label = { Text("Bio") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
           )
           Spacer(modifier = Modifier.height(10.dp))
           OutlinedTextField(
             value = editBirthday,
             onValueChange = { editBirthday = it },
             label = { Text("Birthday (e.g. Mar 04)") },
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
           )
         }
       },
@@ -285,24 +299,24 @@ fun ProfileScreen(
             onUpdateProfile(editBio, editBirthday)
             showEditDialog = false
           }
-        ) { Text("Save") }
+        ) { Text("Save", color = Color.White) }
       },
       dismissButton = {
-        TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = Color.Black) }
+        TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = subTextColor) }
       }
     )
   }
 }
 
 @Composable
-fun ProfileActionButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+fun ProfileActionButton(icon: ImageVector, label: String, surfaceColor: Color, textColor: Color, onClick: () -> Unit) {
   val interactionSource = remember { MutableInteractionSource() }
   val isPressed by interactionSource.collectIsPressedAsState()
   val scale = if (isPressed) 0.95f else 1f
 
   Surface(
     shape = RoundedCornerShape(16.dp),
-    color = Color.White,
+    color = surfaceColor,
     shadowElevation = 2.dp,
     modifier = Modifier
       .width(110.dp)
@@ -314,17 +328,17 @@ fun ProfileActionButton(icon: ImageVector, label: String, onClick: () -> Unit) {
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center
     ) {
-      Icon(imageVector = icon, contentDescription = null, tint = Color.Black, modifier = Modifier.size(24.dp))
+      Icon(imageVector = icon, contentDescription = null, tint = textColor, modifier = Modifier.size(24.dp))
       Spacer(modifier = Modifier.height(4.dp))
-      Text(text = label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = Color.Black)
+      Text(text = label, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = textColor)
     }
   }
 }
 
 @Composable
-fun ProfileInfoRow(value: String, label: String) {
+fun ProfileInfoRow(value: String, label: String, textColor: Color, subTextColor: Color) {
   Column {
-    Text(text = value, fontSize = 16.sp, color = Color.Black, fontWeight = FontWeight.Normal)
-    Text(text = label, fontSize = 13.sp, color = Color.Gray)
+    Text(text = value, fontSize = 16.sp, color = textColor, fontWeight = FontWeight.Normal)
+    Text(text = label, fontSize = 13.sp, color = subTextColor)
   }
 }
