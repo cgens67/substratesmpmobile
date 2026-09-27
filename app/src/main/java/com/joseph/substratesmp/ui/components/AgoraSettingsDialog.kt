@@ -25,9 +25,10 @@ import com.joseph.substratesmp.voice.AgoraSettings
 fun AgoraSettingsDialog(
   currentSettings: AgoraSettings,
   onDismiss: () -> Unit,
-  onSave: (appId: String, token: String) -> Unit
+  onSave: (appId: String, appCertificate: String, token: String) -> Unit
 ) {
   var appIdInput by remember { mutableStateOf(currentSettings.appId) }
+  var appCertInput by remember { mutableStateOf(currentSettings.appCertificate) }
   var tokenInput by remember { mutableStateOf(currentSettings.token) }
 
   AlertDialog(
@@ -42,7 +43,7 @@ fun AgoraSettingsDialog(
     text = {
       Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-          text = "Agora RTC Engine real-time voice & audio settings for Substrate SMP Bedrock channels:",
+          text = "Agora RTC credentials with client-side token generation:",
           style = MaterialTheme.typography.bodySmall,
           color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -62,10 +63,23 @@ fun AgoraSettingsDialog(
         Spacer(modifier = Modifier.height(10.dp))
 
         OutlinedTextField(
+          value = appCertInput,
+          onValueChange = { appCertInput = it },
+          label = { Text("Agora App Certificate") },
+          singleLine = true,
+          modifier = Modifier
+            .fillMaxWidth()
+            .testTag("agora_certificate_input"),
+          shape = MaterialTheme.shapes.small
+        )
+
+        Spacer(modifier = Modifier.height(10.dp))
+
+        OutlinedTextField(
           value = tokenInput,
           onValueChange = { tokenInput = it },
-          label = { Text("Agora RTC Token (Optional / Testing)") },
-          placeholder = { Text("Leave blank for test mode (token=null)") },
+          label = { Text("Override Token (Optional)") },
+          placeholder = { Text("Leave blank to auto-generate locally") },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
           shape = MaterialTheme.shapes.small
@@ -75,7 +89,7 @@ fun AgoraSettingsDialog(
     confirmButton = {
       Button(
         onClick = {
-          onSave(appIdInput.trim(), tokenInput.trim())
+          onSave(appIdInput.trim(), appCertInput.trim(), tokenInput.trim())
         },
         modifier = Modifier.testTag("save_agora_settings_button")
       ) {
