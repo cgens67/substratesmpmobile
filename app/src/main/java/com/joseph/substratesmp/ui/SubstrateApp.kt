@@ -2,11 +2,14 @@ package com.joseph.substratesmp.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -21,6 +24,7 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -60,8 +64,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -92,6 +94,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
@@ -99,6 +103,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
 import com.joseph.substratesmp.data.model.ChatMessage
@@ -125,7 +130,6 @@ import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
 import com.joseph.substratesmp.ui.theme.WhatsAppChatBackground
 import com.joseph.substratesmp.ui.theme.WhatsAppChipUnselected
 import com.joseph.substratesmp.ui.theme.WhatsAppDivider
-import com.joseph.substratesmp.ui.theme.WhatsAppGreen
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
 import com.joseph.substratesmp.ui.theme.WhatsAppHeaderGreen
@@ -175,6 +179,7 @@ fun SubstrateApp(
   var viewedStatus by remember { mutableStateOf<StatusUpdate?>(null) }
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
+  var viewedImageUrl by remember { mutableStateOf<String?>(null) }
   
   val listState = rememberLazyListState()
 
@@ -190,7 +195,7 @@ fun SubstrateApp(
     }
   }
 
-  // FIXED TYPING LOGIC: Instantly sets typing to false when text is blank
+  // Instantly sets typing to false when text is blank
   LaunchedEffect(chatInputText) {
     if (chatInputText.isNotBlank()) {
       viewModel.setTyping(true)
@@ -212,8 +217,10 @@ fun SubstrateApp(
     }
   }
 
-  BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen") {
-    if (showEmojiPicker) {
+  BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen" || viewedImageUrl != null) {
+    if (viewedImageUrl != null) {
+      viewedImageUrl = null
+    } else if (showEmojiPicker) {
       showEmojiPicker = false
     } else if (currentScreen == "video_call_screen") {
       currentScreen = if (activeVoiceRoom?.isConnected == true) "chat_screen" else "home"
@@ -302,6 +309,7 @@ fun SubstrateApp(
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                         }
                       }
+                      // Live typing subtitle indicator (WhatsApp green)
                       if (typingUsers.isNotEmpty()) {
                         Text(
                           text = "${typingUsers.first()} is typing...",
@@ -386,9 +394,11 @@ fun SubstrateApp(
                       items(messages, key = { it.id }) { message ->
                         ChatMessageItem(
                           message = message,
+                          isReadByAll = message.readBy.size >= (members.size - 1),
                           canDelete = userState.isAdmin || message.isLocalUser,
                           onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                           onReply = { msg -> replyingToMessage = msg },
+                          onImageClick = { url -> viewedImageUrl = url },
                           modifier = Modifier.animateItem()
                         )
                       }
@@ -472,13 +482,15 @@ fun SubstrateApp(
                     channelName = activeChannel.name,
                     text = chatInputText,
                     onTextChanged = { chatInputText = it },
-                    onSendMessage = { content, coords, img, aud, dur, isSticker, reply ->
+                    onSendMessage = { content, coords, img, aud, dur, fileUrl, fileName, isSticker, reply ->
                       viewModel.sendMessage(
                         content = content,
                         coordinates = coords,
                         imageUrl = img,
                         audioUrl = aud,
                         audioDurationSeconds = dur,
+                        fileUrl = fileUrl,
+                        fileName = fileName,
                         isSticker = isSticker,
                         replyTo = reply
                       )
@@ -508,11 +520,13 @@ fun SubstrateApp(
                       onOpenCreateSticker = { stickerPickerLauncher.launch("image/*") },
                       onEmojiSelected = { emoji -> chatInputText += emoji },
                       onStickerSelected = { st ->
-                        viewModel.sendMessage("", null, st.imageData, null, 0, true, replyingToMessage)
+                        viewModel.sendMessage("", null, st.imageData, null, 0, null, null, true, replyingToMessage)
                         replyingToMessage = null
                         showEmojiPicker = false
                       },
-                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
+                      onBackspace = {
+                        chatInputText = dropLastGrapheme(chatInputText)
+                      }
                     )
                   }
                 }
@@ -522,7 +536,6 @@ fun SubstrateApp(
         }
 
         else -> {
-          // Added statusBarsPadding() here to fix the overlapping issue shown in Screenshot 2
           Scaffold(
             topBar = {
               Column(modifier = Modifier.background(Color.White).statusBarsPadding()) {
@@ -644,11 +657,11 @@ fun SubstrateApp(
                 targetState = selectedTab,
                 transitionSpec = {
                   if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
+                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeOut())
                   } else {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
+                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut())
                   }
                 },
                 label = "tab_transition"
@@ -688,7 +701,6 @@ fun SubstrateApp(
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
                       }
 
-                      // Unified Chats List (Mix of Groups and PMs)
                       items(filtered, key = { it.id }) { channel ->
                         Row(
                           modifier = Modifier.fillMaxWidth().clickable {
@@ -761,7 +773,7 @@ fun SubstrateApp(
                             }
                           }
 
-                          items(statuses, key = { it.id }) { status ->
+                          items(statuses) { status ->
                             val cardBg = when (status.backgroundTheme) {
                               "CRIMSON" -> Color(0xFFFF4500)
                               "END_VOID" -> Color(0xFF6A0DAD)
@@ -774,7 +786,7 @@ fun SubstrateApp(
                             Card(
                               shape = RoundedCornerShape(16.dp),
                               colors = CardDefaults.cardColors(containerColor = cardBg),
-                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { viewedStatus = status }.animateItem()
+                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { viewedStatus = status }
                             ) {
                               Box(modifier = Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -874,27 +886,49 @@ fun SubstrateApp(
         }
       }
     }
-  }
 
-  // Smooth Zoom/Scale Animation for Status Viewer
-  androidx.compose.animation.AnimatedVisibility(
-    visible = viewedStatus != null,
-    enter = scaleIn(initialScale = 0.88f, animationSpec = tween(260)) + fadeIn(animationSpec = tween(260)),
-    exit = scaleOut(targetScale = 0.88f, animationSpec = tween(220)) + fadeOut(animationSpec = tween(220))
-  ) {
-    viewedStatus?.let { status ->
-      StatusViewerScreen(
-        status = status,
-        isOwnStatus = status.authorGamertag == userState.gamertag,
-        onDismiss = { viewedStatus = null },
-        onDelete = {
-          viewModel.deleteStatus(status.id)
-          viewedStatus = null
-        },
-        onReact = { emoji ->
-          viewModel.reactToStatus(status.id, emoji)
+    // Full-Screen Image Viewer Overlay
+    AnimatedVisibility(
+      visible = viewedImageUrl != null,
+      enter = fadeIn(),
+      exit = fadeOut()
+    ) {
+      Box(
+        modifier = Modifier
+          .fillMaxSize()
+          .background(Color.Black)
+          .clickable { viewedImageUrl = null }
+      ) {
+        IconButton(
+          onClick = { viewedImageUrl = null },
+          modifier = Modifier.align(Alignment.TopStart).statusBarsPadding()
+        ) {
+          Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
         }
-      )
+
+        viewedImageUrl?.let { url ->
+          if (url.startsWith("http")) {
+            AsyncImage(
+              model = url,
+              contentDescription = "Expanded Image",
+              modifier = Modifier.fillMaxSize(),
+              contentScale = ContentScale.Fit
+            )
+          } else {
+            val raw = url.substringAfter("base64,")
+            val bytes = Base64.decode(raw, Base64.NO_WRAP)
+            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+            if (bitmap != null) {
+              Image(
+                bitmap = bitmap,
+                contentDescription = "Expanded Image",
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Fit
+              )
+            }
+          }
+        }
+      }
     }
   }
 
@@ -950,6 +984,21 @@ fun SubstrateApp(
       onPostStatus = { text, theme, activity, coords ->
         viewModel.postStatus(text, theme, activity, coords)
         showCreateStatusDialog = false
+      }
+    )
+  }
+
+  viewedStatus?.let { status ->
+    StatusViewerScreen(
+      status = status,
+      isOwnStatus = status.authorGamertag == userState.gamertag,
+      onDismiss = { viewedStatus = null },
+      onDelete = {
+        viewModel.deleteStatus(status.id)
+        viewedStatus = null
+      },
+      onReact = { emoji ->
+        viewModel.reactToStatus(status.id, emoji)
       }
     )
   }
