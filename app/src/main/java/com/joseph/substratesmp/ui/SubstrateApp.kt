@@ -118,7 +118,7 @@ fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label
   Surface(
     shape = RoundedCornerShape(20.dp),
     color = bgColor,
-    modifier = Modifier.clickable(onClick = onClick).animateContentSize(animationSpec = spring(stiffness = Spring.StiffnessMediumLow))
+    modifier = Modifier.clickable(onClick = onClick).animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -174,6 +174,8 @@ fun SubstrateApp(
   
   var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
   var isStatusViewerVisible by remember { mutableStateOf(false) }
+  
+  var viewedUser by remember { mutableStateOf<String?>(null) }
 
   val isDarkMode = appSettings.isNightMode
   val bgColor = if (isDarkMode) Color(0xFF121212) else Color.White
@@ -223,7 +225,11 @@ fun SubstrateApp(
       if (isScrolledToBottom) {
         delay(60L)
         val targetIndex = (messages.size + if (typingUsers.isNotEmpty()) 1 else 0)
-        listState.animateScrollToItem(targetIndex)
+        if (appSettings.smoothAnimations) {
+          listState.animateScrollToItem(targetIndex)
+        } else {
+          listState.scrollToItem(targetIndex)
+        }
       }
     }
     previousMsgCount = messages.size
@@ -269,6 +275,10 @@ fun SubstrateApp(
       showEmojiPicker = false
     } else if (currentScreen == "video_call_screen") {
       currentScreen = if (activeVoiceRoom?.isConnected == true) "chat_screen" else "home"
+    } else if (currentScreen == "privacy_policy_screen") {
+      currentScreen = "settings_screen"
+    } else if (currentScreen == "user_profile_screen") {
+      currentScreen = "chat_screen"
     } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts") {
       currentScreen = "home"
     } else {
@@ -307,7 +317,7 @@ fun SubstrateApp(
       transitionSpec = {
         if (!appSettings.smoothAnimations) {
            fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
-        } else if (targetState == "profile_screen" || targetState == "settings_screen") {
+        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
@@ -340,7 +350,31 @@ fun SubstrateApp(
             isDarkMode = isDarkMode,
             onUpdateSetting = { key, value -> viewModel.updateSetting(key, value) },
             onNavigateBack = { currentScreen = "home" },
-            onNavigateProfile = { currentScreen = "profile_screen" }
+            onNavigateProfile = { currentScreen = "profile_screen" },
+            onNavigatePrivacy = { currentScreen = "privacy_policy_screen" }
+          )
+        }
+        
+        "privacy_policy_screen" -> {
+          PrivacyPolicyScreen(
+            isDarkMode = isDarkMode,
+            onNavigateBack = { currentScreen = "settings_screen" }
+          )
+        }
+        
+        "user_profile_screen" -> {
+          val targetGamertag = viewedUser ?: "Unknown"
+          val targetMember = members.find { it.gamertag.equals(targetGamertag, ignoreCase = true) }
+          UserProfileScreen(
+            gamertag = targetGamertag,
+            role = targetMember?.role ?: "MEMBER",
+            isAdmin = targetMember?.isAdmin ?: false,
+            isDarkMode = isDarkMode,
+            onNavigateBack = { currentScreen = "chat_screen" },
+            onMessageUser = {
+               viewModel.startPrivateChat(targetGamertag)
+               currentScreen = "chat_screen"
+            }
           )
         }
         
@@ -482,6 +516,7 @@ fun SubstrateApp(
                       }
 
                       val translation = translatedMessages[message.id]
+                      val itemSpec = if (appSettings.smoothAnimations) tween<Float>(durationMillis = 600) else null
 
                       ChatMessageItem(
                         message = message,
@@ -489,6 +524,10 @@ fun SubstrateApp(
                         isDarkMode = isDarkMode,
                         isRead = isRead,
                         canDelete = userState.isAdmin || message.isLocalUser,
+                        onUserClick = { name -> 
+                          viewedUser = name
+                          currentScreen = "user_profile_screen"
+                        },
                         onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                         onReply = { msg -> replyingToMessage = msg },
                         onEdit = { msg -> 
@@ -498,7 +537,7 @@ fun SubstrateApp(
                         },
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
-                        modifier = Modifier.animateItem(fadeInSpec = null, placementSpec = spring(stiffness = Spring.StiffnessLow), fadeOutSpec = null)
+                        modifier = Modifier.animateItem(fadeInSpec = itemSpec, placementSpec = itemSpec?.let { spring(stiffness = Spring.StiffnessLow) }, fadeOutSpec = itemSpec)
                       )
                     }
 
@@ -526,7 +565,11 @@ fun SubstrateApp(
                         .clickable {
                           scope.launch {
                             val targetIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
-                            listState.animateScrollToItem(targetIndex)
+                            if (appSettings.smoothAnimations) {
+                              listState.animateScrollToItem(targetIndex)
+                            } else {
+                              listState.scrollToItem(targetIndex)
+                            }
                           }
                         }
                     ) {
@@ -622,7 +665,11 @@ fun SubstrateApp(
                         scope.launch {
                           delay(60L)
                           val targetIndex = (messages.size + 1).coerceAtLeast(0)
-                          listState.animateScrollToItem(targetIndex)
+                          if (appSettings.smoothAnimations) {
+                            listState.animateScrollToItem(targetIndex)
+                          } else {
+                            listState.scrollToItem(targetIndex)
+                          }
                         }
                       }
                     },
@@ -659,7 +706,12 @@ fun SubstrateApp(
                         showEmojiPicker = false
                         scope.launch {
                           delay(60L)
-                          listState.animateScrollToItem((messages.size + 1).coerceAtLeast(0))
+                          val targetIndex = (messages.size + 1).coerceAtLeast(0)
+                          if (appSettings.smoothAnimations) {
+                            listState.animateScrollToItem(targetIndex)
+                          } else {
+                            listState.scrollToItem(targetIndex)
+                          }
                         }
                       },
                       onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
@@ -735,7 +787,7 @@ fun SubstrateApp(
                     Surface(
                       shape = RoundedCornerShape(18.dp),
                       color = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill) else surfaceColor,
-                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray else Color(0xFFE9EDEF)),
+                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray.copy(alpha = 0.3f) else Color(0xFFE9EDEF)),
                       modifier = Modifier.clickable { activeFilterChip = chip }
                     ) {
                       Text(chip, color = if (isSelected) (if (isDarkMode) Color.White else WhatsAppGreenDark) else subTextColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
@@ -976,6 +1028,7 @@ fun SubstrateApp(
           SheetOption("block", if (isBlocked) "Unblock ${ch.dmRecipientGamertag}" else "Block ${ch.dmRecipientGamertag}", if (isBlocked) "Allow messages" else "Stop receiving messages", isSelected = isBlocked)
         } else null
       ).filterNotNull(),
+      isDarkMode = isDarkMode,
       onDismiss = { longPressedChannel = null },
       onOptionSelected = { opt ->
         when (opt.id) {
@@ -1002,6 +1055,7 @@ fun SubstrateApp(
         SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = false),
         if (userState.isAdmin) SheetOption("admin", "Admin Control Console", "Manage channels and player roles", isSelected = false) else null
       ).filterNotNull(),
+      isDarkMode = isDarkMode,
       onDismiss = { showMenuDropdownSheet = false },
       onOptionSelected = { option ->
         when (option.id) {
