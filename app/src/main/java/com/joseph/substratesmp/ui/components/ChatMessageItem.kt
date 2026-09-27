@@ -402,7 +402,7 @@ fun ChatMessageItem(
                       try {
                         val fileUrl = message.fileUrl
                         val base64Data = if (fileUrl.startsWith("chunked:")) {
-                          Toast.makeText(context, "Downloading file...", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(context, "Downloading file chunks...", Toast.LENGTH_SHORT).show()
                           val snapshot = FirebaseFirestore.getInstance()
                             .collection("channels")
                             .document(message.channelId)
@@ -442,13 +442,15 @@ fun ChatMessageItem(
                 }
               }
 
-              // Fixed Audio Player: 3-tier clean layout that prevents time text wrapping
+              // AUDIO & VOICE NOTE PLAYER
               if (!message.audioUrl.isNullOrBlank()) {
-                val isVoiceNote = message.audioDurationSeconds > 0
+                // FIXED: True voice notes recorded via mic have NO filename.
+                // Attached audio files ALWAYS have a filename (e.g. billiejean.mp3).
+                val isVoiceNote = message.fileName.isNullOrBlank()
                 val audioTitle = if (isVoiceNote) {
                   "Voice message (HD)"
                 } else {
-                  message.fileName?.takeIf { it.isNotBlank() } ?: "Audio file"
+                  message.fileName ?: "Audio file"
                 }
 
                 Surface(
@@ -492,7 +494,7 @@ fun ChatMessageItem(
                     Spacer(modifier = Modifier.width(10.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
-                      // Row 1: Title with Ellipsis
+                      // Row 1: Title (Truncates cleanly with ellipsis, never wraps)
                       Text(
                         text = audioTitle,
                         fontWeight = FontWeight.SemiBold,
@@ -591,7 +593,7 @@ fun ChatMessageItem(
                         )
                       }
 
-                      // Row 3: Timestamps formatted as mm:ss
+                      // Row 3: Timestamps (mm:ss)
                       Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
