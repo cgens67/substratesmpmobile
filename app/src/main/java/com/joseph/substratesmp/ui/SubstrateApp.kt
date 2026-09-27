@@ -53,10 +53,8 @@ suspend fun LazyListState.smoothScrollToBottom() {
   if (total == 0) return
   val targetIndex = total - 1
 
-  // First smoothly navigate towards the bottom item
   animateScrollToItem(targetIndex)
 
-  // Ensure any overflowing pixels (e.g. keyboard padding, tall attachments) scroll completely to the bottom
   val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
   if (lastVisible != null && lastVisible.index == targetIndex) {
     val viewportBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
@@ -249,7 +247,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth, snappy scroll when new messages arrive without conflicting animations
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -306,6 +303,8 @@ fun SubstrateApp(
       showEmojiPicker = false
     } else if (currentScreen == "video_call_screen") {
       currentScreen = if (activeVoiceRoom?.isConnected == true) "chat_screen" else "home"
+    } else if (currentScreen == "channel_info_screen") {
+      currentScreen = "chat_screen"
     } else if (currentScreen == "privacy_policy_screen") {
       currentScreen = "settings_screen"
     } else if (currentScreen == "user_profile_screen") {
@@ -348,7 +347,7 @@ fun SubstrateApp(
       transitionSpec = {
         if (!appSettings.smoothAnimations) {
            fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
-        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen") {
+        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
@@ -362,6 +361,25 @@ fun SubstrateApp(
       label = "screen_transition"
     ) { screen ->
       when (screen) {
+        "channel_info_screen" -> {
+          ChannelInfoScreen(
+            channel = activeChannel,
+            members = members,
+            messages = messages,
+            currentGamertag = userState.gamertag,
+            isMuted = isCurrentChannelMuted,
+            isDarkMode = isDarkMode,
+            onToggleMute = { viewModel.toggleMuteChannel(activeChannel.id) },
+            onNavigateBack = { currentScreen = "chat_screen" },
+            onSelectMember = { member ->
+              viewedUser = member.gamertag
+              currentScreen = "user_profile_screen"
+            },
+            onAddMembers = { currentScreen = "contacts" },
+            onImageClick = { url -> viewedImageUrl = url }
+          )
+        }
+
         "profile_screen" -> {
           ProfileScreen(
             userState = userState,
@@ -456,7 +474,14 @@ fun SubstrateApp(
                 title = {
                   Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { showMenuDropdownSheet = true }
+                    modifier = Modifier.clickable {
+                      if (activeChannel.isDm) {
+                        viewedUser = activeChannel.dmRecipientGamertag ?: activeChannel.name
+                        currentScreen = "user_profile_screen"
+                      } else {
+                        currentScreen = "channel_info_screen"
+                      }
+                    }
                   ) {
                     Box(
                       modifier = Modifier.size(38.dp).clip(CircleShape).background(if (isDarkMode) Color(0xFF424242) else Color(0xFFE9EDEF)),
@@ -957,7 +982,6 @@ fun SubstrateApp(
 
                         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                           if (isLocalSender && channel.lastMessage != null) {
-                            // 1 tick if sent, 2 ticks if delivered, 2 blue ticks if read
                             val tickIcon = when {
                               isLastMessageRead -> Icons.Default.DoneAll
                               channel.lastMessageIsDelivered -> Icons.Default.DoneAll
