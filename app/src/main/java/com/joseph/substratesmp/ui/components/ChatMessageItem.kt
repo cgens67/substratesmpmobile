@@ -15,9 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -28,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -48,12 +49,12 @@ fun ChatMessageItem(
 ) {
   val clipboardManager = LocalClipboardManager.current
   val isLocal = message.isLocalUser
+  val isSenderAdmin = message.isAdmin
 
-  val roleColor = when (message.senderRole) {
-    "ADMIN" -> SubstrateTheme.customColors.adminGold
-    "MOD" -> SubstrateTheme.customColors.modCyan
-    "BUILDER" -> SubstrateTheme.customColors.memberGreen
-    else -> MaterialTheme.colorScheme.onSurfaceVariant
+  val roleColor = if (isSenderAdmin) {
+    SubstrateTheme.customColors.adminGold
+  } else {
+    MaterialTheme.colorScheme.onSurfaceVariant
   }
 
   Row(
@@ -64,14 +65,18 @@ fun ChatMessageItem(
     horizontalArrangement = if (isLocal) Arrangement.End else Arrangement.Start,
     verticalAlignment = Alignment.Top
   ) {
-    // Other user avatar (on left)
+    // Remote avatar
     if (!isLocal) {
       Box(
         modifier = Modifier
           .size(34.dp)
           .clip(CircleShape)
           .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-          .border(1.5.dp, roleColor, CircleShape),
+          .border(
+            width = if (isSenderAdmin) 2.dp else 1.dp,
+            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.outlineVariant,
+            shape = CircleShape
+          ),
         contentAlignment = Alignment.Center
       ) {
         Text(
@@ -85,38 +90,56 @@ fun ChatMessageItem(
       Spacer(modifier = Modifier.width(10.dp))
     }
 
-    // Message Card Bubble
     Column(
       horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
       modifier = Modifier.widthIn(max = 300.dp)
     ) {
-      // Header: Sender Name, Role Badge, and Time
+      // Header: Sender Name, Admin Tag, and Time
       Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(bottom = 3.dp, start = if (isLocal) 0.dp else 4.dp, end = if (isLocal) 4.dp else 0.dp)
+        modifier = Modifier.padding(
+          bottom = 3.dp,
+          start = if (isLocal) 0.dp else 4.dp,
+          end = if (isLocal) 4.dp else 0.dp
+        )
       ) {
         if (!isLocal) {
           Text(
             text = message.senderName,
             style = MaterialTheme.typography.labelMedium,
-            color = roleColor,
+            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onSurface,
             fontWeight = FontWeight.Bold
           )
           Spacer(modifier = Modifier.width(6.dp))
-          Surface(
-            shape = MaterialTheme.shapes.extraSmall,
-            color = roleColor.copy(alpha = 0.16f)
-          ) {
-            Text(
-              text = message.senderRole,
-              style = MaterialTheme.typography.labelSmall,
-              color = roleColor,
-              fontWeight = FontWeight.Bold,
-              fontSize = 9.sp,
-              modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-            )
+
+          if (isSenderAdmin) {
+            Surface(
+              shape = RoundedCornerShape(4.dp),
+              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f),
+              border = androidx.compose.foundation.BorderStroke(1.dp, SubstrateTheme.customColors.adminGold.copy(alpha = 0.6f))
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Shield,
+                  contentDescription = null,
+                  tint = SubstrateTheme.customColors.adminGold,
+                  modifier = Modifier.size(10.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                  text = "ADMIN",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = SubstrateTheme.customColors.adminGold,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 9.sp
+                )
+              }
+            }
+            Spacer(modifier = Modifier.width(6.dp))
           }
-          Spacer(modifier = Modifier.width(6.dp))
         }
 
         Text(
@@ -128,6 +151,34 @@ fun ChatMessageItem(
 
         if (isLocal) {
           Spacer(modifier = Modifier.width(6.dp))
+          if (isSenderAdmin) {
+            Surface(
+              shape = RoundedCornerShape(4.dp),
+              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f),
+              border = androidx.compose.foundation.BorderStroke(1.dp, SubstrateTheme.customColors.adminGold.copy(alpha = 0.6f))
+            ) {
+              Row(
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Shield,
+                  contentDescription = null,
+                  tint = SubstrateTheme.customColors.adminGold,
+                  modifier = Modifier.size(10.dp)
+                )
+                Spacer(modifier = Modifier.width(3.dp))
+                Text(
+                  text = "ADMIN",
+                  style = MaterialTheme.typography.labelSmall,
+                  color = SubstrateTheme.customColors.adminGold,
+                  fontWeight = FontWeight.ExtraBold,
+                  fontSize = 9.sp
+                )
+              }
+            }
+            Spacer(modifier = Modifier.width(4.dp))
+          }
           Text(
             text = "You",
             style = MaterialTheme.typography.labelMedium,
@@ -137,7 +188,7 @@ fun ChatMessageItem(
         }
       }
 
-      // Bubble Body
+      // Message Card Body
       Card(
         shape = if (isLocal) MessageBubbleOtherShape else MessageBubbleStartShape,
         colors = CardDefaults.cardColors(
@@ -161,7 +212,6 @@ fun ChatMessageItem(
             lineHeight = 19.sp
           )
 
-          // Optional Minecraft Coordinates Tag
           if (!message.coordinates.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(6.dp))
             Surface(
@@ -171,10 +221,9 @@ fun ChatMessageItem(
               } else {
                 MaterialTheme.colorScheme.surfaceContainerLowest
               },
-              modifier = Modifier
-                .clickable {
-                  clipboardManager.setText(AnnotatedString(message.coordinates))
-                }
+              modifier = Modifier.clickable {
+                clipboardManager.setText(AnnotatedString(message.coordinates))
+              }
             ) {
               Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -207,7 +256,7 @@ fun ChatMessageItem(
       }
     }
 
-    // Local user avatar (on right)
+    // Local avatar
     if (isLocal) {
       Spacer(modifier = Modifier.width(10.dp))
       Box(
@@ -215,7 +264,11 @@ fun ChatMessageItem(
           .size(34.dp)
           .clip(CircleShape)
           .background(MaterialTheme.colorScheme.primary)
-          .border(1.5.dp, MaterialTheme.colorScheme.primaryContainer, CircleShape),
+          .border(
+            width = if (isSenderAdmin) 2.dp else 1.5.dp,
+            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.primaryContainer,
+            shape = CircleShape
+          ),
         contentAlignment = Alignment.Center
       ) {
         Text(
