@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -50,6 +49,7 @@ import kotlinx.coroutines.launch
 fun SelectContactDialog(
   members: List<AdminMember>,
   currentGamertag: String,
+  isDarkMode: Boolean,
   onDismiss: () -> Unit,
   onSelectMember: (AdminMember) -> Unit
 ) {
@@ -57,11 +57,16 @@ fun SelectContactDialog(
   val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
   val scope = rememberCoroutineScope()
 
+  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val textColor = if (isDarkMode) Color.White else WhatsAppTextPrimary
+  val subTextColor = if (isDarkMode) Color.LightGray else WhatsAppTextSecondary
+  val dividerColor = if (isDarkMode) Color.Gray.copy(alpha = 0.3f) else WhatsAppDivider
+
   ModalBottomSheet(
     onDismissRequest = onDismiss,
     sheetState = sheetState,
     shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-    containerColor = Color.White
+    containerColor = surfaceColor
   ) {
     Column(
       modifier = Modifier
@@ -73,16 +78,16 @@ fun SelectContactDialog(
         verticalAlignment = Alignment.CenterVertically
       ) {
         Column(modifier = Modifier.weight(1f)) {
-          Text("Select Contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = WhatsAppTextPrimary)
-          Text("${availableMembers.size} Bedrock players", style = MaterialTheme.typography.bodySmall, color = WhatsAppTextSecondary)
+          Text("Select Contact", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = textColor)
+          Text("${availableMembers.size} Bedrock players", style = MaterialTheme.typography.bodySmall, color = subTextColor)
         }
         IconButton(onClick = { scope.launch { sheetState.hide(); onDismiss() } }) {
-          Icon(Icons.Default.Close, contentDescription = "Close", tint = WhatsAppTextSecondary)
+          Icon(Icons.Default.Close, contentDescription = "Close", tint = subTextColor)
         }
       }
 
       Spacer(modifier = Modifier.height(10.dp))
-      HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp)
+      HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
 
       if (availableMembers.isEmpty()) {
         Box(
@@ -91,7 +96,7 @@ fun SelectContactDialog(
             .height(160.dp),
           contentAlignment = Alignment.Center
         ) {
-          Text("No other players found to message.", color = WhatsAppTextSecondary, fontSize = 14.sp)
+          Text("No other players found to message.", color = subTextColor, fontSize = 14.sp)
         }
       } else {
         LazyColumn(modifier = Modifier.fillMaxWidth().height(320.dp)) {
@@ -113,12 +118,12 @@ fun SelectContactDialog(
                 modifier = Modifier
                   .size(46.dp)
                   .clip(CircleShape)
-                  .background(if (member.isAdmin) RoleAdminGold else WhatsAppNavSelectedPill),
+                  .background(if (member.isAdmin) RoleAdminGold else (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill)),
                 contentAlignment = Alignment.Center
               ) {
                 Text(
                   text = member.gamertag.take(1).uppercase(),
-                  color = if (member.isAdmin) Color.White else WhatsAppGreenDark,
+                  color = if (member.isAdmin) Color.White else (if (isDarkMode) Color.White else WhatsAppGreenDark),
                   fontWeight = FontWeight.Bold,
                   fontSize = 18.sp
                 )
@@ -128,16 +133,16 @@ fun SelectContactDialog(
 
               Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                  Text(member.gamertag, fontWeight = FontWeight.Bold, color = WhatsAppTextPrimary, fontSize = 16.sp)
+                  Text(member.gamertag, fontWeight = FontWeight.Bold, color = textColor, fontSize = 16.sp)
                   if (member.isAdmin) {
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                   }
                 }
-                Text("Role: ${member.role} • Tap to message privately", color = WhatsAppTextSecondary, fontSize = 12.sp)
+                Text("Role: ${member.role} • Tap to message privately", color = subTextColor, fontSize = 12.sp)
               }
             }
-            HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp)
+            HorizontalDivider(color = dividerColor, thickness = 0.5.dp)
           }
         }
       }
