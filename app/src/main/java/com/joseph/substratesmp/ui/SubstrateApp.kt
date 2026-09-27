@@ -20,6 +20,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -58,8 +59,6 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -88,6 +87,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -386,7 +386,7 @@ fun SubstrateApp(
                   }
 
                   // WhatsApp Floating Scroll-to-Bottom Button when Scrolled Up
-                  AnimatedVisibility(
+                  androidx.compose.animation.AnimatedVisibility(
                     visible = !isScrolledToBottom,
                     enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
                     exit = scaleOut(animationSpec = tween(200)) + fadeOut(),
@@ -497,7 +497,9 @@ fun SubstrateApp(
                         replyingToMessage = null
                         showEmojiPicker = false
                       },
-                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
+                      onBackspace = {
+                        chatInputText = dropLastGrapheme(chatInputText)
+                      }
                     )
                   }
                 }
@@ -603,7 +605,6 @@ fun SubstrateApp(
               FloatingActionButton(
                 onClick = {
                   if (selectedTab == 0) {
-                    // Opens WhatsApp "Select Contact" modal to start a 1-on-1 private DM
                     viewModel.setSelectContactDialogVisible(true)
                   } else if (selectedTab == 1) {
                     showCreateStatusDialog = true
@@ -860,7 +861,7 @@ fun SubstrateApp(
   }
 
   // Smooth Zoom/Scale Animation for Status Viewer
-  AnimatedVisibility(
+  androidx.compose.animation.AnimatedVisibility(
     visible = viewedStatus != null,
     enter = scaleIn(initialScale = 0.88f, animationSpec = tween(260)) + fadeIn(animationSpec = tween(260)),
     exit = scaleOut(targetScale = 0.88f, animationSpec = tween(220)) + fadeOut(animationSpec = tween(220))
