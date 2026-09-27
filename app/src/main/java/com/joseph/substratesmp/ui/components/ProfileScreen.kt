@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
@@ -37,6 +38,10 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDefaults
+import androidx.compose.material3.DatePickerDialog
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -44,6 +49,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,7 +69,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.repository.AuthUserState
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
+import java.util.TimeZone
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
   userState: AuthUserState,
@@ -79,7 +90,6 @@ fun ProfileScreen(
 
   val isLoggedIn = userState.gamertag.isNotBlank()
 
-  // Dark Mode Colors
   val bgColor = if (isDarkMode) Color(0xFF1E1E1E) else Color(0xFFF0F2F5)
   val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
   val textColor = if (isDarkMode) Color.White else Color.Black
@@ -266,6 +276,8 @@ fun ProfileScreen(
   if (showEditDialog) {
     var editBio by remember { mutableStateOf(userState.bio) }
     var editBirthday by remember { mutableStateOf(userState.birthday) }
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState()
 
     AlertDialog(
       onDismissRequest = { showEditDialog = false },
@@ -282,13 +294,26 @@ fun ProfileScreen(
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
           )
-          Spacer(modifier = Modifier.height(10.dp))
+          Spacer(modifier = Modifier.height(12.dp))
+          
           OutlinedTextField(
-            value = editBirthday,
-            onValueChange = { editBirthday = it },
-            label = { Text("Birthday (e.g. Mar 04)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
+            value = editBirthday.ifBlank { "Select date" },
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Birthday") },
+            trailingIcon = {
+              IconButton(onClick = { showDatePicker = true }) {
+                Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Birthday", tint = WhatsAppGreenDark)
+              }
+            },
+            modifier = Modifier
+              .fillMaxWidth()
+              .clickable { showDatePicker = true },
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedTextColor = textColor,
+              unfocusedTextColor = textColor,
+              disabledTextColor = textColor
+            )
           )
         }
       },
@@ -305,6 +330,53 @@ fun ProfileScreen(
         TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = subTextColor) }
       }
     )
+
+    if (showDatePicker) {
+      DatePickerDialog(
+        onDismissRequest = { showDatePicker = false },
+        confirmButton = {
+          TextButton(onClick = {
+            datePickerState.selectedDateMillis?.let { millis ->
+              val cal = Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
+                timeInMillis = millis
+              }
+              val sdf = SimpleDateFormat("MMM dd", Locale.ENGLISH).apply {
+                timeZone = TimeZone.getTimeZone("UTC")
+              }
+              editBirthday = sdf.format(cal.time)
+            }
+            showDatePicker = false
+          }) {
+            Text("OK", color = WhatsAppGreenDark, fontWeight = FontWeight.Bold)
+          }
+        },
+        dismissButton = {
+          TextButton(onClick = { showDatePicker = false }) {
+            Text("Cancel", color = subTextColor)
+          }
+        },
+        colors = DatePickerDefaults.colors(containerColor = surfaceColor)
+      ) {
+        DatePicker(
+          state = datePickerState,
+          colors = DatePickerDefaults.colors(
+            containerColor = surfaceColor,
+            titleContentColor = textColor,
+            headlineContentColor = textColor,
+            weekdayContentColor = subTextColor,
+            yearContentColor = textColor,
+            currentYearContentColor = WhatsAppGreenDark,
+            selectedYearContentColor = Color.White,
+            selectedYearContainerColor = WhatsAppGreenDark,
+            dayContentColor = textColor,
+            selectedDayContentColor = Color.White,
+            selectedDayContainerColor = WhatsAppGreenDark,
+            todayContentColor = WhatsAppGreenDark,
+            todayDateStatusColor = WhatsAppGreenDark
+          )
+        )
+      }
+    }
   }
 }
 
