@@ -129,11 +129,39 @@ fun SubstrateApp(
     derivedStateOf {
       val layoutInfo = listState.layoutInfo
       val totalItems = layoutInfo.totalItemsCount
-      if (totalItems == 0) true
+      if (totalItems <= 1) true
       else {
         val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-        lastVisible >= totalItems - 2
+        lastVisible >= totalItems - 1
       }
+    }
+  }
+
+  // Auto-scroll to the bottom whenever you enter a chat screen
+  LaunchedEffect(currentScreen, activeChannel.id) {
+    if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
+      delay(60L)
+      listState.scrollToItem(messages.size)
+    }
+  }
+
+  // Auto-scroll on new messages arriving or being sent
+  var previousMsgCount by remember { mutableIntStateOf(0) }
+  LaunchedEffect(messages.size) {
+    if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
+      delay(60L)
+      val targetIndex = if (typingUsers.isNotEmpty()) messages.size + 1 else messages.size
+      listState.animateScrollToItem(targetIndex)
+    }
+    previousMsgCount = messages.size
+  }
+
+  // Auto-scroll when keyboard opens
+  val imeBottomPadding = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+  LaunchedEffect(imeBottomPadding) {
+    if (imeBottomPadding > 0.dp && messages.isNotEmpty() && currentScreen == "chat_screen") {
+      delay(60L)
+      listState.animateScrollToItem(messages.size)
     }
   }
 
@@ -163,7 +191,7 @@ fun SubstrateApp(
   ) {}
 
   LaunchedEffect(Unit) {
-    if (android.os.Build.VERSION.SDK_INT >= 33) {
+    if (Build.VERSION.SDK_INT >= 33) {
       notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
   }
@@ -201,12 +229,6 @@ fun SubstrateApp(
     } else {
       pendingAction = action
       permissionLauncher.launch(arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA))
-    }
-  }
-
-  LaunchedEffect(messages.size) {
-    if (messages.isNotEmpty() && isScrolledToBottom) {
-      listState.animateScrollToItem(messages.size - 1)
     }
   }
 
@@ -329,47 +351,48 @@ fun SubstrateApp(
             Box(modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)) {
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                  if (messages.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                      Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.9f)) {
-                        Text(
-                          "Messages in #${activeChannel.name} are synchronized in real-time.",
-                          color = WhatsAppTextSecondary,
-                          style = MaterialTheme.typography.labelSmall,
-                          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
+                  LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+                    item {
+                      Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
+                          Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                        }
                       }
                     }
-                  } else {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+
+                    items(messages, key = { it.id }) { message ->
+                      // Reliable blue ticks logic for DMs vs group channels
+                      val isRead = if (activeChannel.isDm) {
+                        val recipient = activeChannel.dmRecipientGamertag
+                        if (!recipient.isNullOrBlank()) {
+                          message.readBy.any { it.equals(recipient, ignoreCase = true) }
+                        } else {
+                          message.readBy.isNotEmpty()
+                        }
+                      } else {
+                        val cleanSender = message.senderName.trim()
+                        message.readBy.any { !it.equals(cleanSender, ignoreCase = true) }
+                      }
+
+                      ChatMessageItem(
+                        message = message,
+                        isRead = isRead,
+                        canDelete = userState.isAdmin || message.isLocalUser,
+                        onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
+                        onReply = { msg -> replyingToMessage = msg },
+                        onImageClick = { url -> viewedImageUrl = url },
+                        modifier = Modifier.animateItem()
+                      )
+                    }
+
+                    if (typingUsers.isNotEmpty()) {
                       item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                          Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
-                            Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
-                          }
-                        }
-                      }
-
-                      items(messages, key = { it.id }) { message ->
-                        ChatMessageItem(
-                          message = message,
-                          isReadByAll = message.readBy.size >= (members.size - 1),
-                          canDelete = userState.isAdmin || message.isLocalUser,
-                          onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
-                          onReply = { msg -> replyingToMessage = msg },
-                          onImageClick = { url -> viewedImageUrl = url },
-                          modifier = Modifier.animateItem()
-                        )
-                      }
-
-                      if (typingUsers.isNotEmpty()) {
-                        item {
-                          TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
-                        }
+                        TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
                       }
                     }
                   }
 
+                  // Floating scroll-to-bottom button
                   androidx.compose.animation.AnimatedVisibility(
                     visible = !isScrolledToBottom,
                     enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
@@ -386,7 +409,8 @@ fun SubstrateApp(
                         .size(42.dp)
                         .clickable {
                           scope.launch {
-                            listState.animateScrollToItem(messages.size - 1)
+                            val targetIndex = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+                            listState.animateScrollToItem(targetIndex)
                           }
                         }
                     ) {
@@ -519,7 +543,6 @@ fun SubstrateApp(
                   horizontalArrangement = Arrangement.SpaceBetween,
                   verticalAlignment = Alignment.CenterVertically
                 ) {
-                  // Updated title to Substrate SMP
                   Text(
                     text = "Substrate SMP",
                     style = MaterialTheme.typography.headlineMedium,
@@ -687,6 +710,8 @@ fun SubstrateApp(
                         val isMuted = mutedChannels.contains(channel.id)
                         val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
                         val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
+                        val isLastMessageRead = channel.lastMessageIsRead
+
                         val displayPreview = when {
                           channel.lastMessage.isNullOrBlank() -> channel.description
                           channel.isDm -> channel.lastMessage
@@ -736,7 +761,7 @@ fun SubstrateApp(
                                   Spacer(modifier = Modifier.width(4.dp))
                                 }
                                 if (formattedTime.isNotBlank()) {
-                                  Text(formattedTime, color = WhatsAppTextSecondary, fontSize = 12.sp)
+                                  Text(formattedTime, color = if (isLastMessageRead) WhatsAppTextSecondary else WhatsAppGreenDark, fontSize = 12.sp)
                                 }
                               }
                             }
@@ -745,7 +770,12 @@ fun SubstrateApp(
 
                             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                               if (isLocalSender && channel.lastMessage != null) {
-                                Icon(Icons.Default.DoneAll, contentDescription = "Sent", tint = WhatsAppCheckmarkBlue, modifier = Modifier.size(15.dp))
+                                Icon(
+                                  Icons.Default.DoneAll,
+                                  contentDescription = if (isLastMessageRead) "Read" else "Sent",
+                                  tint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0),
+                                  modifier = Modifier.size(15.dp)
+                                )
                                 Spacer(modifier = Modifier.width(3.dp))
                               }
                               Text(
