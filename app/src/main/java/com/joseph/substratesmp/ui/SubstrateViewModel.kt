@@ -169,7 +169,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                 return@mapNotNull null
               }
 
-              val name = doc.getString("name") ?: id
+              // In a DM, the channel name for me is the OTHER person's gamertag
+              val rawName = doc.getString("name") ?: id
+              val name = if (isDm && parts != null) {
+                parts.find { it != myTag } ?: rawName
+              } else rawName
+
               val typeStr = doc.getString("type") ?: "TEXT"
               val category = doc.getString("category") ?: "CHANNELS"
               val description = doc.getString("description") ?: ""
@@ -295,6 +300,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     )
   }
 
+  fun deleteServerSticker(stickerId: String) {
+    firestore.collection("stickers").document(stickerId).delete()
+  }
+
   fun postStatus(content: String, theme: String, activity: String, coords: String?) {
     if (content.isBlank()) return
     val user = userState.value
@@ -355,7 +364,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   }
 
   fun deleteChannel(channelId: String) {
-    if (channelId == "general-chat") return
+    if (channelId == "general-chat" || channelId == "announcements") return
     firestore.collection("channels").document(channelId).delete()
     if (_activeChannel.value.id == channelId) {
       val fallback = _channels.value.firstOrNull { it.id == "general-chat" }
@@ -468,6 +477,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     imageUrl: String? = null,
     audioUrl: String? = null,
     audioDurationSeconds: Int = 0,
+    fileUrl: String? = null,
+    fileName: String? = null,
     isSticker: Boolean = false,
     replyTo: ChatMessage? = null
   ) {
@@ -479,7 +490,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) {
       return
     }
-    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null) return
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
 
     setTyping(false)
     val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
@@ -492,6 +503,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl = imageUrl,
       audioUrl = audioUrl,
       audioDurationSeconds = audioDurationSeconds,
+      fileUrl = fileUrl,
+      fileName = fileName,
       isSticker = isSticker,
       replyToId = replyTo?.id,
       replyToSender = replyTo?.senderName,
