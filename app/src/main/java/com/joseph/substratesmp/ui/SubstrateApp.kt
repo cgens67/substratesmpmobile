@@ -2,9 +2,7 @@ package com.joseph.substratesmp.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.os.Build
-import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -25,9 +23,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -240,13 +236,15 @@ fun SubstrateApp(
     }
   }
 
+  // Instant jump to bottom when first entering chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
-      delay(80L)
-      listState.scrollToItem(messages.size)
+      delay(40L)
+      listState.scrollToItem((messages.size + 1).coerceAtLeast(0))
     }
   }
 
+  // Smooth scroll when new incoming/sent messages arrive
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -367,6 +365,7 @@ fun SubstrateApp(
             members = members,
             messages = messages,
             currentGamertag = userState.gamertag,
+            isAdmin = userState.isAdmin,
             isMuted = isCurrentChannelMuted,
             isDarkMode = isDarkMode,
             onToggleMute = { viewModel.toggleMuteChannel(activeChannel.id) },
@@ -376,7 +375,9 @@ fun SubstrateApp(
               currentScreen = "user_profile_screen"
             },
             onAddMembers = { currentScreen = "contacts" },
-            onImageClick = { url -> viewedImageUrl = url }
+            onImageClick = { url -> viewedImageUrl = url },
+            onUpdateChannel = { id, name, desc -> viewModel.updateChannelInfo(id, name, desc) },
+            onTogglePermission = { ch -> viewModel.toggleChannelPermission(ch) }
           )
         }
 
@@ -631,9 +632,9 @@ fun SubstrateApp(
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
                         modifier = Modifier.animateItem(
-                          fadeInSpec = tween(250),
-                          placementSpec = tween(300, easing = FastOutSlowInEasing),
-                          fadeOutSpec = tween(200)
+                          fadeInSpec = tween(200),
+                          placementSpec = tween(250, easing = FastOutSlowInEasing),
+                          fadeOutSpec = tween(150)
                         )
                       )
                     }
@@ -642,6 +643,10 @@ fun SubstrateApp(
                       item {
                         TypingBubble(typerName = typingUsers.first(), modifier = Modifier.animateItem())
                       }
+                    }
+
+                    item {
+                      Spacer(modifier = Modifier.height(6.dp))
                     }
                   }
 
