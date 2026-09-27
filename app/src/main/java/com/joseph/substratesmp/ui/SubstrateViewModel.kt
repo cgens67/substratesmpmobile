@@ -1,12 +1,12 @@
 package com.joseph.substratesmp.ui
 
 import android.app.Application
-import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.firestore.FirebaseFirestore
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
+import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.data.model.DefaultChannels
 import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
@@ -19,8 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 class SubstrateViewModel(application: Application) : AndroidViewModel(application) {
-  private val TAG = "SubstrateVM"
-
   val authRepository = AuthRepository(application)
   val chatRepository = ChatRepository(application)
   val voiceManager = AgoraVoiceManager(application)
@@ -83,7 +81,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val typeStr = doc.getString("type") ?: "TEXT"
               val category = doc.getString("category") ?: "CHANNELS"
               val description = doc.getString("description") ?: ""
-              val allowed = (doc.get("allowedRolesToSend") as? List<*>)?.mapNotNull { it?.toString() } ?: listOf("ALL")
+              val allowed = (doc.get("allowedRolesToSend") as? List<*>)?.mapNotNull { it?.toString() }
+                ?: if (id == "announcements") listOf("ADMIN") else listOf("ALL")
               val type = try {
                 ChannelType.valueOf(typeStr)
               } catch (_: Exception) {
@@ -156,7 +155,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             val list = snapshot.documents.mapNotNull { doc ->
               val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
               val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
-              val role = if (isAdmin) "ADMIN" else "MEMBER"
+              val role = doc.getString("role") ?: if (isAdmin) "ADMIN" else "MEMBER"
               AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin)
             }
             _members.value = list
@@ -188,27 +187,47 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun reactToStatus(statusId: String, emoji: String) {
     firestore.collection("statuses").document(statusId).get().addOnSuccessListener { doc ->
-      val counts = (doc.get("reactionCounts") as? Map<*, *>)?.mapKeys { it.key.toString() }?.mapValues { (it.value as? Long)?.toInt() ?: 0 }?.toMutableMap() ?: mutableMapOf()
+      val reactionsRaw = doc.get("reactionCounts") as? Map<*, *>
+      val counts = reactionsRaw?.mapKeys { it.key.toString() }?.mapValues { (it.value as? Long)?.toInt() ?: 0 }?.toMutableMap() ?: mutableMapOf()
       counts[emoji] = (counts[emoji] ?: 0) + 1
       firestore.collection("statuses").document(statusId).update("reactionCounts", counts)
     }
   }
 
   fun createChannel(name: String, type: ChannelType, desc: String, onlyAdmin: Boolean) {
-    val id = name.lowercase().replace(" ", "-")
+    val cleanName = name.trim()
+    val id = cleanName.lowercase().replace(" ", "-")
+    val newChannel = Channel(
+      id = id,
+      name = cleanName,
+      type = type,
+      category = if (type == ChannelType.TEXT) "TEXT CHANNELS" else "VOICE CHANNELS",
+      description = desc.trim(),
+      allowedRolesToSend = if (onlyAdmin) listOf("ADMIN") else listOf("ALL")
+    )
     firestore.collection("channels").document(id).set(
       hashMapOf(
-        "name" to name,
-        "type" to type.name,
-        "category" to if (type == ChannelType.TEXT) "TEXT CHANNELS" else "VOICE CHANNELS",
-        "description" to desc,
-        "allowedRolesToSend" to if (onlyAdmin) listOf("ADMIN") else listOf("ALL")
+        "name" to newChannel.name,
+        "type" to newChannel.type.name,
+        "category" to newChannel.category,
+        "description" to newChannel.description,
+        "allowedRolesToSend" to newChannel.allowedRolesToSend
       )
     )
+    if (type == ChannelType.TEXT) {
+      selectChannel(newChannel)
+    }
   }
 
   fun deleteChannel(channelId: String) {
+    if (channelId == "general-chat") return
     firestore.collection("channels").document(channelId).delete()
+    if (_activeChannel.value.id == channelId) {
+      val fallback = _channels.value.firstOrNull { it.id == "general-chat" }
+        ?: _channels.value.firstOrNull { it.type == ChannelType.TEXT }
+        ?: DefaultChannels[1]
+      selectChannel(fallback)
+    }
   }
 
   fun toggleChannelPermission(channel: Channel) {
@@ -217,16 +236,48 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   }
 
   fun updateMemberRole(userId: String, newRole: String) {
-    val isAdmin = newRole == "ADMIN"
-    firestore.collection("users").document(userId).update("isAdmin", isAdmin)
+    val isAdmin = newRole.equals("ADMIN", ignoreCase = true)
+    firestore.collection("users").document(userId).update(
+      mapOf(
+        "role" to newRole,
+        "isAdmin" to isAdmin
+      )
+    )
+    val member = _members.value.find { it.id == userId }
+    if (member != null) {
+      firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).update(
+        mapOf(
+          "role" to newRole,
+          "isAdmin" to isAdmin
+        )
+      )
+    }
   }
 
   fun updateMemberGamertag(userId: String, newName: String) {
-    firestore.collection("users").document(userId).update("gamertag", newName)
+    val cleanName = newName.trim()
+    if (cleanName.isBlank()) return
+    val member = _members.value.find { it.id == userId }
+    firestore.collection("users").document(userId).update("gamertag", cleanName)
+    if (member != null) {
+      firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
+      firestore.collection("gamertags").document(cleanName.lowercase()).set(
+        hashMapOf(
+          "uid" to userId,
+          "gamertag" to cleanName,
+          "isAdmin" to member.isAdmin,
+          "role" to member.role
+        )
+      )
+    }
   }
 
   fun removeMember(userId: String) {
+    val member = _members.value.find { it.id == userId }
     firestore.collection("users").document(userId).delete()
+    if (member != null) {
+      firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
+    }
   }
 
   fun selectChannel(channel: Channel) {
@@ -252,7 +303,14 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     voiceManager.joinVoiceChannel(channel.id, channel.name, gamertag, isVideo = true)
   }
 
-  fun sendMessage(content: String, coordinates: String? = null) {
+  fun sendMessage(
+    content: String,
+    coordinates: String? = null,
+    imageUrl: String? = null,
+    audioUrl: String? = null,
+    audioDurationSeconds: Int = 0,
+    replyTo: ChatMessage? = null
+  ) {
     val user = userState.value
     if (user.gamertag.isBlank()) {
       _showGamertagDialog.value = true
@@ -261,14 +319,21 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) {
       return
     }
-    if (content.isBlank() && coordinates == null) return
-    val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else "MEMBER"
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null) return
+
+    val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
     chatRepository.sendMessage(
       channelId = _activeChannel.value.id,
       senderName = user.gamertag,
       senderRole = role,
       content = content.trim(),
-      coordinates = coordinates
+      coordinates = coordinates,
+      imageUrl = imageUrl,
+      audioUrl = audioUrl,
+      audioDurationSeconds = audioDurationSeconds,
+      replyToId = replyTo?.id,
+      replyToSender = replyTo?.senderName,
+      replyToContent = replyTo?.content
     )
   }
 
