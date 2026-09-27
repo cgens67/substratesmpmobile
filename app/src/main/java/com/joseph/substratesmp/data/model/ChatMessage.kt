@@ -16,10 +16,13 @@ data class ChatMessage(
   val imageUrl: String? = null,
   val audioUrl: String? = null,
   val audioDurationSeconds: Int = 0,
+  val fileUrl: String? = null,
+  val fileName: String? = null,
   val isSticker: Boolean = false,
   val replyToId: String? = null,
   val replyToSender: String? = null,
-  val replyToContent: String? = null
+  val replyToContent: String? = null,
+  val readBy: List<String> = emptyList() // Tracks who has seen this message
 ) {
   val isAdmin: Boolean
     get() = senderRole == "ADMIN" || senderName.equals("Siang5680", ignoreCase = true)
