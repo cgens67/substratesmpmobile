@@ -3,6 +3,7 @@ package com.joseph.substratesmp.data.repository
 import android.content.Context
 import android.util.Log
 import com.google.firebase.FirebaseApp
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -24,9 +25,7 @@ class ChatRepository(private val context: Context) {
   private var isInitialLoadDone = false
 
   private val firestore: FirebaseFirestore by lazy {
-    if (FirebaseApp.getApps(context).isEmpty()) {
-      FirebaseApp.initializeApp(context)
-    }
+    if (FirebaseApp.getApps(context).isEmpty()) FirebaseApp.initializeApp(context)
     FirebaseFirestore.getInstance()
   }
 
@@ -54,51 +53,42 @@ class ChatRepository(private val context: Context) {
         .collection("messages")
         .orderBy("timestamp", Query.Direction.ASCENDING)
         .addSnapshotListener { snapshot, error ->
-          if (error != null) {
-            Log.e(TAG, "Firestore messages listener error: ${error.message}")
-            return@addSnapshotListener
-          }
+          if (error != null) return@addSnapshotListener
 
           if (snapshot != null) {
             val previousCount = _messagesFlow.value.size
             val liveMessages = snapshot.documents.mapNotNull { doc ->
-              val id = doc.id
-              val chId = doc.getString("channelId") ?: channelId
               val sender = doc.getString("senderName") ?: "Player"
-              val rawRole = doc.getString("senderRole") ?: "MEMBER"
-              val role = if (sender.equals("Siang5680", ignoreCase = true)) "ADMIN" else rawRole
-              val content = doc.getString("content") ?: ""
-              val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
-              val coords = doc.getString("coordinates")
-              val img = doc.getString("imageUrl")
-              val aud = doc.getString("audioUrl")
-              val audDuration = doc.getLong("audioDurationSeconds")?.toInt() ?: 0
-              val sticker = doc.getBoolean("isSticker") ?: false
-              val repId = doc.getString("replyToId")
-              val repSender = doc.getString("replyToSender")
-              val repContent = doc.getString("replyToContent")
               val isLocal = currentGamertag.isNotBlank() && sender.equals(currentGamertag, ignoreCase = true)
+              val readByList = (doc.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+
+              // Auto-mark as read if it's not my message and I haven't read it yet
+              if (!isLocal && currentGamertag.isNotBlank() && !readByList.contains(currentGamertag)) {
+                doc.reference.update("readBy", FieldValue.arrayUnion(currentGamertag))
+              }
 
               ChatMessage(
-                id = id,
-                channelId = chId,
+                id = doc.id,
+                channelId = doc.getString("channelId") ?: channelId,
                 senderName = sender,
-                senderRole = role,
-                content = content,
-                timestamp = ts,
+                senderRole = if (sender.equals("Siang5680", ignoreCase = true)) "ADMIN" else doc.getString("senderRole") ?: "MEMBER",
+                content = doc.getString("content") ?: "",
+                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
                 isLocalUser = isLocal,
-                coordinates = coords,
-                imageUrl = img,
-                audioUrl = aud,
-                audioDurationSeconds = audDuration,
-                isSticker = sticker,
-                replyToId = repId,
-                replyToSender = repSender,
-                replyToContent = repContent
+                coordinates = doc.getString("coordinates"),
+                imageUrl = doc.getString("imageUrl"),
+                audioUrl = doc.getString("audioUrl"),
+                audioDurationSeconds = doc.getLong("audioDurationSeconds")?.toInt() ?: 0,
+                fileUrl = doc.getString("fileUrl"),
+                fileName = doc.getString("fileName"),
+                isSticker = doc.getBoolean("isSticker") ?: false,
+                replyToId = doc.getString("replyToId"),
+                replyToSender = doc.getString("replyToSender"),
+                replyToContent = doc.getString("replyToContent"),
+                readBy = readByList
               )
             }
 
-            // Play incoming sound only when a new remote message arrives after initial fetch
             if (isInitialLoadDone && liveMessages.size > previousCount) {
               val newest = liveMessages.lastOrNull()
               if (newest != null && !newest.isLocalUser) {
@@ -109,9 +99,7 @@ class ChatRepository(private val context: Context) {
             _messagesFlow.value = liveMessages
           }
         }
-    } catch (e: Exception) {
-      Log.e(TAG, "Error connecting to Firestore: ${e.message}")
-    }
+    } catch (_: Exception) {}
   }
 
   fun sendMessage(
@@ -123,36 +111,36 @@ class ChatRepository(private val context: Context) {
     imageUrl: String? = null,
     audioUrl: String? = null,
     audioDurationSeconds: Int = 0,
+    fileUrl: String? = null,
+    fileName: String? = null,
     isSticker: Boolean = false,
     replyToId: String? = null,
     replyToSender: String? = null,
     replyToContent: String? = null
   ) {
-    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null) return
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
     if (senderName.isBlank()) return
 
-    val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
-    val docRef = firestore.collection("channels")
-      .document(channelId)
-      .collection("messages")
-      .document()
-
-    val docData = hashMapOf(
-      "channelId" to channelId,
-      "senderName" to senderName,
-      "senderRole" to effectiveRole,
-      "content" to content,
-      "timestamp" to System.currentTimeMillis(),
-      "coordinates" to coordinates,
-      "imageUrl" to imageUrl,
-      "audioUrl" to audioUrl,
-      "audioDurationSeconds" to audioDurationSeconds,
-      "isSticker" to isSticker,
-      "replyToId" to replyToId,
-      "replyToSender" to replyToSender,
-      "replyToContent" to replyToContent
+    val docRef = firestore.collection("channels").document(channelId).collection("messages").document()
+    docRef.set(
+      hashMapOf(
+        "channelId" to channelId,
+        "senderName" to senderName,
+        "senderRole" to if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole,
+        "content" to content,
+        "timestamp" to System.currentTimeMillis(),
+        "coordinates" to coordinates,
+        "imageUrl" to imageUrl,
+        "audioUrl" to audioUrl,
+        "audioDurationSeconds" to audioDurationSeconds,
+        "fileUrl" to fileUrl,
+        "fileName" to fileName,
+        "isSticker" to isSticker,
+        "replyToId" to replyToId,
+        "replyToSender" to replyToSender,
+        "replyToContent" to replyToContent,
+        "readBy" to emptyList<String>()
+      )
     )
-
-    docRef.set(docData)
   }
 }
