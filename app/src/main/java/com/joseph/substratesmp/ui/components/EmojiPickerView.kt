@@ -1,5 +1,8 @@
 package com.joseph.substratesmp.ui.components
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -17,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -31,17 +35,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joseph.substratesmp.data.model.ServerSticker
 import com.joseph.substratesmp.ui.theme.WhatsAppDivider
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 import java.text.BreakIterator
 
-/**
- * Correctly deletes a complete Unicode grapheme cluster (e.g. 🏳️‍🌈, 💅🏿, 👨‍👩‍👧‍👦)
- * instead of dropping a single 16-bit Char, preventing 🏳️‍? surrogate corruption.
- */
 fun dropLastGrapheme(str: String): String {
   if (str.isEmpty()) return ""
   val boundary = BreakIterator.getCharacterInstance()
@@ -57,7 +61,11 @@ fun dropLastGrapheme(str: String): String {
 
 @Composable
 fun EmojiPickerView(
+  stickers: List<ServerSticker> = emptyList(),
+  isAdmin: Boolean = false,
+  onOpenCreateSticker: () -> Unit = {},
   onEmojiSelected: (String) -> Unit,
+  onStickerSelected: (ServerSticker) -> Unit = {},
   onBackspace: () -> Unit,
   modifier: Modifier = Modifier
 ) {
@@ -110,7 +118,7 @@ fun EmojiPickerView(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
       ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
           categories.forEachIndexed { index, _ ->
             val icon = when (index) {
               0 -> "🇲🇾"
@@ -124,46 +132,116 @@ fun EmojiPickerView(
                 .clip(RoundedCornerShape(8.dp))
                 .background(if (selectedCategory == index) WhatsAppNavSelectedPill else Color.Transparent)
                 .clickable { selectedCategory = index }
-                .padding(horizontal = 10.dp, vertical = 6.dp),
+                .padding(horizontal = 8.dp, vertical = 5.dp),
               contentAlignment = Alignment.Center
             ) {
-              Text(text = icon, fontSize = 18.sp)
+              Text(text = icon, fontSize = 17.sp)
             }
+          }
+
+          // Stickers Tab (WhatsApp style sticker icon)
+          Box(
+            modifier = Modifier
+              .clip(RoundedCornerShape(8.dp))
+              .background(if (selectedCategory == 99) WhatsAppNavSelectedPill else Color.Transparent)
+              .clickable { selectedCategory = 99 }
+              .padding(horizontal = 8.dp, vertical = 5.dp),
+            contentAlignment = Alignment.Center
+          ) {
+            Text(text = "💟", fontSize = 17.sp)
           }
         }
 
-        IconButton(
-          onClick = onBackspace,
-          modifier = Modifier.size(36.dp)
-        ) {
-          Icon(
-            imageVector = Icons.AutoMirrored.Filled.Backspace,
-            contentDescription = "Backspace",
-            tint = WhatsAppTextSecondary,
-            modifier = Modifier.size(20.dp)
-          )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          if (selectedCategory == 99 && isAdmin) {
+            IconButton(onClick = onOpenCreateSticker, modifier = Modifier.size(36.dp)) {
+              Icon(Icons.Default.AddPhotoAlternate, contentDescription = "Add Sticker", tint = WhatsAppGreenDark, modifier = Modifier.size(20.dp))
+            }
+          }
+
+          if (selectedCategory != 99) {
+            IconButton(onClick = onBackspace, modifier = Modifier.size(36.dp)) {
+              Icon(
+                imageVector = Icons.AutoMirrored.Filled.Backspace,
+                contentDescription = "Backspace",
+                tint = WhatsAppTextSecondary,
+                modifier = Modifier.size(20.dp)
+              )
+            }
+          }
         }
       }
 
       HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp)
 
-      val currentEmojis = categories[selectedCategory].second
-      LazyVerticalGrid(
-        columns = GridCells.Fixed(7),
-        modifier = Modifier
-          .fillMaxWidth()
-          .weight(1f)
-          .padding(horizontal = 6.dp, vertical = 4.dp)
-      ) {
-        items(currentEmojis) { emoji ->
-          Box(
-            modifier = Modifier
-              .size(44.dp)
-              .clip(CircleShape)
-              .clickable { onEmojiSelected(emoji) },
-            contentAlignment = Alignment.Center
+      if (selectedCategory == 99) {
+        // WhatsApp Stickers Grid
+        if (stickers.isEmpty()) {
+          Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+              Text("No Server Stickers Yet", fontWeight = FontWeight.Bold, color = WhatsAppTextSecondary, fontSize = 14.sp)
+              if (isAdmin) {
+                Text("Admins can tap + above to add stickers", color = WhatsAppGreenDark, fontSize = 12.sp, modifier = Modifier.clickable { onOpenCreateSticker() })
+              }
+            }
+          }
+        } else {
+          LazyVerticalGrid(
+            columns = GridCells.Fixed(4),
+            modifier = Modifier.fillMaxWidth().weight(1f).padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
           ) {
-            Text(text = emoji, fontSize = 23.sp)
+            items(stickers) { sticker ->
+              val stickerBitmap = remember(sticker.imageData) {
+                try {
+                  val raw = sticker.imageData.substringAfter("base64,")
+                  val bytes = Base64.decode(raw, Base64.NO_WRAP)
+                  BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                } catch (_: Exception) {
+                  null
+                }
+              }
+
+              if (stickerBitmap != null) {
+                Box(
+                  modifier = Modifier
+                    .size(76.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable { onStickerSelected(sticker) }
+                    .padding(4.dp),
+                  contentAlignment = Alignment.Center
+                ) {
+                  Image(
+                    bitmap = stickerBitmap,
+                    contentDescription = sticker.name,
+                    modifier = Modifier.size(68.dp),
+                    contentScale = ContentScale.Fit
+                  )
+                }
+              }
+            }
+          }
+        }
+      } else {
+        val currentEmojis = categories[selectedCategory].second
+        LazyVerticalGrid(
+          columns = GridCells.Fixed(7),
+          modifier = Modifier
+            .fillMaxWidth()
+            .weight(1f)
+            .padding(horizontal = 6.dp, vertical = 4.dp)
+        ) {
+          items(currentEmojis) { emoji ->
+            Box(
+              modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .clickable { onEmojiSelected(emoji) },
+              contentAlignment = Alignment.Center
+            ) {
+              Text(text = emoji, fontSize = 23.sp)
+            }
           }
         }
       }
