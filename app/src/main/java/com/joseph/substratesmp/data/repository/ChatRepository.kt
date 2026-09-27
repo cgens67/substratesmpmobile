@@ -2,7 +2,6 @@ package com.joseph.substratesmp.data.repository
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -10,13 +9,11 @@ import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.components.NotificationHelper
-import com.joseph.substratesmp.ui.components.SoundHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class ChatRepository(private val context: Context) {
-  private val TAG = "SubstrateChat"
   private val prefs: SharedPreferences = context.getSharedPreferences("substrate_chat_settings", Context.MODE_PRIVATE)
 
   private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
@@ -36,7 +33,6 @@ class ChatRepository(private val context: Context) {
   private var activeChannelId: String = "general-chat"
   private var firestoreListener: ListenerRegistration? = null
   private var currentGamertag: String = ""
-  private var isInitialLoadDone = false
 
   private val firestore: FirebaseFirestore by lazy {
     if (FirebaseApp.getApps(context).isEmpty()) FirebaseApp.initializeApp(context)
@@ -109,7 +105,6 @@ class ChatRepository(private val context: Context) {
     firestoreListener?.remove()
     firestoreListener = null
     _messagesFlow.value = emptyList()
-    isInitialLoadDone = false
 
     try {
       firestoreListener = firestore.collection("channels")
@@ -120,17 +115,25 @@ class ChatRepository(private val context: Context) {
           if (error != null) return@addSnapshotListener
 
           if (snapshot != null) {
-            val previousCount = _messagesFlow.value.size
             val cleanMyTag = currentGamertag.trim()
 
             val liveMessages = snapshot.documents.mapNotNull { doc ->
               val sender = doc.getString("senderName") ?: "Player"
               val isLocal = cleanMyTag.isNotBlank() && sender.equals(cleanMyTag, ignoreCase = true)
               val readByList = (doc.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
+              val deliveredToList = (doc.get("deliveredTo") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
 
+              val hasDelivered = deliveredToList.any { it.equals(cleanMyTag, ignoreCase = true) }
               val hasAlreadyRead = readByList.any { it.equals(cleanMyTag, ignoreCase = true) }
-              if (!isLocal && cleanMyTag.isNotBlank() && !hasAlreadyRead) {
-                doc.reference.update("readBy", FieldValue.arrayUnion(cleanMyTag))
+
+              // Update delivery and read markers
+              if (!isLocal && cleanMyTag.isNotBlank()) {
+                if (!hasDelivered) {
+                  doc.reference.update("deliveredTo", FieldValue.arrayUnion(cleanMyTag))
+                }
+                if (!hasAlreadyRead) {
+                  doc.reference.update("readBy", FieldValue.arrayUnion(cleanMyTag))
+                }
               }
 
               ChatMessage(
@@ -152,35 +155,10 @@ class ChatRepository(private val context: Context) {
                 replyToSender = doc.getString("replyToSender"),
                 replyToContent = doc.getString("replyToContent"),
                 readBy = readByList,
+                deliveredTo = deliveredToList,
                 isEdited = doc.getBoolean("isEdited") ?: false
               )
             }
-
-            if (isInitialLoadDone && liveMessages.size > previousCount) {
-              val newest = liveMessages.lastOrNull()
-              if (newest != null && !newest.isLocalUser) {
-                val senderClean = newest.senderName.lowercase().trim()
-                if (!isChannelMuted(channelId) && !isUserBlocked(senderClean)) {
-                  SoundHelper.playMessageSound(context)
-
-                  val notifTitle = if (channelId.startsWith("dm_")) newest.senderName else "#$channelId • ${newest.senderName}"
-                  val notifContent = when {
-                    newest.isSticker -> "💟 Sticker"
-                    newest.imageUrl != null -> "📷 Photo"
-                    newest.audioUrl != null -> "🎤 Voice message"
-                    newest.fileUrl != null -> "📄 ${newest.fileName ?: "Document"}"
-                    else -> newest.content
-                  }
-                  NotificationHelper.showMessageNotification(
-                    context = context,
-                    notificationId = channelId.hashCode(),
-                    title = notifTitle,
-                    content = notifContent
-                  )
-                }
-              }
-            }
-            isInitialLoadDone = true
             _messagesFlow.value = liveMessages
           }
         }
@@ -252,6 +230,7 @@ class ChatRepository(private val context: Context) {
       "replyToSender" to replyToSender,
       "replyToContent" to replyToContent,
       "readBy" to emptyList<String>(),
+      "deliveredTo" to emptyList<String>(),
       "isEdited" to false
     )
 
