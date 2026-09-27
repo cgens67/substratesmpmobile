@@ -1,5 +1,6 @@
 package com.joseph.substratesmp.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -80,7 +81,6 @@ fun AdminControlSheet(
   onRemoveMember: (userId: String) -> Unit
 ) {
   var selectedTab by remember { mutableIntStateOf(0) }
-  // FILTER OUT DMS FROM CHANNELS ADMIN PANEL
   val serverChannels = channels.filter { !it.isDm }
 
   var showNewChannelDialog by remember { mutableStateOf(false) }
