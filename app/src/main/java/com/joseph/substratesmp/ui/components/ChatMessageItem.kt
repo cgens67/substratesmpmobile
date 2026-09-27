@@ -39,6 +39,7 @@ import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
@@ -116,6 +117,7 @@ fun ChatMessageItem(
   canDelete: Boolean = false,
   onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
+  onEdit: (ChatMessage) -> Unit = {},
   onTranslate: (messageId: String, targetLanguage: String) -> Unit = { _, _ -> },
   onImageClick: (String) -> Unit = {},
   modifier: Modifier = Modifier
@@ -663,6 +665,9 @@ fun ChatMessageItem(
               }
 
               Row(modifier = Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                if (message.isEdited) {
+                  Text("Edited", fontSize = 9.sp, color = WhatsAppTextSecondary, modifier = Modifier.padding(end = 4.dp))
+                }
                 Text(message.formattedTime, style = MaterialTheme.typography.labelSmall, color = WhatsAppTextSecondary, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
@@ -685,6 +690,7 @@ fun ChatMessageItem(
     if (showTranslateMenu) {
       AlertDialog(
         onDismissRequest = { showTranslateMenu = false; showOptionsDialog = false },
+        containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
         title = { Text("Translate Message", fontWeight = FontWeight.Bold) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -700,17 +706,23 @@ fun ChatMessageItem(
           }
         },
         confirmButton = {
-          TextButton(onClick = { showTranslateMenu = false }) { Text("Back") }
+          TextButton(onClick = { showTranslateMenu = false }) { Text("Back", color = WhatsAppGreenDark) }
         }
       )
     } else {
       AlertDialog(
         onDismissRequest = { showOptionsDialog = false },
+        containerColor = Color.White, titleContentColor = Color.Black, textContentColor = Color.Black,
         title = { Text("Message Options", fontWeight = FontWeight.Bold) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
               Text("Reply", fontSize = 16.sp, color = WhatsAppTextPrimary)
+            }
+            if (message.isLocalUser && message.content.isNotBlank()) {
+              TextButton(onClick = { onEdit(message); showOptionsDialog = false }) {
+                Text("Edit", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              }
             }
             if (message.content.isNotBlank()) {
               TextButton(onClick = { showTranslateMenu = true }) {
@@ -741,7 +753,7 @@ fun ChatMessageItem(
           }
         },
         confirmButton = {
-          TextButton(onClick = { showOptionsDialog = false }) { Text("Cancel") }
+          TextButton(onClick = { showOptionsDialog = false }) { Text("Cancel", color = WhatsAppGreenDark) }
         }
       )
     }
