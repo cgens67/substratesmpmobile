@@ -8,7 +8,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -57,9 +56,7 @@ import com.joseph.substratesmp.data.model.ActiveVoiceRoom
 import com.joseph.substratesmp.data.model.VoiceParticipant
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.StatusCallEndRed
-import com.joseph.substratesmp.ui.theme.SubstrateTheme
-import com.joseph.substratesmp.ui.theme.WhatsAppChatOutgoing
-import com.joseph.substratesmp.ui.theme.WhatsAppSurfaceHigh
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 
 @Composable
 fun ActiveVoiceBar(
@@ -88,9 +85,7 @@ fun ActiveVoiceBar(
       .padding(horizontal = 10.dp, vertical = 6.dp)
       .testTag("active_voice_bar"),
     shape = RoundedCornerShape(20.dp),
-    colors = CardDefaults.cardColors(
-      containerColor = WhatsAppSurfaceHigh
-    ),
+    colors = CardDefaults.cardColors(containerColor = Color(0xFF1F2C34)),
     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
   ) {
     Column(
@@ -108,7 +103,7 @@ fun ActiveVoiceBar(
             modifier = Modifier
               .size(10.dp)
               .clip(CircleShape)
-              .background(SubstrateTheme.customColors.statusOnline.copy(alpha = pulseAlpha))
+              .background(Color(0xFF25D366).copy(alpha = pulseAlpha))
           )
           Spacer(modifier = Modifier.width(8.dp))
           Column {
@@ -119,9 +114,9 @@ fun ActiveVoiceBar(
               color = Color.White
             )
             Text(
-              text = if (voiceRoom.isConnecting) "Calling..." else "${voiceRoom.participants.size} participant(s) in call",
+              text = if (voiceRoom.isConnecting) "Connecting..." else "${voiceRoom.participants.size} participant(s) in call",
               style = MaterialTheme.typography.labelSmall,
-              color = SubstrateTheme.customColors.statusOnline,
+              color = Color(0xFF25D366),
               fontSize = 11.sp
             )
           }
@@ -129,27 +124,18 @@ fun ActiveVoiceBar(
 
         FilledIconButton(
           onClick = onDisconnect,
-          modifier = Modifier
-            .size(40.dp)
-            .testTag("voice_disconnect_button"),
-          colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = StatusCallEndRed,
-            contentColor = Color.White
-          )
+          modifier = Modifier.size(38.dp).testTag("voice_disconnect_button"),
+          colors = IconButtonDefaults.filledIconButtonColors(containerColor = StatusCallEndRed)
         ) {
-          Icon(
-            imageVector = Icons.Default.CallEnd,
-            contentDescription = "End Call",
-            modifier = Modifier.size(20.dp)
-          )
+          Icon(Icons.Default.CallEnd, contentDescription = "End Call", tint = Color.White, modifier = Modifier.size(18.dp))
         }
       }
 
-      Spacer(modifier = Modifier.height(12.dp))
+      Spacer(modifier = Modifier.height(10.dp))
 
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
         items(voiceRoom.participants) { participant ->
@@ -159,6 +145,7 @@ fun ActiveVoiceBar(
 
       Spacer(modifier = Modifier.height(12.dp))
 
+      // High-contrast Call Control Buttons
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -170,13 +157,12 @@ fun ActiveVoiceBar(
           modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(if (isMuted) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-            .testTag("voice_mute_toggle")
+            .background(if (isMuted) StatusCallEndRed else Color(0xFF2A3942))
         ) {
           Icon(
             imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-            contentDescription = if (isMuted) "Unmute" else "Mute",
-            tint = if (isMuted) StatusCallEndRed else Color.White,
+            contentDescription = "Mute",
+            tint = Color.White,
             modifier = Modifier.size(20.dp)
           )
         }
@@ -187,8 +173,7 @@ fun ActiveVoiceBar(
           modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(if (isSpeaker) WhatsAppChatOutgoing else MaterialTheme.colorScheme.surfaceVariant)
-            .testTag("voice_speaker_toggle")
+            .background(if (isSpeaker) WhatsAppGreenDark else Color(0xFF2A3942))
         ) {
           Icon(
             imageVector = if (isSpeaker) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
@@ -204,12 +189,11 @@ fun ActiveVoiceBar(
           modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(if (isCam) WhatsAppChatOutgoing else MaterialTheme.colorScheme.surfaceVariant)
-            .testTag("voice_camera_toggle")
+            .background(if (isCam) WhatsAppGreenDark else Color(0xFF2A3942))
         ) {
           Icon(
             imageVector = if (isCam) Icons.Default.Videocam else Icons.Default.VideocamOff,
-            contentDescription = "Video",
+            contentDescription = "Camera",
             tint = Color.White,
             modifier = Modifier.size(20.dp)
           )
@@ -221,13 +205,12 @@ fun ActiveVoiceBar(
           modifier = Modifier
             .size(42.dp)
             .clip(CircleShape)
-            .background(if (isDeaf) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
-            .testTag("voice_deafen_toggle")
+            .background(if (isDeaf) StatusCallEndRed else Color(0xFF2A3942))
         ) {
           Icon(
             imageVector = if (isDeaf) Icons.Default.VolumeOff else Icons.Default.Headphones,
             contentDescription = "Deafen",
-            tint = if (isDeaf) StatusCallEndRed else Color.White,
+            tint = Color.White,
             modifier = Modifier.size(20.dp)
           )
         }
@@ -243,7 +226,7 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
 
   val ringBorderColor by animateColorAsState(
     targetValue = when {
-      isSpeaking -> SubstrateTheme.customColors.statusOnline
+      isSpeaking -> Color(0xFF25D366)
       isAdmin -> RoleAdminGold
       else -> Color.Transparent
     },
@@ -251,25 +234,22 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
   )
 
   Surface(
-    shape = RoundedCornerShape(16.dp),
-    color = MaterialTheme.colorScheme.surfaceVariant,
+    shape = RoundedCornerShape(14.dp),
+    color = Color(0xFF2A3942),
     border = androidx.compose.foundation.BorderStroke(
       width = if (isSpeaking) 2.dp else if (isAdmin) 1.dp else 0.dp,
       color = ringBorderColor
     )
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+      modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Box(
         modifier = Modifier
-          .size(28.dp)
+          .size(26.dp)
           .clip(CircleShape)
-          .background(
-            if (isAdmin) RoleAdminGold.copy(alpha = 0.25f)
-            else WhatsAppChatOutgoing
-          ),
+          .background(if (isAdmin) RoleAdminGold.copy(alpha = 0.3f) else WhatsAppGreenDark),
         contentAlignment = Alignment.Center
       ) {
         Text(
@@ -286,64 +266,37 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
             text = participant.name,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = if (isAdmin) RoleAdminGold else Color.White,
             fontWeight = if (isSpeaking || isAdmin) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1
           )
 
           if (isAdmin) {
-            Spacer(modifier = Modifier.width(4.dp))
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = RoleAdminGold.copy(alpha = 0.2f)
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Shield,
-                  contentDescription = null,
-                  tint = RoleAdminGold,
-                  modifier = Modifier.size(9.dp)
-                )
-                Spacer(modifier = Modifier.width(2.dp))
-                Text(
-                  text = "ADMIN",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = RoleAdminGold,
-                  fontWeight = FontWeight.ExtraBold,
-                  fontSize = 8.sp
-                )
-              }
-            }
+            Spacer(modifier = Modifier.width(3.dp))
+            Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(10.dp))
           }
         }
 
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(2.dp),
-          modifier = Modifier.height(8.dp)
+          modifier = Modifier.height(6.dp)
         ) {
           val baseLevel = if (participant.isMuted) 0f else participant.audioLevel
           for (i in 0..3) {
             val barHeight = when (i) {
-              0 -> (3 + baseLevel * 5).dp
-              1 -> (5 + baseLevel * 7).dp
-              2 -> (3 + baseLevel * 6).dp
-              else -> (4 + baseLevel * 4).dp
+              0 -> (3 + baseLevel * 4).dp
+              1 -> (4 + baseLevel * 6).dp
+              2 -> (3 + baseLevel * 5).dp
+              else -> (4 + baseLevel * 3).dp
             }
             Box(
               modifier = Modifier
                 .width(2.dp)
                 .height(barHeight)
                 .clip(CircleShape)
-                .background(
-                  if (participant.isMuted) StatusCallEndRed
-                  else if (isSpeaking) SubstrateTheme.customColors.statusOnline
-                  else Color.Gray.copy(alpha = 0.4f)
-                )
+                .background(if (participant.isMuted) StatusCallEndRed else if (isSpeaking) Color(0xFF25D366) else Color.Gray.copy(alpha = 0.4f))
             )
           }
         }
