@@ -7,6 +7,7 @@ data class VoiceParticipant(
   val isMuted: Boolean = false,
   val isDeafened: Boolean = false,
   val isLocal: Boolean = false,
+  val isAdmin: Boolean = false,
   val audioLevel: Float = 0.5f // 0.0f to 1.0f for visualizer
 )
 
