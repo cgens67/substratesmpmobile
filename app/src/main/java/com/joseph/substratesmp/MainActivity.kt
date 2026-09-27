@@ -8,7 +8,9 @@ import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.joseph.substratesmp.ui.SubstrateApp
 import com.joseph.substratesmp.ui.SubstrateViewModel
 import com.joseph.substratesmp.ui.theme.SubstrateSMPTheme
@@ -21,7 +23,9 @@ class MainActivity : ComponentActivity() {
     enableEdgeToEdge()
     viewModel.voiceManager.initAgoraEngine()
     setContent {
-      SubstrateSMPTheme {
+      val settings by viewModel.appSettings.collectAsStateWithLifecycle()
+      
+      SubstrateSMPTheme(darkTheme = settings.isNightMode) {
         Surface(
           modifier = Modifier.fillMaxSize(),
           color = MaterialTheme.colorScheme.background
