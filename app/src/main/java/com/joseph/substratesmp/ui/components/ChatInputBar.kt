@@ -10,8 +10,13 @@ import android.util.Base64
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -76,10 +81,6 @@ import kotlinx.coroutines.delay
 import java.io.ByteArrayOutputStream
 import java.io.File
 
-/**
- * Downsamples high-resolution camera/gallery photos to a max dimension of 800px
- * and compresses them to ~35KB–60KB JPEG, well below Firestore's 1MB limit.
- */
 fun processAndCompressImage(uri: Uri, context: Context): String? {
   return try {
     val inputStream = context.contentResolver.openInputStream(uri) ?: return null
@@ -128,7 +129,7 @@ fun ChatInputBar(
   channelName: String,
   text: String,
   onTextChanged: (String) -> Unit,
-  onSendMessage: (content: String, coordinates: String?, imageUrl: String?, audioUrl: String?, audioDuration: Int, replyTo: ChatMessage?) -> Unit,
+  onSendMessage: (content: String, coordinates: String?, imageUrl: String?, audioUrl: String?, audioDuration: Int, isSticker: Boolean, replyTo: ChatMessage?) -> Unit,
   replyingTo: ChatMessage? = null,
   onCancelReply: () -> Unit = {},
   isEmojiPickerVisible: Boolean,
@@ -152,7 +153,7 @@ fun ChatInputBar(
     if (uri != null) {
       val base64Img = processAndCompressImage(uri, context)
       if (base64Img != null) {
-        onSendMessage("", null, base64Img, null, 0, replyingTo)
+        onSendMessage("", null, base64Img, null, 0, false, replyingTo)
       }
     }
   }
@@ -162,7 +163,7 @@ fun ChatInputBar(
   ) { bitmap: Bitmap? ->
     if (bitmap != null) {
       val base64Img = compressBitmapDirect(bitmap)
-      onSendMessage("", null, base64Img, null, 0, replyingTo)
+      onSendMessage("", null, base64Img, null, 0, false, replyingTo)
     }
   }
 
@@ -181,29 +182,36 @@ fun ChatInputBar(
     color = Color.Transparent
   ) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
-      if (replyingTo != null) {
-        Surface(
-          shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
-          color = Color(0xFFF0F2F5),
-          modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
-        ) {
-          Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
+      // Smooth Animation when opening or closing "Replying to..."
+      AnimatedVisibility(
+        visible = replyingTo != null,
+        enter = slideInVertically(animationSpec = tween(220)) { it } + expandVertically(animationSpec = tween(220)) + fadeIn(),
+        exit = slideOutVertically(animationSpec = tween(200)) { it } + shrinkVertically(animationSpec = tween(200)) + fadeOut()
+      ) {
+        replyingTo?.let { replyTarget ->
+          Surface(
+            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
+            color = Color(0xFFF0F2F5),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
-            Box(modifier = Modifier.width(3.dp).height(32.dp).background(WhatsAppGreenDark, RoundedCornerShape(2.dp)))
-            Spacer(modifier = Modifier.width(8.dp))
-            Column(modifier = Modifier.weight(1f)) {
-              Text("Replying to ${replyingTo.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
-              Text(
-                replyingTo.content.ifBlank { if (replyingTo.imageUrl != null) "📷 Photo" else "🎤 Voice note" },
-                color = WhatsAppTextSecondary,
-                fontSize = 11.5.sp,
-                maxLines = 1
-              )
-            }
-            IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-              Icon(Icons.Default.Close, contentDescription = "Cancel", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
+            Row(
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Box(modifier = Modifier.width(3.dp).height(32.dp).background(WhatsAppGreenDark, RoundedCornerShape(2.dp)))
+              Spacer(modifier = Modifier.width(8.dp))
+              Column(modifier = Modifier.weight(1f)) {
+                Text("Replying to ${replyTarget.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
+                Text(
+                  replyTarget.content.ifBlank { if (replyTarget.isSticker) "💟 Sticker" else if (replyTarget.imageUrl != null) "📷 Photo" else "🎤 Voice note" },
+                  color = WhatsAppTextSecondary,
+                  fontSize = 11.5.sp,
+                  maxLines = 1
+                )
+              }
+              IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
+              }
             }
           }
         }
@@ -344,7 +352,7 @@ fun ChatInputBar(
                   onSend = {
                     if (text.isNotBlank() || coordText.isNotBlank()) {
                       val coords = if (coordText.isNotBlank()) coordText.trim() else null
-                      onSendMessage(text.trim(), coords, null, null, 0, replyingTo)
+                      onSendMessage(text.trim(), coords, null, null, 0, false, replyingTo)
                       coordText = ""
                       showCoordinateInput = false
                     }
@@ -380,17 +388,16 @@ fun ChatInputBar(
                 if (file != null && file.exists()) {
                   val bytes = file.readBytes()
                   val base64Aud = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-                  onSendMessage("", null, null, base64Aud, recordingSeconds, replyingTo)
+                  onSendMessage("", null, null, base64Aud, recordingSeconds, false, replyingTo)
                   file.delete()
                 }
               } catch (_: Exception) {}
             } else if (canSend) {
               val coords = if (coordText.isNotBlank()) coordText.trim() else null
-              onSendMessage(text.trim(), coords, null, null, 0, replyingTo)
+              onSendMessage(text.trim(), coords, null, null, 0, false, replyingTo)
               coordText = ""
               showCoordinateInput = false
             } else {
-              // High-Definition Studio Voice Recording (48kHz sample rate, 128kbps AAC bitrate)
               try {
                 val tempAudio = File(context.cacheDir, "rec_${System.currentTimeMillis()}.m4a")
                 recordedAudioFile = tempAudio
