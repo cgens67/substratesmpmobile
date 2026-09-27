@@ -8,11 +8,17 @@ data class ChatMessage(
   val id: String = "",
   val channelId: String = "general-chat",
   val senderName: String = "",
-  val senderRole: String = "MEMBER", // "ADMIN", "MEMBER"
+  val senderRole: String = "MEMBER",
   val content: String = "",
   val timestamp: Long = System.currentTimeMillis(),
   val isLocalUser: Boolean = false,
-  val coordinates: String? = null // e.g. "X: -412, Y: -58, Z: 890"
+  val coordinates: String? = null,
+  val imageUrl: String? = null,
+  val audioUrl: String? = null,
+  val audioDurationSeconds: Int = 0,
+  val replyToId: String? = null,
+  val replyToSender: String? = null,
+  val replyToContent: String? = null
 ) {
   val isAdmin: Boolean
     get() = senderRole == "ADMIN" || senderName.equals("Siang5680", ignoreCase = true)
