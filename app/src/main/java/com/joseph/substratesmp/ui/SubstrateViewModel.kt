@@ -386,7 +386,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val isFromMe = myTag.isNotBlank() && sender.equals(myTag, ignoreCase = true)
         val isViewingThisChat = _currentScreenState.value == "chat_screen" && _activeChannel.value.id == channelId
 
-        // FIX: Proactively trigger notifications when message arrives in background or from other chats
+        // Proactively trigger notifications when message arrives in background or from other chats
         if (prevTs != null && ts > prevTs && !isFromMe) {
           if (!isViewingThisChat && !isChannelMuted(channelId) && !isUserBlocked(sender)) {
             SoundHelper.playMessageSound(getApplication())
@@ -699,7 +699,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl != null -> "📷 Photo"
       audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
       fileUrl != null -> "📄 ${fileName ?: "Document"}"
-      coordinates != null && content.isBlank() -> "📍 $coords"
+      coordinates != null && content.isBlank() -> "📍 $coordinates"
       else -> content.trim()
     }
     firestore.collection("channels").document(channelId).set(
