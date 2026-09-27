@@ -1,6 +1,7 @@
 package com.joseph.substratesmp.data.repository
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.util.Log
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FieldValue
@@ -8,6 +9,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.joseph.substratesmp.data.model.ChatMessage
+import com.joseph.substratesmp.ui.components.NotificationHelper
 import com.joseph.substratesmp.ui.components.SoundHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,9 +17,17 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class ChatRepository(private val context: Context) {
   private val TAG = "SubstrateChat"
+  private val prefs: SharedPreferences = context.getSharedPreferences("substrate_chat_settings", Context.MODE_PRIVATE)
 
   private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
   val messagesFlow: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
+
+  // Sets of Muted Channels and Blocked Users (Stored in SharedPreferences for 0-cost instant access)
+  private val _mutedChannels = MutableStateFlow<Set<String>>(prefs.getStringSet("muted_channels", emptySet()) ?: emptySet())
+  val mutedChannels: StateFlow<Set<String>> = _mutedChannels.asStateFlow()
+
+  private val _blockedUsers = MutableStateFlow<Set<String>>(prefs.getStringSet("blocked_users", emptySet()) ?: emptySet())
+  val blockedUsers: StateFlow<Set<String>> = _blockedUsers.asStateFlow()
 
   private var activeChannelId: String = "general-chat"
   private var firestoreListener: ListenerRegistration? = null
@@ -30,7 +40,41 @@ class ChatRepository(private val context: Context) {
   }
 
   init {
+    NotificationHelper.init(context)
     selectChannel("general-chat")
+  }
+
+  fun isChannelMuted(channelId: String): Boolean = _mutedChannels.value.contains(channelId)
+
+  fun toggleMuteChannel(channelId: String): Boolean {
+    val current = _mutedChannels.value.toMutableSet()
+    val isNowMuted = if (current.contains(channelId)) {
+      current.remove(channelId)
+      false
+    } else {
+      current.add(channelId)
+      true
+    }
+    prefs.edit().putStringSet("muted_channels", current).apply()
+    _mutedChannels.value = current
+    return isNowMuted
+  }
+
+  fun isUserBlocked(gamertag: String): Boolean = _blockedUsers.value.contains(gamertag.lowercase().trim())
+
+  fun toggleBlockUser(gamertag: String): Boolean {
+    val clean = gamertag.lowercase().trim()
+    val current = _blockedUsers.value.toMutableSet()
+    val isNowBlocked = if (current.contains(clean)) {
+      current.remove(clean)
+      false
+    } else {
+      current.add(clean)
+      true
+    }
+    prefs.edit().putStringSet("blocked_users", current).apply()
+    _blockedUsers.value = current
+    return isNowBlocked
   }
 
   fun updateLocalGamertag(gamertag: String) {
@@ -91,7 +135,26 @@ class ChatRepository(private val context: Context) {
             if (isInitialLoadDone && liveMessages.size > previousCount) {
               val newest = liveMessages.lastOrNull()
               if (newest != null && !newest.isLocalUser) {
-                SoundHelper.playMessageSound(context)
+                val senderClean = newest.senderName.lowercase().trim()
+                // Do not notify if channel is muted or sender is blocked
+                if (!isChannelMuted(channelId) && !isUserBlocked(senderClean)) {
+                  SoundHelper.playMessageSound(context)
+
+                  val notifTitle = if (channelId.startsWith("dm_")) newest.senderName else "#$channelId • ${newest.senderName}"
+                  val notifContent = when {
+                    newest.isSticker -> "💟 Sticker"
+                    newest.imageUrl != null -> "📷 Photo"
+                    newest.audioUrl != null -> "🎤 Voice message"
+                    newest.fileUrl != null -> "📄 ${newest.fileName ?: "Document"}"
+                    else -> newest.content
+                  }
+                  NotificationHelper.showMessageNotification(
+                    context = context,
+                    notificationId = channelId.hashCode(),
+                    title = notifTitle,
+                    content = notifContent
+                  )
+                }
               }
             }
             isInitialLoadDone = true
@@ -123,7 +186,6 @@ class ChatRepository(private val context: Context) {
     val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
     val docRef = firestore.collection("channels").document(channelId).collection("messages").document()
 
-    // Subcollection chunking: If payload > 600KB (e.g. your 1.18MB audio file), chunk it to bypass Firestore 1MB doc limit
     val CHUNK_LIMIT = 500_000
     var finalAudioUrl = audioUrl
     var isAudioChunked = false
@@ -176,5 +238,20 @@ class ChatRepository(private val context: Context) {
         }
       }
     }
+  }
+
+  /**
+   * RECURSIVE DELETION:
+   * Actually purges all chunked documents in subcollections so 0 bytes remain in Firebase.
+   */
+  fun deleteMessage(channelId: String, messageId: String) {
+    val docRef = firestore.collection("channels").document(channelId).collection("messages").document(messageId)
+    docRef.collection("audioChunks").get().addOnSuccessListener { snapshot ->
+      for (doc in snapshot.documents) doc.reference.delete()
+    }
+    docRef.collection("fileChunks").get().addOnSuccessListener { snapshot ->
+      for (doc in snapshot.documents) doc.reference.delete()
+    }
+    docRef.delete()
   }
 }
