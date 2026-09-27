@@ -43,10 +43,12 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -109,10 +111,12 @@ fun formatDuration(ms: Int): String {
 @Composable
 fun ChatMessageItem(
   message: ChatMessage,
+  translatedText: String? = null,
   isRead: Boolean = false,
   canDelete: Boolean = false,
   onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
+  onTranslate: (messageId: String, targetLanguage: String) -> Unit = { _, _ -> },
   onImageClick: (String) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
@@ -124,6 +128,7 @@ fun ChatMessageItem(
 
   var isMessageVisible by remember { mutableStateOf(true) }
   var showOptionsDialog by remember { mutableStateOf(false) }
+  var showTranslateMenu by remember { mutableStateOf(false) }
 
   var isPlayingAudio by remember { mutableStateOf(false) }
   var isDownloadingAudio by remember { mutableStateOf(false) }
@@ -624,6 +629,22 @@ fun ChatMessageItem(
                 )
               }
 
+              if (translatedText != null) {
+                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.Gray.copy(alpha = 0.3f))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                  Icon(Icons.Default.Translate, contentDescription = null, tint = WhatsAppTextSecondary, modifier = Modifier.size(12.dp))
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Text(text = "Translated", fontSize = 10.sp, color = WhatsAppTextSecondary, fontWeight = FontWeight.Bold)
+                }
+                Text(
+                  text = translatedText,
+                  style = MaterialTheme.typography.bodyMedium,
+                  color = WhatsAppTextPrimary,
+                  fontSize = 14.5.sp,
+                  modifier = Modifier.padding(top = 2.dp)
+                )
+              }
+
               if (!message.coordinates.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Surface(
@@ -661,40 +682,68 @@ fun ChatMessageItem(
   }
 
   if (showOptionsDialog) {
-    AlertDialog(
-      onDismissRequest = { showOptionsDialog = false },
-      title = { Text("Message Options", fontWeight = FontWeight.Bold) },
-      text = {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-          TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
-            Text("Reply", fontSize = 16.sp, color = WhatsAppTextPrimary)
-          }
-          if (message.content.isNotBlank() || !message.coordinates.isNullOrBlank()) {
-            TextButton(onClick = {
-              val copyText = if (message.content.isNotBlank()) message.content else message.coordinates ?: ""
-              clipboardManager.setText(AnnotatedString(copyText))
-              showOptionsDialog = false
-            }) {
-              Text("Copy Text", fontSize = 16.sp, color = WhatsAppTextPrimary)
+    if (showTranslateMenu) {
+      AlertDialog(
+        onDismissRequest = { showTranslateMenu = false; showOptionsDialog = false },
+        title = { Text("Translate Message", fontWeight = FontWeight.Bold) },
+        text = {
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { onTranslate(message.id, "en"); showTranslateMenu = false; showOptionsDialog = false }) {
+              Text("Translate to English", fontSize = 16.sp, color = WhatsAppTextPrimary)
+            }
+            TextButton(onClick = { onTranslate(message.id, "zh"); showTranslateMenu = false; showOptionsDialog = false }) {
+              Text("Translate to Chinese", fontSize = 16.sp, color = WhatsAppTextPrimary)
+            }
+            TextButton(onClick = { onTranslate(message.id, "ms"); showTranslateMenu = false; showOptionsDialog = false }) {
+              Text("Translate to Malay", fontSize = 16.sp, color = WhatsAppTextPrimary)
             }
           }
-          if (canDelete) {
-            TextButton(onClick = {
-              scope.launch {
-                showOptionsDialog = false
-                isMessageVisible = false
-                delay(250L) 
-                onDeleteMessage(message)
-              }
-            }) {
-              Text("Delete for everyone", color = Color(0xFFEA0038), fontSize = 16.sp)
-            }
-          }
+        },
+        confirmButton = {
+          TextButton(onClick = { showTranslateMenu = false }) { Text("Back") }
         }
-      },
-      confirmButton = {
-        TextButton(onClick = { showOptionsDialog = false }) { Text("Cancel") }
-      }
-    )
+      )
+    } else {
+      AlertDialog(
+        onDismissRequest = { showOptionsDialog = false },
+        title = { Text("Message Options", fontWeight = FontWeight.Bold) },
+        text = {
+          Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
+              Text("Reply", fontSize = 16.sp, color = WhatsAppTextPrimary)
+            }
+            if (message.content.isNotBlank()) {
+              TextButton(onClick = { showTranslateMenu = true }) {
+                Text("Translate Message", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              }
+            }
+            if (message.content.isNotBlank() || !message.coordinates.isNullOrBlank()) {
+              TextButton(onClick = {
+                val copyText = if (message.content.isNotBlank()) message.content else message.coordinates ?: ""
+                clipboardManager.setText(AnnotatedString(copyText))
+                showOptionsDialog = false
+              }) {
+                Text("Copy Text", fontSize = 16.sp, color = WhatsAppTextPrimary)
+              }
+            }
+            if (canDelete) {
+              TextButton(onClick = {
+                scope.launch {
+                  showOptionsDialog = false
+                  isMessageVisible = false
+                  delay(250L)
+                  onDeleteMessage(message)
+                }
+              }) {
+                Text("Delete for everyone", color = Color(0xFFEA0038), fontSize = 16.sp)
+              }
+            }
+          }
+        },
+        confirmButton = {
+          TextButton(onClick = { showOptionsDialog = false }) { Text("Cancel") }
+        }
+      )
+    }
   }
 }
