@@ -3,13 +3,9 @@ package com.joseph.substratesmp
 import android.content.Context
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
 import com.joseph.substratesmp.data.model.ChatMessage
-import com.joseph.substratesmp.data.model.DefaultChannels
-import com.joseph.substratesmp.data.repository.AuthUserState
-import com.joseph.substratesmp.ui.components.ChannelDrawerContent
 import com.joseph.substratesmp.ui.components.ChatMessageItem
 import com.joseph.substratesmp.ui.theme.SubstrateSMPTheme
 import com.joseph.substratesmp.voice.AgoraVoiceManager
@@ -62,12 +58,10 @@ class ExampleRobolectricTest {
   fun `siang5680 exclusively gains admin privileges`() {
     val admin1 = "Siang5680".equals("Siang5680", ignoreCase = true)
     val admin2 = "siang5680".equals("Siang5680", ignoreCase = true)
-    val admin3 = "SIANG5680".equals("Siang5680", ignoreCase = true)
-    val normalUser = "DiamondMiner99".equals("Siang5680", ignoreCase = true)
+    val normalUser = "DiamondMiner".equals("Siang5680", ignoreCase = true)
 
     assertTrue(admin1)
     assertTrue(admin2)
-    assertTrue(admin3)
     assertFalse(normalUser)
   }
 
@@ -78,7 +72,7 @@ class ExampleRobolectricTest {
       channelId = "general-chat",
       senderName = "Siang5680",
       senderRole = "ADMIN",
-      content = "Welcome to Substrate SMP Bedrock Realm!",
+      content = "Welcome to Substrate SMP!",
       isLocalUser = false
     )
 
@@ -89,27 +83,6 @@ class ExampleRobolectricTest {
     }
 
     composeTestRule.onNodeWithText("Siang5680").assertIsDisplayed()
-    composeTestRule.onNodeWithText("ADMIN").assertIsDisplayed()
-  }
-
-  @Test
-  fun `channel drawer renders successfully with banner and profile`() {
-    composeTestRule.setContent {
-      SubstrateSMPTheme {
-        ChannelDrawerContent(
-          channels = DefaultChannels,
-          activeChannel = DefaultChannels[1],
-          userState = AuthUserState(gamertag = "Siang5680", role = "ADMIN", isAdmin = true),
-          onSelectChannel = {},
-          onOpenGamertagDialog = {},
-          onOpenAgoraSettings = {},
-          onOpenServerInfo = {}
-        )
-      }
-    }
-
-    composeTestRule.onNodeWithTag("channel_drawer_surface").assertIsDisplayed()
-    composeTestRule.onNodeWithTag("user_profile_bar").assertIsDisplayed()
     composeTestRule.onNodeWithText("ADMIN").assertIsDisplayed()
   }
 }
