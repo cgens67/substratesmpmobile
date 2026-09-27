@@ -36,10 +36,12 @@ import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
-import com.joseph.substratesmp.ui.theme.SubstrateTheme
-import com.joseph.substratesmp.ui.theme.WhatsAppChatIncoming
-import com.joseph.substratesmp.ui.theme.WhatsAppChatOutgoing
+import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
 import com.joseph.substratesmp.ui.theme.WhatsAppCheckmarkBlue
+import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import com.joseph.substratesmp.ui.theme.WhatsAppIncomingBubble
+import com.joseph.substratesmp.ui.theme.WhatsAppOutgoingBubble
+import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 
 @Composable
@@ -51,16 +53,17 @@ fun ChatMessageItem(
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
 
+  // WhatsApp rounded message bubble shape
   val bubbleShape = if (isLocal) {
-    RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+    RoundedCornerShape(topStart = 14.dp, topEnd = 4.dp, bottomEnd = 14.dp, bottomStart = 14.dp)
   } else {
-    RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
+    RoundedCornerShape(topStart = 4.dp, topEnd = 14.dp, bottomEnd = 14.dp, bottomStart = 14.dp)
   }
 
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 8.dp, vertical = 3.dp)
+      .padding(horizontal = 10.dp, vertical = 2.dp)
       .testTag("chat_message_${message.id}"),
     horizontalArrangement = if (isLocal) Arrangement.End else Arrangement.Start,
     verticalAlignment = Alignment.Top
@@ -68,15 +71,15 @@ fun ChatMessageItem(
     Card(
       shape = bubbleShape,
       colors = CardDefaults.cardColors(
-        containerColor = if (isLocal) WhatsAppChatOutgoing else WhatsAppChatIncoming
+        containerColor = if (isLocal) WhatsAppOutgoingBubble else WhatsAppIncomingBubble
       ),
       elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-      modifier = Modifier.widthIn(min = 80.dp, max = 310.dp)
+      modifier = Modifier.widthIn(min = 90.dp, max = 310.dp)
     ) {
       Column(
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+        modifier = Modifier.padding(horizontal = 9.dp, vertical = 5.dp)
       ) {
-        // Sender Header for incoming messages
+        // Sender header for incoming group messages
         if (!isLocal) {
           Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -85,16 +88,15 @@ fun ChatMessageItem(
             Text(
               text = message.senderName,
               style = MaterialTheme.typography.labelMedium,
-              color = if (isSenderAdmin) RoleAdminGold else SubstrateTheme.customColors.statusOnline,
+              color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
               fontWeight = FontWeight.Bold,
-              fontSize = 13.sp
+              fontSize = 12.5.sp
             )
             if (isSenderAdmin) {
-              Spacer(modifier = Modifier.width(6.dp))
+              Spacer(modifier = Modifier.width(5.dp))
               Surface(
                 shape = RoundedCornerShape(4.dp),
-                color = RoleAdminGold.copy(alpha = 0.2f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, RoleAdminGold.copy(alpha = 0.6f))
+                color = RoleAdminGoldContainer
               ) {
                 Row(
                   modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
@@ -104,15 +106,15 @@ fun ChatMessageItem(
                     imageVector = Icons.Default.Shield,
                     contentDescription = null,
                     tint = RoleAdminGold,
-                    modifier = Modifier.size(10.dp)
+                    modifier = Modifier.size(9.dp)
                   )
-                  Spacer(modifier = Modifier.width(3.dp))
+                  Spacer(modifier = Modifier.width(2.dp))
                   Text(
                     text = "ADMIN",
                     style = MaterialTheme.typography.labelSmall,
                     color = RoleAdminGold,
                     fontWeight = FontWeight.ExtraBold,
-                    fontSize = 9.sp
+                    fontSize = 8.sp
                   )
                 }
               }
@@ -120,25 +122,24 @@ fun ChatMessageItem(
           }
         }
 
-        // Message Content
+        // Message text
         Text(
           text = message.content,
           style = MaterialTheme.typography.bodyMedium,
-          color = Color.White,
+          color = WhatsAppTextPrimary,
           lineHeight = 18.sp,
-          fontSize = 14.sp
+          fontSize = 14.5.sp
         )
 
-        // Coordinates attachment card (Minecraft Bedrock location stamp)
+        // Minecraft Coordinates attachment pill
         if (!message.coordinates.isNullOrBlank()) {
           Spacer(modifier = Modifier.height(4.dp))
           Surface(
             shape = RoundedCornerShape(8.dp),
-            color = Color.Black.copy(alpha = 0.25f),
-            modifier = Modifier
-              .clickable {
-                clipboardManager.setText(AnnotatedString(message.coordinates))
-              }
+            color = if (isLocal) Color.White.copy(alpha = 0.6f) else Color(0xFFF0F2F5),
+            modifier = Modifier.clickable {
+              clipboardManager.setText(AnnotatedString(message.coordinates))
+            }
           ) {
             Row(
               modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
@@ -147,15 +148,15 @@ fun ChatMessageItem(
               Icon(
                 imageVector = Icons.Default.Place,
                 contentDescription = null,
-                tint = SubstrateTheme.customColors.statusOnline,
+                tint = WhatsAppGreenDark,
                 modifier = Modifier.size(13.dp)
               )
               Spacer(modifier = Modifier.width(4.dp))
               Text(
                 text = message.coordinates,
                 style = CoordinateTextStyle,
-                color = SubstrateTheme.customColors.statusOnline,
-                fontSize = 11.sp
+                color = WhatsAppGreenDark,
+                fontSize = 11.5.sp
               )
               Spacer(modifier = Modifier.width(6.dp))
               Icon(
@@ -168,11 +169,11 @@ fun ChatMessageItem(
           }
         }
 
-        // WhatsApp timestamp & double checkmarks footer
+        // Timestamp & WhatsApp Double Checkmarks
         Row(
           modifier = Modifier
             .align(Alignment.End)
-            .padding(top = 2.dp),
+            .padding(top = 1.dp),
           verticalAlignment = Alignment.CenterVertically
         ) {
           Text(
