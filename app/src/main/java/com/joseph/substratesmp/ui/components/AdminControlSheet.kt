@@ -64,7 +64,9 @@ data class AdminMember(
   val id: String,
   val gamertag: String,
   val role: String,
-  val isAdmin: Boolean
+  val isAdmin: Boolean,
+  val bio: String = "",
+  val birthday: String = ""
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
