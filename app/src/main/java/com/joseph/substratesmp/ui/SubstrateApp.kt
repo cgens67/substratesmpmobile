@@ -25,6 +25,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -47,25 +48,27 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-suspend fun LazyListState.slowSmoothScrollToBottom() {
+suspend fun LazyListState.smoothScrollToBottom() {
   val total = layoutInfo.totalItemsCount
   if (total == 0) return
   val targetIndex = total - 1
-  val visibleItems = layoutInfo.visibleItemsInfo
-  val lastVisible = visibleItems.lastOrNull()
 
-  if (lastVisible != null && targetIndex - lastVisible.index <= 4) {
-    val viewportHeight = layoutInfo.viewportEndOffset - layoutInfo.viewportStartOffset
-    val bottomOffset = lastVisible.offset + lastVisible.size
-    val delta = (bottomOffset - viewportHeight + 120).toFloat().coerceAtLeast(0f)
-    if (delta > 0f) {
+  // First smoothly navigate towards the bottom item
+  animateScrollToItem(targetIndex)
+
+  // Ensure any overflowing pixels (e.g. keyboard padding, tall attachments) scroll completely to the bottom
+  val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()
+  if (lastVisible != null && lastVisible.index == targetIndex) {
+    val viewportBottom = layoutInfo.viewportEndOffset - layoutInfo.afterContentPadding
+    val itemBottom = lastVisible.offset + lastVisible.size
+    val diff = (itemBottom - viewportBottom).toFloat()
+    if (diff > 0f) {
       animateScrollBy(
-        value = delta,
-        animationSpec = tween(durationMillis = 650, easing = CubicBezierEasing(0.25f, 0.1f, 0.25f, 1.0f))
+        value = diff + 30f,
+        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
       )
     }
   }
-  animateScrollToItem(targetIndex)
 }
 
 fun formatChatListTime(timestamp: Long): String {
@@ -246,14 +249,14 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth, slow scroll when new messages arrive without conflicting animations
+  // Smooth, snappy scroll when new messages arrive without conflicting animations
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
       if (isScrolledToBottom || shouldForceScrollToBottom) {
-        delay(80L)
+        delay(60L)
         if (appSettings.smoothAnimations) {
-          listState.slowSmoothScrollToBottom()
+          listState.smoothScrollToBottom()
         } else {
           listState.scrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
         }
@@ -462,9 +465,16 @@ fun SubstrateApp(
                       Text(activeChannel.name.take(1).uppercase(), fontWeight = FontWeight.Bold, color = if (isDarkMode) Color.White else WhatsAppGreenDark)
                     }
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f, fill = false)) {
                       Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(activeChannel.name, fontWeight = FontWeight.Bold, color = textColor, fontSize = 17.sp)
+                        Text(
+                          activeChannel.name, 
+                          fontWeight = FontWeight.Bold, 
+                          color = textColor, 
+                          fontSize = 17.sp,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis
+                        )
                         if (activeChannel.isRestrictedToAdmin) {
                           Spacer(modifier = Modifier.width(4.dp))
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
@@ -479,13 +489,17 @@ fun SubstrateApp(
                           text = "${typingUsers.first()} is typing...",
                           color = WhatsAppGreenDark,
                           fontWeight = FontWeight.Medium,
-                          fontSize = 11.5.sp
+                          fontSize = 11.5.sp,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis
                         )
                       } else {
                         Text(
-                          text = if (activeChannel.isDm) "Direct Message • Tap for info" else "mc.substratesmp.net • Tap for info",
+                          text = if (activeChannel.isDm) "Direct Message" else "mc.substratesmp.net",
                           color = subTextColor,
-                          fontSize = 11.5.sp
+                          fontSize = 11.5.sp,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis
                         )
                       }
                     }
@@ -592,9 +606,9 @@ fun SubstrateApp(
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
                         modifier = Modifier.animateItem(
-                          fadeInSpec = tween(350),
-                          placementSpec = tween(400, easing = FastOutSlowInEasing),
-                          fadeOutSpec = tween(250)
+                          fadeInSpec = tween(250),
+                          placementSpec = tween(300, easing = FastOutSlowInEasing),
+                          fadeOutSpec = tween(200)
                         )
                       )
                     }
@@ -622,7 +636,7 @@ fun SubstrateApp(
                         .size(42.dp)
                         .clickable {
                           scope.launch {
-                            listState.slowSmoothScrollToBottom()
+                            listState.smoothScrollToBottom()
                           }
                         }
                     ) {
@@ -823,7 +837,7 @@ fun SubstrateApp(
                     Surface(
                       shape = RoundedCornerShape(18.dp),
                       color = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill) else surfaceColor,
-                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray.copy(alpha = 0.3f) else Color(0xFFE9EDEF)),
+                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray else Color(0xFFE9EDEF)),
                       modifier = Modifier.clickable { activeFilterChip = chip }
                     ) {
                       Text(chip, color = if (isSelected) (if (isDarkMode) Color.White else WhatsAppGreenDark) else subTextColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
