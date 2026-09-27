@@ -89,6 +89,7 @@ fun SubstrateApp(
   val mutedChannels by viewModel.mutedChannels.collectAsStateWithLifecycle()
   val blockedUsers by viewModel.blockedUsers.collectAsStateWithLifecycle()
   val favouriteChannels by viewModel.favouriteChannels.collectAsStateWithLifecycle()
+  val translatedMessages by viewModel.translatedMessages.collectAsStateWithLifecycle()
 
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
@@ -192,7 +193,7 @@ fun SubstrateApp(
     }
   }
 
-  BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen" || viewedImageUrl != null || isStatusViewerVisible) {
+  BackHandler(enabled = currentScreen != "home" || viewedImageUrl != null || isStatusViewerVisible) {
     if (isStatusViewerVisible) {
       closeStatus()
     } else if (viewedImageUrl != null) {
@@ -201,6 +202,8 @@ fun SubstrateApp(
       showEmojiPicker = false
     } else if (currentScreen == "video_call_screen") {
       currentScreen = if (activeVoiceRoom?.isConnected == true) "chat_screen" else "home"
+    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen") {
+      currentScreen = "home"
     } else {
       currentScreen = "home"
     }
@@ -235,7 +238,10 @@ fun SubstrateApp(
     AnimatedContent(
       targetState = currentScreen,
       transitionSpec = {
-        if (targetState == "chat_screen" || targetState == "video_call_screen") {
+        if (targetState == "profile_screen" || targetState == "settings_screen") {
+          (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+            .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
+        } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
           (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else {
@@ -246,6 +252,22 @@ fun SubstrateApp(
       label = "screen_transition"
     ) { screen ->
       when (screen) {
+        "profile_screen" -> {
+          ProfileScreen(
+            userState = userState,
+            onNavigateSettings = { currentScreen = "settings_screen" },
+            onNavigateHome = { currentScreen = "home" },
+            onUpdateProfile = { bio, bday -> viewModel.updateProfile(bio, bday) }
+          )
+        }
+        
+        "settings_screen" -> {
+          SettingsScreen(
+            userState = userState,
+            onNavigateBack = { currentScreen = "profile_screen" }
+          )
+        }
+
         "video_call_screen" -> {
           activeVoiceRoom?.let { room ->
             VideoCallScreen(
@@ -372,12 +394,16 @@ fun SubstrateApp(
                         message.readBy.any { !it.equals(cleanSender, ignoreCase = true) }
                       }
 
+                      val translation = translatedMessages[message.id]
+
                       ChatMessageItem(
                         message = message,
+                        translatedText = translation,
                         isRead = isRead,
                         canDelete = userState.isAdmin || message.isLocalUser,
                         onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                         onReply = { msg -> replyingToMessage = msg },
+                        onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
                         modifier = Modifier.animateItem()
                       )
@@ -709,7 +735,7 @@ fun SubstrateApp(
                     LazyColumn(modifier = Modifier.fillMaxSize().background(Color.White)) {
                       item {
                         Row(
-                          modifier = Modifier.fillMaxWidth().clickable { viewModel.setGamertagDialogVisible(true) }.padding(horizontal = 16.dp, vertical = 10.dp),
+                          modifier = Modifier.fillMaxWidth().clickable { currentScreen = "profile_screen" }.padding(horizontal = 16.dp, vertical = 10.dp),
                           verticalAlignment = Alignment.CenterVertically
                         ) {
                           Box(
@@ -729,7 +755,7 @@ fun SubstrateApp(
                                 }
                               }
                             }
-                            Text("Bedrock Role: ${userState.role} • Tap to manage account", color = WhatsAppTextSecondary, fontSize = 13.sp)
+                            Text("Bedrock Role: ${userState.role} • Tap to view profile", color = WhatsAppTextSecondary, fontSize = 13.sp)
                           }
                         }
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
@@ -1121,7 +1147,7 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
-          "profile" -> viewModel.setGamertagDialogVisible(true)
+          "profile" -> currentScreen = "profile_screen"
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "agora" -> viewModel.setAgoraDialogVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
