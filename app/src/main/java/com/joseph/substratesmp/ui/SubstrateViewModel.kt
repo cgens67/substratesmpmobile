@@ -8,8 +8,10 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChannelType
 import com.joseph.substratesmp.data.model.DefaultChannels
+import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
+import com.joseph.substratesmp.ui.components.AdminMember
 import com.joseph.substratesmp.voice.AgoraVoiceManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +36,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _activeChannel = MutableStateFlow(DefaultChannels[1])
   val activeChannel: StateFlow<Channel> = _activeChannel.asStateFlow()
 
+  private val _statuses = MutableStateFlow<List<StatusUpdate>>(emptyList())
+  val statuses: StateFlow<List<StatusUpdate>> = _statuses.asStateFlow()
+
+  private val _members = MutableStateFlow<List<AdminMember>>(emptyList())
+  val members: StateFlow<List<AdminMember>> = _members.asStateFlow()
+
   private val _showGamertagDialog = MutableStateFlow(false)
   val showGamertagDialog: StateFlow<Boolean> = _showGamertagDialog.asStateFlow()
 
@@ -43,37 +51,39 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _showServerInfoSheet = MutableStateFlow(false)
   val showServerInfoSheet: StateFlow<Boolean> = _showServerInfoSheet.asStateFlow()
 
+  private val _showAdminConsole = MutableStateFlow(false)
+  val showAdminConsole: StateFlow<Boolean> = _showAdminConsole.asStateFlow()
+
+  private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
+
   init {
     viewModelScope.launch {
       authRepository.initializeAuth()
       val currentGamertag = authRepository.userState.value.gamertag
       chatRepository.updateLocalGamertag(currentGamertag)
 
-      // Prompt new users immediately to register a Gamertag
       if (currentGamertag.isBlank()) {
         _showGamertagDialog.value = true
       }
       syncLiveChannels()
+      syncLiveStatuses()
+      syncMembers()
     }
   }
 
   private fun syncLiveChannels() {
     try {
-      val firestore = FirebaseFirestore.getInstance()
       firestore.collection("channels")
         .addSnapshotListener { snapshot, error ->
-          if (error != null) {
-            Log.w(TAG, "Live channels listener warning: ${error.message}")
-            return@addSnapshotListener
-          }
-
+          if (error != null) return@addSnapshotListener
           if (snapshot != null && !snapshot.isEmpty) {
-            val remoteChannels = snapshot.documents.mapNotNull { doc ->
+            val remote = snapshot.documents.mapNotNull { doc ->
               val id = doc.id
               val name = doc.getString("name") ?: id
               val typeStr = doc.getString("type") ?: "TEXT"
               val category = doc.getString("category") ?: "CHANNELS"
               val description = doc.getString("description") ?: ""
+              val allowed = (doc.get("allowedRolesToSend") as? List<*>)?.mapNotNull { it?.toString() } ?: listOf("ALL")
               val type = try {
                 ChannelType.valueOf(typeStr)
               } catch (_: Exception) {
@@ -85,13 +95,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                 type = type,
                 category = category,
                 description = description,
-                unreadCount = 0,
-                activeUsersCount = 0
+                allowedRolesToSend = allowed
               )
             }
-            if (remoteChannels.isNotEmpty()) {
-              _channels.value = remoteChannels
-              remoteChannels.find { it.id == _activeChannel.value.id }?.let {
+            if (remote.isNotEmpty()) {
+              _channels.value = remote
+              remote.find { it.id == _activeChannel.value.id }?.let {
                 _activeChannel.value = it
               }
             }
@@ -102,15 +111,102 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                   "name" to ch.name,
                   "type" to ch.type.name,
                   "category" to ch.category,
-                  "description" to ch.description
+                  "description" to ch.description,
+                  "allowedRolesToSend" to ch.allowedRolesToSend
                 )
               )
             }
           }
         }
-    } catch (e: Exception) {
-      Log.w(TAG, "Channel sync fallback: ${e.message}")
-    }
+    } catch (_: Exception) {}
+  }
+
+  private fun syncLiveStatuses() {
+    try {
+      firestore.collection("statuses")
+        .orderBy("timestamp")
+        .addSnapshotListener { snapshot, _ ->
+          if (snapshot != null) {
+            val list = snapshot.documents.mapNotNull { doc ->
+              StatusUpdate(
+                id = doc.id,
+                authorGamertag = doc.getString("authorGamertag") ?: "Player",
+                content = doc.getString("content") ?: "",
+                timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
+                isAdmin = doc.getBoolean("isAdmin") ?: false,
+                emoji = doc.getString("emoji") ?: "⛏️"
+              )
+            }
+            _statuses.value = list
+          }
+        }
+    } catch (_: Exception) {}
+  }
+
+  fun syncMembers() {
+    try {
+      firestore.collection("users")
+        .addSnapshotListener { snapshot, _ ->
+          if (snapshot != null) {
+            val list = snapshot.documents.mapNotNull { doc ->
+              val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
+              val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
+              val role = if (isAdmin) "ADMIN" else "MEMBER"
+              AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin)
+            }
+            _members.value = list
+          }
+        }
+    } catch (_: Exception) {}
+  }
+
+  fun postStatus(content: String, emoji: String) {
+    if (content.isBlank()) return
+    val user = userState.value
+    firestore.collection("statuses").add(
+      hashMapOf(
+        "authorGamertag" to user.gamertag,
+        "content" to content.trim(),
+        "timestamp" to System.currentTimeMillis(),
+        "isAdmin" to user.isAdmin,
+        "emoji" to emoji
+      )
+    )
+  }
+
+  fun createChannel(name: String, type: ChannelType, desc: String, onlyAdmin: Boolean) {
+    val id = name.lowercase().replace(" ", "-")
+    firestore.collection("channels").document(id).set(
+      hashMapOf(
+        "name" to name,
+        "type" to type.name,
+        "category" to if (type == ChannelType.TEXT) "TEXT CHANNELS" else "VOICE CHANNELS",
+        "description" to desc,
+        "allowedRolesToSend" to if (onlyAdmin) listOf("ADMIN") else listOf("ALL")
+      )
+    )
+  }
+
+  fun deleteChannel(channelId: String) {
+    firestore.collection("channels").document(channelId).delete()
+  }
+
+  fun toggleChannelPermission(channel: Channel) {
+    val newPerm = if (channel.isRestrictedToAdmin) listOf("ALL") else listOf("ADMIN")
+    firestore.collection("channels").document(channel.id).update("allowedRolesToSend", newPerm)
+  }
+
+  fun updateMemberRole(userId: String, newRole: String) {
+    val isAdmin = newRole == "ADMIN"
+    firestore.collection("users").document(userId).update("isAdmin", isAdmin)
+  }
+
+  fun updateMemberGamertag(userId: String, newName: String) {
+    firestore.collection("users").document(userId).update("gamertag", newName)
+  }
+
+  fun removeMember(userId: String) {
+    firestore.collection("users").document(userId).delete()
   }
 
   fun selectChannel(channel: Channel) {
@@ -123,14 +219,26 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         _showGamertagDialog.value = true
         return
       }
-      voiceManager.joinVoiceChannel(channel.id, channel.name, gamertag)
+      voiceManager.joinVoiceChannel(channel.id, channel.name, gamertag, isVideo = false)
     }
+  }
+
+  fun startVideoCall(channel: Channel) {
+    val gamertag = userState.value.gamertag
+    if (gamertag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+    voiceManager.joinVoiceChannel(channel.id, channel.name, gamertag, isVideo = true)
   }
 
   fun sendMessage(content: String, coordinates: String? = null) {
     val user = userState.value
     if (user.gamertag.isBlank()) {
       _showGamertagDialog.value = true
+      return
+    }
+    if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) {
       return
     }
     if (content.isBlank() && coordinates == null) return
@@ -156,17 +264,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
-  fun setGamertagDialogVisible(visible: Boolean) {
-    _showGamertagDialog.value = visible
-  }
-
-  fun setAgoraDialogVisible(visible: Boolean) {
-    _showAgoraDialog.value = visible
-  }
-
-  fun setServerInfoSheetVisible(visible: Boolean) {
-    _showServerInfoSheet.value = visible
-  }
+  fun setGamertagDialogVisible(v: Boolean) { _showGamertagDialog.value = v }
+  fun setAgoraDialogVisible(v: Boolean) { _showAgoraDialog.value = v }
+  fun setServerInfoSheetVisible(v: Boolean) { _showServerInfoSheet.value = v }
+  fun setAdminConsoleVisible(v: Boolean) { _showAdminConsole.value = v }
 
   override fun onCleared() {
     super.onCleared()
