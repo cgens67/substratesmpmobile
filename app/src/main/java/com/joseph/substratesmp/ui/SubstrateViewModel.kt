@@ -185,6 +185,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("statuses").document(statusId).delete()
   }
 
+  fun deleteMessage(channelId: String, messageId: String) {
+    firestore.collection("channels").document(channelId).collection("messages").document(messageId).delete()
+  }
+
   fun reactToStatus(statusId: String, emoji: String) {
     firestore.collection("statuses").document(statusId).get().addOnSuccessListener { doc ->
       val reactionsRaw = doc.get("reactionCounts") as? Map<*, *>
