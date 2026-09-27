@@ -1,10 +1,7 @@
 package com.joseph.substratesmp.ui.components
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -14,10 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Card
@@ -29,7 +26,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -38,9 +35,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
-import com.joseph.substratesmp.ui.theme.MessageBubbleOtherShape
-import com.joseph.substratesmp.ui.theme.MessageBubbleStartShape
+import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.SubstrateTheme
+import com.joseph.substratesmp.ui.theme.WhatsAppChatIncoming
+import com.joseph.substratesmp.ui.theme.WhatsAppChatOutgoing
+import com.joseph.substratesmp.ui.theme.WhatsAppCheckmarkBlue
+import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 
 @Composable
 fun ChatMessageItem(
@@ -51,233 +51,146 @@ fun ChatMessageItem(
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
 
-  val roleColor = if (isSenderAdmin) {
-    SubstrateTheme.customColors.adminGold
+  val bubbleShape = if (isLocal) {
+    RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
   } else {
-    MaterialTheme.colorScheme.onSurfaceVariant
+    RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
   }
 
   Row(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 12.dp, vertical = 5.dp)
+      .padding(horizontal = 8.dp, vertical = 3.dp)
       .testTag("chat_message_${message.id}"),
     horizontalArrangement = if (isLocal) Arrangement.End else Arrangement.Start,
     verticalAlignment = Alignment.Top
   ) {
-    // Remote avatar
-    if (!isLocal) {
-      Box(
-        modifier = Modifier
-          .size(34.dp)
-          .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-          .border(
-            width = if (isSenderAdmin) 2.dp else 1.dp,
-            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.outlineVariant,
-            shape = CircleShape
-          ),
-        contentAlignment = Alignment.Center
-      ) {
-        Text(
-          text = message.senderName.take(1).uppercase(),
-          style = MaterialTheme.typography.titleSmall,
-          color = roleColor,
-          fontWeight = FontWeight.Bold,
-          fontSize = 13.sp
-        )
-      }
-      Spacer(modifier = Modifier.width(10.dp))
-    }
-
-    Column(
-      horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
-      modifier = Modifier.widthIn(max = 300.dp)
+    Card(
+      shape = bubbleShape,
+      colors = CardDefaults.cardColors(
+        containerColor = if (isLocal) WhatsAppChatOutgoing else WhatsAppChatIncoming
+      ),
+      elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+      modifier = Modifier.widthIn(min = 80.dp, max = 310.dp)
     ) {
-      // Header: Sender Name, Admin Tag, and Time
-      Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.padding(
-          bottom = 3.dp,
-          start = if (isLocal) 0.dp else 4.dp,
-          end = if (isLocal) 4.dp else 0.dp
-        )
+      Column(
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
       ) {
+        // Sender Header for incoming messages
         if (!isLocal) {
-          Text(
-            text = message.senderName,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onSurface,
-            fontWeight = FontWeight.Bold
-          )
-          Spacer(modifier = Modifier.width(6.dp))
-
-          if (isSenderAdmin) {
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f),
-              border = androidx.compose.foundation.BorderStroke(1.dp, SubstrateTheme.customColors.adminGold.copy(alpha = 0.6f))
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                verticalAlignment = Alignment.CenterVertically
+          Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 2.dp)
+          ) {
+            Text(
+              text = message.senderName,
+              style = MaterialTheme.typography.labelMedium,
+              color = if (isSenderAdmin) RoleAdminGold else SubstrateTheme.customColors.statusOnline,
+              fontWeight = FontWeight.Bold,
+              fontSize = 13.sp
+            )
+            if (isSenderAdmin) {
+              Spacer(modifier = Modifier.width(6.dp))
+              Surface(
+                shape = RoundedCornerShape(4.dp),
+                color = RoleAdminGold.copy(alpha = 0.2f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, RoleAdminGold.copy(alpha = 0.6f))
               ) {
-                Icon(
-                  imageVector = Icons.Default.Shield,
-                  contentDescription = null,
-                  tint = SubstrateTheme.customColors.adminGold,
-                  modifier = Modifier.size(10.dp)
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                  text = "ADMIN",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = SubstrateTheme.customColors.adminGold,
-                  fontWeight = FontWeight.ExtraBold,
-                  fontSize = 9.sp
-                )
+                Row(
+                  modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = RoleAdminGold,
+                    modifier = Modifier.size(10.dp)
+                  )
+                  Spacer(modifier = Modifier.width(3.dp))
+                  Text(
+                    text = "ADMIN",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = RoleAdminGold,
+                    fontWeight = FontWeight.ExtraBold,
+                    fontSize = 9.sp
+                  )
+                }
               }
             }
-            Spacer(modifier = Modifier.width(6.dp))
           }
         }
 
+        // Message Content
         Text(
-          text = message.formattedTime,
-          style = MaterialTheme.typography.labelSmall,
-          color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-          fontSize = 10.sp
+          text = message.content,
+          style = MaterialTheme.typography.bodyMedium,
+          color = Color.White,
+          lineHeight = 18.sp,
+          fontSize = 14.sp
         )
 
-        if (isLocal) {
-          Spacer(modifier = Modifier.width(6.dp))
-          if (isSenderAdmin) {
-            Surface(
-              shape = RoundedCornerShape(4.dp),
-              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f),
-              border = androidx.compose.foundation.BorderStroke(1.dp, SubstrateTheme.customColors.adminGold.copy(alpha = 0.6f))
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Shield,
-                  contentDescription = null,
-                  tint = SubstrateTheme.customColors.adminGold,
-                  modifier = Modifier.size(10.dp)
-                )
-                Spacer(modifier = Modifier.width(3.dp))
-                Text(
-                  text = "ADMIN",
-                  style = MaterialTheme.typography.labelSmall,
-                  color = SubstrateTheme.customColors.adminGold,
-                  fontWeight = FontWeight.ExtraBold,
-                  fontSize = 9.sp
-                )
-              }
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-          }
-          Text(
-            text = "You",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.Bold
-          )
-        }
-      }
-
-      // Message Card Body
-      Card(
-        shape = if (isLocal) MessageBubbleOtherShape else MessageBubbleStartShape,
-        colors = CardDefaults.cardColors(
-          containerColor = if (isLocal) {
-            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.85f)
-          } else {
-            MaterialTheme.colorScheme.surfaceContainerHigh
-          }
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-      ) {
-        Column(modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)) {
-          Text(
-            text = message.content,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (isLocal) {
-              MaterialTheme.colorScheme.onPrimaryContainer
-            } else {
-              MaterialTheme.colorScheme.onSurface
-            },
-            lineHeight = 19.sp
-          )
-
-          if (!message.coordinates.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(6.dp))
-            Surface(
-              shape = MaterialTheme.shapes.small,
-              color = if (isLocal) {
-                MaterialTheme.colorScheme.surfaceContainerLowest.copy(alpha = 0.7f)
-              } else {
-                MaterialTheme.colorScheme.surfaceContainerLowest
-              },
-              modifier = Modifier.clickable {
+        // Coordinates attachment card (Minecraft Bedrock location stamp)
+        if (!message.coordinates.isNullOrBlank()) {
+          Spacer(modifier = Modifier.height(4.dp))
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color.Black.copy(alpha = 0.25f),
+            modifier = Modifier
+              .clickable {
                 clipboardManager.setText(AnnotatedString(message.coordinates))
               }
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+              verticalAlignment = Alignment.CenterVertically
             ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Place,
-                  contentDescription = null,
-                  tint = MaterialTheme.colorScheme.primary,
-                  modifier = Modifier.size(13.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(
-                  text = message.coordinates,
-                  style = CoordinateTextStyle,
-                  color = MaterialTheme.colorScheme.primary,
-                  fontSize = 11.sp
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-                Icon(
-                  imageVector = Icons.Default.ContentCopy,
-                  contentDescription = "Copy coordinates",
-                  tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                  modifier = Modifier.size(11.dp)
-                )
-              }
+              Icon(
+                imageVector = Icons.Default.Place,
+                contentDescription = null,
+                tint = SubstrateTheme.customColors.statusOnline,
+                modifier = Modifier.size(13.dp)
+              )
+              Spacer(modifier = Modifier.width(4.dp))
+              Text(
+                text = message.coordinates,
+                style = CoordinateTextStyle,
+                color = SubstrateTheme.customColors.statusOnline,
+                fontSize = 11.sp
+              )
+              Spacer(modifier = Modifier.width(6.dp))
+              Icon(
+                imageVector = Icons.Default.ContentCopy,
+                contentDescription = "Copy coordinates",
+                tint = WhatsAppTextSecondary,
+                modifier = Modifier.size(12.dp)
+              )
             }
           }
         }
-      }
-    }
 
-    // Local avatar
-    if (isLocal) {
-      Spacer(modifier = Modifier.width(10.dp))
-      Box(
-        modifier = Modifier
-          .size(34.dp)
-          .clip(CircleShape)
-          .background(MaterialTheme.colorScheme.primary)
-          .border(
-            width = if (isSenderAdmin) 2.dp else 1.5.dp,
-            color = if (isSenderAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.primaryContainer,
-            shape = CircleShape
-          ),
-        contentAlignment = Alignment.Center
-      ) {
-        Text(
-          text = message.senderName.take(1).uppercase(),
-          style = MaterialTheme.typography.titleSmall,
-          color = MaterialTheme.colorScheme.onPrimary,
-          fontWeight = FontWeight.Bold,
-          fontSize = 13.sp
-        )
+        // WhatsApp timestamp & double checkmarks footer
+        Row(
+          modifier = Modifier
+            .align(Alignment.End)
+            .padding(top = 2.dp),
+          verticalAlignment = Alignment.CenterVertically
+        ) {
+          Text(
+            text = message.formattedTime,
+            style = MaterialTheme.typography.labelSmall,
+            color = WhatsAppTextSecondary,
+            fontSize = 10.sp
+          )
+          if (isLocal) {
+            Spacer(modifier = Modifier.width(3.dp))
+            Icon(
+              imageVector = Icons.Default.DoneAll,
+              contentDescription = "Sent",
+              tint = WhatsAppCheckmarkBlue,
+              modifier = Modifier.size(14.dp)
+            )
+          }
+        }
       }
     }
   }
