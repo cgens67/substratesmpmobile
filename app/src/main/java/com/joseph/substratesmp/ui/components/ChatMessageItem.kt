@@ -52,6 +52,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -113,6 +114,7 @@ fun ChatMessageItem(
   isDarkMode: Boolean,
   isRead: Boolean = false,
   canDelete: Boolean = false,
+  onUserClick: (String) -> Unit = {},
   onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
   onEdit: (ChatMessage) -> Unit = {},
@@ -306,7 +308,13 @@ fun ChatMessageItem(
             )
           ) {
             if (!isLocal) {
-              Text(message.senderName, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark)
+              Text(
+                text = message.senderName, 
+                fontSize = 11.sp, 
+                fontWeight = FontWeight.Bold, 
+                color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
+                modifier = Modifier.padding(bottom = 2.dp).clickable { onUserClick(message.senderName) }
+              )
             }
             AsyncImage(
               model = imageBytes ?: message.imageUrl,
@@ -342,7 +350,10 @@ fun ChatMessageItem(
           ) {
             Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
               if (!isLocal) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 4.dp)) {
+                Row(
+                  verticalAlignment = Alignment.CenterVertically, 
+                  modifier = Modifier.padding(bottom = 4.dp).clickable { onUserClick(message.senderName) }
+                ) {
                   Text(
                     text = message.senderName,
                     color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
