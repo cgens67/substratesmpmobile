@@ -59,6 +59,9 @@ fun SubstrateApp(
   val stickers by viewModel.stickers.collectAsStateWithLifecycle()
   val members by viewModel.members.collectAsStateWithLifecycle()
   val typingUsers by viewModel.typingUsers.collectAsStateWithLifecycle()
+  val mutedChannels by viewModel.mutedChannels.collectAsStateWithLifecycle()
+  val blockedUsers by viewModel.blockedUsers.collectAsStateWithLifecycle()
+
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
 
@@ -77,7 +80,6 @@ fun SubstrateApp(
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var showCreateStatusDialog by remember { mutableStateOf(false) }
   
-  // Status Viewer state with smooth animated entry/exit
   var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
   var isStatusViewerVisible by remember { mutableStateOf(false) }
 
@@ -129,6 +131,17 @@ fun SubstrateApp(
     }
   }
 
+  // Request notifications permission on Android 13+
+  val notificationPermissionLauncher = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.RequestPermission()
+  ) {}
+
+  LaunchedEffect(Unit) {
+    if (android.os.Build.VERSION.SDK_INT >= 33) {
+      notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+  }
+
   BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen" || viewedImageUrl != null || isStatusViewerVisible) {
     if (isStatusViewerVisible) {
       closeStatus()
@@ -170,6 +183,9 @@ fun SubstrateApp(
       listState.animateScrollToItem(messages.size - 1)
     }
   }
+
+  val isCurrentChannelMuted = mutedChannels.contains(activeChannel.id)
+  val isRecipientBlocked = activeChannel.isDm && activeChannel.dmRecipientGamertag != null && blockedUsers.contains(activeChannel.dmRecipientGamertag!!.lowercase().trim())
 
   Box(modifier = modifier.fillMaxSize().background(Color.White)) {
     AnimatedContent(
@@ -221,6 +237,10 @@ fun SubstrateApp(
                         if (activeChannel.isRestrictedToAdmin) {
                           Spacer(modifier = Modifier.width(4.dp))
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
+                        }
+                        if (isCurrentChannelMuted) {
+                          Spacer(modifier = Modifier.width(4.dp))
+                          Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
                         }
                       }
                       if (typingUsers.isNotEmpty()) {
@@ -378,7 +398,25 @@ fun SubstrateApp(
                   }
                 }
 
-                if (activeChannel.isRestrictedToAdmin && !userState.isAdmin) {
+                if (isRecipientBlocked) {
+                  // WhatsApp-style Blocked Contact Banner
+                  Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color(0xFFF7F8FA),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+                  ) {
+                    Row(
+                      modifier = Modifier.padding(14.dp).clickable {
+                        activeChannel.dmRecipientGamertag?.let { viewModel.toggleBlockUser(it) }
+                      },
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      Icon(Icons.Default.Block, contentDescription = null, tint = Color(0xFFEA0038))
+                      Spacer(modifier = Modifier.width(10.dp))
+                      Text("You blocked this player. Tap to unblock.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEA0038), fontWeight = FontWeight.Bold)
+                    }
+                  }
+                } else if (activeChannel.isRestrictedToAdmin && !userState.isAdmin) {
                   Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = Color(0xFFF7F8FA),
@@ -438,9 +476,7 @@ fun SubstrateApp(
                         showEmojiPicker = false
                       },
                       onDeleteSticker = { id -> viewModel.deleteServerSticker(id) },
-                      onBackspace = {
-                        chatInputText = dropLastGrapheme(chatInputText)
-                      }
+                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
                     )
                   }
                 }
@@ -571,11 +607,11 @@ fun SubstrateApp(
                 targetState = selectedTab,
                 transitionSpec = {
                   if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
                   } else {
-                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut())
+                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
                   }
                 },
                 label = "tab_transition"
@@ -616,6 +652,8 @@ fun SubstrateApp(
                       }
 
                       items(filtered, key = { it.id }) { channel ->
+                        val isMuted = mutedChannels.contains(channel.id)
+
                         Row(
                           modifier = Modifier.fillMaxWidth().clickable {
                             viewModel.selectChannel(channel)
@@ -632,7 +670,7 @@ fun SubstrateApp(
                           }
                           Spacer(modifier = Modifier.width(14.dp))
                           Column(modifier = Modifier.weight(1f)) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                               Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(channel.name, fontWeight = FontWeight.SemiBold, color = WhatsAppTextPrimary, fontSize = 16.5.sp)
                                 if (channel.isDm) {
@@ -644,7 +682,13 @@ fun SubstrateApp(
                                   Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                                 }
                               }
-                              Text("11:37 am", color = WhatsAppTextSecondary, fontSize = 12.sp)
+                              Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (isMuted) {
+                                  Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = WhatsAppTextSecondary, modifier = Modifier.size(14.dp))
+                                  Spacer(modifier = Modifier.width(4.dp))
+                                }
+                                Text("11:37 am", color = WhatsAppTextSecondary, fontSize = 12.sp)
+                              }
                             }
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                               Text(channel.description, color = WhatsAppTextSecondary, fontSize = 13.5.sp, maxLines = 1, modifier = Modifier.weight(1f))
@@ -844,8 +888,8 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth Animated Entry & Exit for Status Viewer Screen
-  AnimatedVisibility(
+  // Smooth Zoom/Scale Animation for Status Viewer
+  androidx.compose.animation.AnimatedVisibility(
     visible = isStatusViewerVisible && statusToDisplay != null,
     enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
     exit = scaleOut(targetScale = 0.82f, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(200))
@@ -878,9 +922,17 @@ fun SubstrateApp(
     )
   }
 
+  // Menu Dropdown with Mute / Block Actions
   if (showMenuDropdownSheet) {
+    val isDm = activeChannel.isDm
+    val recipient = activeChannel.dmRecipientGamertag
+    val isMuted = viewModel.isChannelMuted(activeChannel.id)
+    val isBlocked = recipient != null && viewModel.isUserBlocked(recipient)
+
     CustomDropdownModalSheet(
       options = listOf(
+        SheetOption("mute", if (isMuted) "Unmute Notifications" else "Mute Notifications", if (isMuted) "Notifications are silenced" else "Play sounds on messages", isSelected = isMuted),
+        if (isDm && recipient != null) SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock this contact" else "Stop receiving messages", isSelected = isBlocked) else null,
         SheetOption("profile", "Account Profile", "Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", isSelected = false),
         SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = true),
         SheetOption("agora", "Voice Engine Settings", "App ID: ${agoraSettings.appId.take(8)}...", isSelected = false),
@@ -889,6 +941,8 @@ fun SubstrateApp(
       onDismiss = { showMenuDropdownSheet = false },
       onOptionSelected = { option ->
         when (option.id) {
+          "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
+          "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
           "profile" -> viewModel.setGamertagDialogVisible(true)
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "agora" -> viewModel.setAgoraDialogVisible(true)
