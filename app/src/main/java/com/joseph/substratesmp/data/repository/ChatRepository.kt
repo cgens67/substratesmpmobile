@@ -43,18 +43,16 @@ class ChatRepository(private val context: Context) {
     activeChannelId = channelId
     firestoreListener?.remove()
     firestoreListener = null
-
     _messagesFlow.value = emptyList()
 
     try {
-      Log.i(TAG, "Attaching live Firestore listener for channels/$channelId/messages")
       firestoreListener = firestore.collection("channels")
         .document(channelId)
         .collection("messages")
         .orderBy("timestamp", Query.Direction.ASCENDING)
         .addSnapshotListener { snapshot, error ->
           if (error != null) {
-            Log.e(TAG, "Firestore messages listener error for #$channelId: ${error.message}", error)
+            Log.e(TAG, "Firestore messages listener error: ${error.message}")
             return@addSnapshotListener
           }
 
@@ -64,11 +62,16 @@ class ChatRepository(private val context: Context) {
               val chId = doc.getString("channelId") ?: channelId
               val sender = doc.getString("senderName") ?: "Player"
               val rawRole = doc.getString("senderRole") ?: "MEMBER"
-              // Ensure Siang5680 always displays ADMIN
               val role = if (sender.equals("Siang5680", ignoreCase = true)) "ADMIN" else rawRole
               val content = doc.getString("content") ?: ""
               val ts = doc.getLong("timestamp") ?: System.currentTimeMillis()
               val coords = doc.getString("coordinates")
+              val img = doc.getString("imageUrl")
+              val aud = doc.getString("audioUrl")
+              val audDuration = doc.getLong("audioDurationSeconds")?.toInt() ?: 0
+              val repId = doc.getString("replyToId")
+              val repSender = doc.getString("replyToSender")
+              val repContent = doc.getString("replyToContent")
               val isLocal = currentGamertag.isNotBlank() && sender.equals(currentGamertag, ignoreCase = true)
 
               ChatMessage(
@@ -79,15 +82,20 @@ class ChatRepository(private val context: Context) {
                 content = content,
                 timestamp = ts,
                 isLocalUser = isLocal,
-                coordinates = coords
+                coordinates = coords,
+                imageUrl = img,
+                audioUrl = aud,
+                audioDurationSeconds = audDuration,
+                replyToId = repId,
+                replyToSender = repSender,
+                replyToContent = repContent
               )
             }
             _messagesFlow.value = liveMessages
-            Log.d(TAG, "Live Firestore synced ${liveMessages.size} messages for #$channelId")
           }
         }
     } catch (e: Exception) {
-      Log.e(TAG, "Error connecting to live Firestore: ${e.message}", e)
+      Log.e(TAG, "Error connecting to Firestore: ${e.message}")
     }
   }
 
@@ -96,9 +104,15 @@ class ChatRepository(private val context: Context) {
     senderName: String,
     senderRole: String,
     content: String,
-    coordinates: String? = null
+    coordinates: String? = null,
+    imageUrl: String? = null,
+    audioUrl: String? = null,
+    audioDurationSeconds: Int = 0,
+    replyToId: String? = null,
+    replyToSender: String? = null,
+    replyToContent: String? = null
   ) {
-    if (content.isBlank() && coordinates == null) return
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null) return
     if (senderName.isBlank()) return
 
     val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
@@ -113,15 +127,15 @@ class ChatRepository(private val context: Context) {
       "senderRole" to effectiveRole,
       "content" to content,
       "timestamp" to System.currentTimeMillis(),
-      "coordinates" to coordinates
+      "coordinates" to coordinates,
+      "imageUrl" to imageUrl,
+      "audioUrl" to audioUrl,
+      "audioDurationSeconds" to audioDurationSeconds,
+      "replyToId" to replyToId,
+      "replyToSender" to replyToSender,
+      "replyToContent" to replyToContent
     )
 
     docRef.set(docData)
-      .addOnSuccessListener {
-        Log.d(TAG, "Live message ${docRef.id} written to Firestore successfully in #$channelId")
-      }
-      .addOnFailureListener { error ->
-        Log.e(TAG, "Failed writing message to Firestore in #$channelId: ${error.message}", error)
-      }
   }
 }
