@@ -18,20 +18,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Badge
-import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -75,6 +71,7 @@ fun ChannelDrawerContent(
   modifier: Modifier = Modifier
 ) {
   val clipboardManager = LocalClipboardManager.current
+  val isAdmin = userState.isAdmin || userState.gamertag.equals("Siang5680", ignoreCase = true)
 
   Surface(
     modifier = modifier
@@ -84,7 +81,6 @@ fun ChannelDrawerContent(
     color = MaterialTheme.colorScheme.surfaceContainerLowest
   ) {
     Column(modifier = Modifier.fillMaxHeight()) {
-      // 1. Server Header Banner & Info
       Box(
         modifier = Modifier
           .fillMaxWidth()
@@ -97,7 +93,6 @@ fun ChannelDrawerContent(
           contentScale = ContentScale.Crop
         )
 
-        // Gradient overlay for readability
         Box(
           modifier = Modifier
             .fillMaxWidth()
@@ -176,13 +171,11 @@ fun ChannelDrawerContent(
 
       HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 
-      // 2. Channel Lists (Text & Voice)
       LazyColumn(
         modifier = Modifier
           .weight(1f)
           .padding(horizontal = 10.dp, vertical = 6.dp)
       ) {
-        // Category: TEXT CHANNELS
         item {
           CategoryHeader(title = "TEXT CHANNELS")
         }
@@ -262,7 +255,7 @@ fun ChannelDrawerContent(
 
       HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-      // 3. User Gamertag Status Footer (Discord-style)
+      // User Gamertag Status Footer
       Surface(
         color = MaterialTheme.colorScheme.surfaceContainerLow,
         modifier = Modifier
@@ -282,19 +275,25 @@ fun ChannelDrawerContent(
               .weight(1f)
               .clickable { onOpenGamertagDialog() }
           ) {
-            // Avatar badge
             Box(
               modifier = Modifier
                 .size(38.dp)
                 .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary)
-                .border(2.dp, SubstrateTheme.customColors.statusOnline, CircleShape),
+                .background(
+                  if (isAdmin) SubstrateTheme.customColors.adminGold.copy(alpha = 0.25f)
+                  else MaterialTheme.colorScheme.primary
+                )
+                .border(
+                  width = 2.dp,
+                  color = if (isAdmin) SubstrateTheme.customColors.adminGold else SubstrateTheme.customColors.statusOnline,
+                  shape = CircleShape
+                ),
               contentAlignment = Alignment.Center
             ) {
               Text(
-                text = userState.gamertag.take(1).uppercase(),
+                text = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onPrimary,
                 fontWeight = FontWeight.Bold
               )
             }
@@ -303,33 +302,53 @@ fun ChannelDrawerContent(
 
             Column {
               Text(
-                text = userState.gamertag,
+                text = if (userState.gamertag.isNotBlank()) userState.gamertag else "Set Gamertag",
                 style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 1
               )
               Row(verticalAlignment = Alignment.CenterVertically) {
-                Surface(
-                  shape = MaterialTheme.shapes.extraSmall,
-                  color = when (userState.role) {
-                    "ADMIN" -> SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f)
-                    "MOD" -> SubstrateTheme.customColors.modCyan.copy(alpha = 0.2f)
-                    else -> SubstrateTheme.customColors.memberGreen.copy(alpha = 0.2f)
+                if (isAdmin) {
+                  Surface(
+                    shape = RoundedCornerShape(4.dp),
+                    color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, SubstrateTheme.customColors.adminGold.copy(alpha = 0.6f))
+                  ) {
+                    Row(
+                      modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      Icon(
+                        imageVector = Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = SubstrateTheme.customColors.adminGold,
+                        modifier = Modifier.size(9.dp)
+                      )
+                      Spacer(modifier = Modifier.width(2.dp))
+                      Text(
+                        text = "ADMIN",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SubstrateTheme.customColors.adminGold,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp
+                      )
+                    }
                   }
-                ) {
-                  Text(
-                    text = userState.role,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = when (userState.role) {
-                      "ADMIN" -> SubstrateTheme.customColors.adminGold
-                      "MOD" -> SubstrateTheme.customColors.modCyan
-                      else -> SubstrateTheme.customColors.memberGreen
-                    },
-                    modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 9.sp
-                  )
+                } else {
+                  Surface(
+                    shape = MaterialTheme.shapes.extraSmall,
+                    color = SubstrateTheme.customColors.memberGreen.copy(alpha = 0.2f)
+                  ) {
+                    Text(
+                      text = "MEMBER",
+                      style = MaterialTheme.typography.labelSmall,
+                      color = SubstrateTheme.customColors.memberGreen,
+                      modifier = Modifier.padding(horizontal = 5.dp, vertical = 1.dp),
+                      fontWeight = FontWeight.Bold,
+                      fontSize = 9.sp
+                    )
+                  }
                 }
               }
             }
