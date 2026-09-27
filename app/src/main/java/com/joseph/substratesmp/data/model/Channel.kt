@@ -18,7 +18,8 @@ data class Channel(
   val dmRecipientGamertag: String? = null,
   val lastMessage: String? = null,
   val lastMessageTimestamp: Long = 0L,
-  val lastMessageSender: String? = null
+  val lastMessageSender: String? = null,
+  val lastMessageIsRead: Boolean = false
 ) {
   val isRestrictedToAdmin: Boolean
     get() = !isDm && (id == "announcements" || (allowedRolesToSend.contains("ADMIN") && !allowedRolesToSend.contains("ALL")))
