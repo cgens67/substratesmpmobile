@@ -12,13 +12,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -51,11 +52,14 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DonutLarge
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -74,15 +78,16 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -103,10 +108,12 @@ import com.joseph.substratesmp.ui.components.ChatMessageItem
 import com.joseph.substratesmp.ui.components.CustomDropdownModalSheet
 import com.joseph.substratesmp.ui.components.EmojiPickerView
 import com.joseph.substratesmp.ui.components.GamertagDialog
+import com.joseph.substratesmp.ui.components.SelectContactDialog
 import com.joseph.substratesmp.ui.components.ServerInfoSheet
 import com.joseph.substratesmp.ui.components.SheetOption
 import com.joseph.substratesmp.ui.components.StatusCreatorDialog
 import com.joseph.substratesmp.ui.components.StatusViewerScreen
+import com.joseph.substratesmp.ui.components.TypingBubble
 import com.joseph.substratesmp.ui.components.VideoCallScreen
 import com.joseph.substratesmp.ui.components.dropLastGrapheme
 import com.joseph.substratesmp.ui.components.processAndCompressImage
@@ -123,6 +130,8 @@ import com.joseph.substratesmp.ui.theme.WhatsAppNavSelectedPill
 import com.joseph.substratesmp.ui.theme.WhatsAppSearchBackground
 import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
 import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -131,6 +140,7 @@ fun SubstrateApp(
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
+  val scope = rememberCoroutineScope()
   val keyboardController = LocalSoftwareKeyboardController.current
 
   val channels by viewModel.channels.collectAsStateWithLifecycle()
@@ -140,6 +150,7 @@ fun SubstrateApp(
   val statuses by viewModel.statuses.collectAsStateWithLifecycle()
   val stickers by viewModel.stickers.collectAsStateWithLifecycle()
   val members by viewModel.members.collectAsStateWithLifecycle()
+  val typingUsers by viewModel.typingUsers.collectAsStateWithLifecycle()
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
 
@@ -147,6 +158,7 @@ fun SubstrateApp(
   val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
+  val showSelectContactDialog by viewModel.showSelectContactDialog.collectAsStateWithLifecycle()
 
   var currentScreen by remember { mutableStateOf("home") }
   var selectedTab by remember { mutableIntStateOf(0) }
@@ -162,14 +174,35 @@ fun SubstrateApp(
   var showEmojiPicker by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
 
-  // Admin Sticker Picker Launcher
+  // Track if user is scrolled away from bottom to show "New Message" pill button
+  val isScrolledToBottom by remember {
+    derivedStateOf {
+      val layoutInfo = listState.layoutInfo
+      val totalItems = layoutInfo.totalItemsCount
+      if (totalItems == 0) true
+      else {
+        val lastVisible = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+        lastVisible >= totalItems - 2
+      }
+    }
+  }
+
+  // Trigger typing indicator when input text changes
+  LaunchedEffect(chatInputText) {
+    if (chatInputText.isNotBlank()) {
+      viewModel.setTyping(true)
+      delay(3000L)
+      viewModel.setTyping(false)
+    }
+  }
+
   val stickerPickerLauncher = rememberLauncherForActivityResult(
     contract = ActivityResultContracts.GetContent()
   ) { uri ->
     if (uri != null) {
       val base64 = processAndCompressImage(uri, context)
       if (base64 != null) {
-        viewModel.addServerSticker("ServerSticker_${System.currentTimeMillis() % 1000}", base64)
+        viewModel.addServerSticker("Sticker_${System.currentTimeMillis() % 1000}", base64)
       }
     }
   }
@@ -207,7 +240,7 @@ fun SubstrateApp(
   }
 
   LaunchedEffect(messages.size) {
-    if (messages.isNotEmpty()) {
+    if (messages.isNotEmpty() && isScrolledToBottom) {
       listState.animateScrollToItem(messages.size - 1)
     }
   }
@@ -264,7 +297,21 @@ fun SubstrateApp(
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                         }
                       }
-                      Text("mc.substratesmp.net", color = WhatsAppTextSecondary, fontSize = 11.5.sp)
+                      // Live typing subtitle indicator (WhatsApp green)
+                      if (typingUsers.isNotEmpty()) {
+                        Text(
+                          text = "${typingUsers.first()} is typing...",
+                          color = WhatsAppGreenDark,
+                          fontWeight = FontWeight.Medium,
+                          fontSize = 11.5.sp
+                        )
+                      } else {
+                        Text(
+                          text = if (activeChannel.isDm) "Direct Message" else "mc.substratesmp.net",
+                          color = WhatsAppTextSecondary,
+                          fontSize = 11.5.sp
+                        )
+                      }
                     }
                   }
                 },
@@ -311,36 +358,60 @@ fun SubstrateApp(
             Box(modifier = Modifier.fillMaxSize().padding(chatPadding).background(WhatsAppChatBackground)) {
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                  if (messages.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                      Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.9f)) {
-                        Text(
-                          "Messages in #${activeChannel.name} are synchronized in real-time.",
-                          color = WhatsAppTextSecondary,
-                          style = MaterialTheme.typography.labelSmall,
-                          modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                        )
-                      }
-                    }
-                  } else {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
-                      item {
-                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                          Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
-                            Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
-                          }
+                  LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
+                    item {
+                      Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                        Surface(shape = RoundedCornerShape(8.dp), color = Color.White.copy(alpha = 0.95f)) {
+                          Text("Today", color = WhatsAppTextSecondary, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                         }
                       }
+                    }
 
-                      items(messages, key = { it.id }) { message ->
-                        ChatMessageItem(
-                          message = message,
-                          canDelete = userState.isAdmin || message.isLocalUser,
-                          onDeleteMessage = { msg ->
-                            viewModel.deleteMessage(msg.channelId, msg.id)
-                          },
-                          onReply = { msg -> replyingToMessage = msg },
-                          modifier = Modifier.animateItem()
+                    items(messages, key = { it.id }) { message ->
+                      ChatMessageItem(
+                        message = message,
+                        canDelete = userState.isAdmin || message.isLocalUser,
+                        onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
+                        onReply = { msg -> replyingToMessage = msg },
+                        modifier = Modifier.animateItem()
+                      )
+                    }
+
+                    // Live typing bubble at the bottom of the feed
+                    if (typingUsers.isNotEmpty()) {
+                      item {
+                        TypingBubble(typerName = typingUsers.first())
+                      }
+                    }
+                  }
+
+                  // WhatsApp Floating Scroll-to-Bottom Button when Scrolled Up
+                  AnimatedVisibility(
+                    visible = !isScrolledToBottom,
+                    enter = scaleIn(animationSpec = tween(200)) + fadeIn(),
+                    exit = scaleOut(animationSpec = tween(200)) + fadeOut(),
+                    modifier = Modifier
+                      .align(Alignment.BottomEnd)
+                      .padding(bottom = 12.dp, end = 16.dp)
+                  ) {
+                    Surface(
+                      shape = CircleShape,
+                      color = Color.White,
+                      shadowElevation = 4.dp,
+                      modifier = Modifier
+                        .size(42.dp)
+                        .clickable {
+                          scope.launch {
+                            listState.animateScrollToItem(messages.size - 1)
+                          }
+                        }
+                    ) {
+                      Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                          imageVector = Icons.Default.KeyboardArrowDown,
+                          contentDescription = "Scroll to bottom",
+                          tint = WhatsAppGreenDark,
+                          modifier = Modifier.size(24.dp)
                         )
                       }
                     }
@@ -426,9 +497,7 @@ fun SubstrateApp(
                         replyingToMessage = null
                         showEmojiPicker = false
                       },
-                      onBackspace = {
-                        chatInputText = dropLastGrapheme(chatInputText)
-                      }
+                      onBackspace = { chatInputText = dropLastGrapheme(chatInputText) }
                     )
                   }
                 }
@@ -533,13 +602,14 @@ fun SubstrateApp(
             floatingActionButton = {
               FloatingActionButton(
                 onClick = {
-                  if (selectedTab == 1) {
+                  if (selectedTab == 0) {
+                    // Opens WhatsApp "Select Contact" modal to start a 1-on-1 private DM
+                    viewModel.setSelectContactDialogVisible(true)
+                  } else if (selectedTab == 1) {
                     showCreateStatusDialog = true
                   } else if (selectedTab == 2) {
                     val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
                     runWithPermissions { viewModel.selectChannel(vc) }
-                  } else {
-                    viewModel.setServerInfoSheetVisible(true)
                   }
                 },
                 shape = RoundedCornerShape(16.dp),
@@ -597,7 +667,7 @@ fun SubstrateApp(
                                 }
                               }
                             }
-                            Text("Bedrock SMP Account • Tap to switch or log in", color = WhatsAppTextSecondary, fontSize = 13.sp)
+                            Text("Bedrock Role: ${userState.role} • Tap to manage account", color = WhatsAppTextSecondary, fontSize = 13.sp)
                           }
                         }
                         HorizontalDivider(color = WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
@@ -612,16 +682,20 @@ fun SubstrateApp(
                           verticalAlignment = Alignment.CenterVertically
                         ) {
                           Box(
-                            modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else WhatsAppNavSelectedPill),
+                            modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else WhatsAppNavSelectedPill),
                             contentAlignment = Alignment.Center
                           ) {
-                            Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                            Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else WhatsAppGreenDark, fontWeight = FontWeight.Bold, fontSize = 20.sp)
                           }
                           Spacer(modifier = Modifier.width(14.dp))
                           Column(modifier = Modifier.weight(1f)) {
                             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                               Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(channel.name, fontWeight = FontWeight.SemiBold, color = WhatsAppTextPrimary, fontSize = 16.5.sp)
+                                if (channel.isDm) {
+                                  Spacer(modifier = Modifier.width(4.dp))
+                                  Text("• DM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
                                 if (channel.isRestrictedToAdmin) {
                                   Spacer(modifier = Modifier.width(4.dp))
                                   Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
@@ -785,6 +859,41 @@ fun SubstrateApp(
     }
   }
 
+  // Smooth Zoom/Scale Animation for Status Viewer
+  AnimatedVisibility(
+    visible = viewedStatus != null,
+    enter = scaleIn(initialScale = 0.88f, animationSpec = tween(260)) + fadeIn(animationSpec = tween(260)),
+    exit = scaleOut(targetScale = 0.88f, animationSpec = tween(220)) + fadeOut(animationSpec = tween(220))
+  ) {
+    viewedStatus?.let { status ->
+      StatusViewerScreen(
+        status = status,
+        isOwnStatus = status.authorGamertag == userState.gamertag,
+        onDismiss = { viewedStatus = null },
+        onDelete = {
+          viewModel.deleteStatus(status.id)
+          viewedStatus = null
+        },
+        onReact = { emoji ->
+          viewModel.reactToStatus(status.id, emoji)
+        }
+      )
+    }
+  }
+
+  // Dialog to select player and start a private chat
+  if (showSelectContactDialog) {
+    SelectContactDialog(
+      members = members,
+      currentGamertag = userState.gamertag,
+      onDismiss = { viewModel.setSelectContactDialogVisible(false) },
+      onSelectMember = { target ->
+        viewModel.startPrivateChat(target.gamertag)
+        currentScreen = "chat_screen"
+      }
+    )
+  }
+
   if (showMenuDropdownSheet) {
     CustomDropdownModalSheet(
       options = listOf(
@@ -825,21 +934,6 @@ fun SubstrateApp(
       onPostStatus = { text, theme, activity, coords ->
         viewModel.postStatus(text, theme, activity, coords)
         showCreateStatusDialog = false
-      }
-    )
-  }
-
-  viewedStatus?.let { status ->
-    StatusViewerScreen(
-      status = status,
-      isOwnStatus = status.authorGamertag == userState.gamertag,
-      onDismiss = { viewedStatus = null },
-      onDelete = {
-        viewModel.deleteStatus(status.id)
-        viewedStatus = null
-      },
-      onReact = { emoji ->
-        viewModel.reactToStatus(status.id, emoji)
       }
     )
   }
