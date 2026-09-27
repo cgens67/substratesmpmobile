@@ -22,7 +22,6 @@ class ChatRepository(private val context: Context) {
   private val _messagesFlow = MutableStateFlow<List<ChatMessage>>(emptyList())
   val messagesFlow: StateFlow<List<ChatMessage>> = _messagesFlow.asStateFlow()
 
-  // Sets of Muted Channels, Blocked Users, and Favourites (Stored in SharedPreferences for instant 0-cost access)
   private val _mutedChannels = MutableStateFlow<Set<String>>(prefs.getStringSet("muted_channels", emptySet()) ?: emptySet())
   val mutedChannels: StateFlow<Set<String>> = _mutedChannels.asStateFlow()
 
@@ -152,7 +151,8 @@ class ChatRepository(private val context: Context) {
                 replyToId = doc.getString("replyToId"),
                 replyToSender = doc.getString("replyToSender"),
                 replyToContent = doc.getString("replyToContent"),
-                readBy = readByList
+                readBy = readByList,
+                isEdited = doc.getBoolean("isEdited") ?: false
               )
             }
 
@@ -185,6 +185,11 @@ class ChatRepository(private val context: Context) {
           }
         }
     } catch (_: Exception) {}
+  }
+
+  fun editMessage(channelId: String, messageId: String, newContent: String) {
+    firestore.collection("channels").document(channelId).collection("messages").document(messageId)
+      .update(mapOf("content" to newContent, "isEdited" to true))
   }
 
   fun sendMessage(
@@ -246,7 +251,8 @@ class ChatRepository(private val context: Context) {
       "replyToId" to replyToId,
       "replyToSender" to replyToSender,
       "replyToContent" to replyToContent,
-      "readBy" to emptyList<String>()
+      "readBy" to emptyList<String>(),
+      "isEdited" to false
     )
 
     docRef.set(docData).addOnSuccessListener {
