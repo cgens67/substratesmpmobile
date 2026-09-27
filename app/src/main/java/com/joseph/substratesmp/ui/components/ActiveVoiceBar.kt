@@ -8,6 +8,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,9 +55,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ActiveVoiceRoom
 import com.joseph.substratesmp.data.model.VoiceParticipant
-import com.joseph.substratesmp.ui.theme.ActiveSpeakerShape
+import com.joseph.substratesmp.ui.theme.RoleAdminGold
+import com.joseph.substratesmp.ui.theme.StatusCallEndRed
 import com.joseph.substratesmp.ui.theme.SubstrateTheme
-import com.joseph.substratesmp.ui.theme.VoiceOverlayCardShape
+import com.joseph.substratesmp.ui.theme.WhatsAppChatOutgoing
+import com.joseph.substratesmp.ui.theme.WhatsAppSurfaceHigh
 
 @Composable
 fun ActiveVoiceBar(
@@ -70,7 +73,7 @@ fun ActiveVoiceBar(
 ) {
   val infiniteTransition = rememberInfiniteTransition(label = "pulse_trans")
   val pulseAlpha by infiniteTransition.animateFloat(
-    initialValue = 0.4f,
+    initialValue = 0.5f,
     targetValue = 1f,
     animationSpec = infiniteRepeatable(
       animation = tween(900, easing = FastOutSlowInEasing),
@@ -82,25 +85,20 @@ fun ActiveVoiceBar(
   Card(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 12.dp, vertical = 6.dp)
+      .padding(horizontal = 10.dp, vertical = 6.dp)
       .testTag("active_voice_bar"),
-    shape = VoiceOverlayCardShape,
+    shape = RoundedCornerShape(20.dp),
     colors = CardDefaults.cardColors(
-      containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+      containerColor = WhatsAppSurfaceHigh
     ),
-    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
-    border = CardDefaults.outlinedCardBorder().copy(
-      width = 1.dp,
-      brush = androidx.compose.ui.graphics.SolidColor(
-        SubstrateTheme.customColors.statusVoiceActive.copy(alpha = 0.5f)
-      )
-    )
+    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 14.dp, vertical = 10.dp)
+        .padding(horizontal = 14.dp, vertical = 12.dp)
     ) {
+      // WhatsApp Call Header
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -111,45 +109,47 @@ fun ActiveVoiceBar(
             modifier = Modifier
               .size(10.dp)
               .clip(CircleShape)
-              .background(SubstrateTheme.customColors.statusVoiceActive.copy(alpha = pulseAlpha))
+              .background(SubstrateTheme.customColors.statusOnline.copy(alpha = pulseAlpha))
           )
           Spacer(modifier = Modifier.width(8.dp))
           Column {
             Text(
-              text = "🔊 ${voiceRoom.channelName}",
+              text = voiceRoom.channelName,
               style = MaterialTheme.typography.titleSmall,
               fontWeight = FontWeight.Bold,
-              color = MaterialTheme.colorScheme.onSurface
+              color = Color.White
             )
             Text(
-              text = if (voiceRoom.isConnecting) "Connecting to Agora RTC..." else "Agora.io RTC • Token Authenticated",
+              text = if (voiceRoom.isConnecting) "Calling..." else "${voiceRoom.participants.size} participant(s) in call",
               style = MaterialTheme.typography.labelSmall,
-              color = SubstrateTheme.customColors.statusVoiceActive,
-              fontSize = 10.sp
+              color = SubstrateTheme.customColors.statusOnline,
+              fontSize = 11.sp
             )
           }
         }
 
+        // WhatsApp signature red call hangup button
         FilledIconButton(
           onClick = onDisconnect,
           modifier = Modifier
-            .size(36.dp)
+            .size(40.dp)
             .testTag("voice_disconnect_button"),
           colors = IconButtonDefaults.filledIconButtonColors(
-            containerColor = SubstrateTheme.customColors.statusMuted,
+            containerColor = StatusCallEndRed,
             contentColor = Color.White
           )
         ) {
           Icon(
             imageVector = Icons.Default.CallEnd,
-            contentDescription = "Disconnect from voice",
-            modifier = Modifier.size(18.dp)
+            contentDescription = "End Call",
+            modifier = Modifier.size(20.dp)
           )
         }
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
+      // Real Gamertag Participant Avatars
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -160,119 +160,80 @@ fun ActiveVoiceBar(
         }
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
+      Spacer(modifier = Modifier.height(12.dp))
 
+      // Call Control Buttons (Mute, Speaker, Video, Deafen)
       Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
       ) {
         val isMuted = voiceRoom.isMuted
-        val micBg by animateColorAsState(
-          targetValue = if (isMuted) SubstrateTheme.customColors.statusMuted.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainer,
-          label = "mic_bg"
-        )
-        val micTint by animateColorAsState(
-          targetValue = if (isMuted) SubstrateTheme.customColors.statusMuted else MaterialTheme.colorScheme.onSurface,
-          label = "mic_tint"
-        )
-
-        Surface(
-          shape = MaterialTheme.shapes.small,
-          color = micBg,
-          modifier = Modifier.testTag("voice_mute_toggle")
+        IconButton(
+          onClick = onToggleMute,
+          modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(if (isMuted) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+            .testTag("voice_mute_toggle")
         ) {
-          IconButton(
-            onClick = onToggleMute,
-            modifier = Modifier.size(40.dp)
-          ) {
-            Icon(
-              imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-              contentDescription = if (isMuted) "Unmute" else "Mute",
-              tint = micTint,
-              modifier = Modifier.size(20.dp)
-            )
-          }
+          Icon(
+            imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+            contentDescription = if (isMuted) "Unmute" else "Mute",
+            tint = if (isMuted) StatusCallEndRed else Color.White,
+            modifier = Modifier.size(20.dp)
+          )
         }
 
         val isSpeaker = voiceRoom.isSpeakerOn
-        val speakerBg by animateColorAsState(
-          targetValue = if (isSpeaker) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-          label = "speaker_bg"
-        )
-        val speakerTint by animateColorAsState(
-          targetValue = if (isSpeaker) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-          label = "speaker_tint"
-        )
-
-        Surface(
-          shape = MaterialTheme.shapes.small,
-          color = speakerBg,
-          modifier = Modifier.testTag("voice_speaker_toggle")
+        IconButton(
+          onClick = onToggleSpeaker,
+          modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(if (isSpeaker) WhatsAppChatOutgoing else MaterialTheme.colorScheme.surfaceVariant)
+            .testTag("voice_speaker_toggle")
         ) {
-          IconButton(
-            onClick = onToggleSpeaker,
-            modifier = Modifier.size(40.dp)
-          ) {
-            Icon(
-              imageVector = if (isSpeaker) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
-              contentDescription = if (isSpeaker) "Speakerphone On" else "Earpiece Mode",
-              tint = speakerTint,
-              modifier = Modifier.size(20.dp)
-            )
-          }
-        }
-
-        val isDeaf = voiceRoom.isDeafened
-        val deafBg by animateColorAsState(
-          targetValue = if (isDeaf) SubstrateTheme.customColors.statusMuted.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceContainer,
-          label = "deaf_bg"
-        )
-        val deafTint by animateColorAsState(
-          targetValue = if (isDeaf) SubstrateTheme.customColors.statusMuted else MaterialTheme.colorScheme.onSurface,
-          label = "deaf_tint"
-        )
-
-        Surface(
-          shape = MaterialTheme.shapes.small,
-          color = deafBg,
-          modifier = Modifier.testTag("voice_deafen_toggle")
-        ) {
-          IconButton(
-            onClick = onToggleDeafen,
-            modifier = Modifier.size(40.dp)
-          ) {
-            Icon(
-              imageVector = if (isDeaf) Icons.Default.VolumeOff else Icons.Default.Headphones,
-              contentDescription = if (isDeaf) "Undeafen" else "Deafen",
-              tint = deafTint,
-              modifier = Modifier.size(20.dp)
-            )
-          }
+          Icon(
+            imageVector = if (isSpeaker) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
+            contentDescription = "Speaker",
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+          )
         }
 
         val isCam = voiceRoom.isCameraOn
-        val camBg by animateColorAsState(
-          targetValue = if (isCam) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer,
-          label = "cam_bg"
-        )
-
-        Surface(
-          shape = MaterialTheme.shapes.small,
-          color = camBg,
-          modifier = Modifier.testTag("voice_camera_toggle")
+        IconButton(
+          onClick = onToggleCamera,
+          modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(if (isCam) WhatsAppChatOutgoing else MaterialTheme.colorScheme.surfaceVariant)
+            .testTag("voice_camera_toggle")
         ) {
-          IconButton(
-            onClick = onToggleCamera,
-            modifier = Modifier.size(40.dp)
-          ) {
-            Icon(
-              imageVector = if (isCam) Icons.Default.Videocam else Icons.Default.VideocamOff,
-              contentDescription = if (isCam) "Turn Camera Off" else "Turn Camera On",
-              tint = if (isCam) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-              modifier = Modifier.size(20.dp)
-            )
-          }
+          Icon(
+            imageVector = if (isCam) Icons.Default.Videocam else Icons.Default.VideocamOff,
+            contentDescription = "Video",
+            tint = Color.White,
+            modifier = Modifier.size(20.dp)
+          )
+        }
+
+        val isDeaf = voiceRoom.isDeafened
+        IconButton(
+          onClick = onToggleDeafen,
+          modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(if (isDeaf) Color.White.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surfaceVariant)
+            .testTag("voice_deafen_toggle")
+        ) {
+          Icon(
+            imageVector = if (isDeaf) Icons.Default.VolumeOff else Icons.Default.Headphones,
+            contentDescription = "Deafen",
+            tint = if (isDeaf) StatusCallEndRed else Color.White,
+            modifier = Modifier.size(20.dp)
+          )
         }
       }
     }
@@ -284,41 +245,41 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
   val isSpeaking = participant.isSpeaking
   val isAdmin = participant.isAdmin || participant.name.contains("Siang5680", ignoreCase = true)
 
-  val borderColor by animateColorAsState(
+  val ringBorderColor by animateColorAsState(
     targetValue = when {
-      isSpeaking -> SubstrateTheme.customColors.statusVoiceActive
-      isAdmin -> SubstrateTheme.customColors.adminGold.copy(alpha = 0.5f)
+      isSpeaking -> SubstrateTheme.customColors.statusOnline
+      isAdmin -> RoleAdminGold
       else -> Color.Transparent
     },
-    label = "border_color"
+    label = "ring_border"
   )
 
   Surface(
-    shape = ActiveSpeakerShape,
-    color = MaterialTheme.colorScheme.surfaceContainer,
+    shape = RoundedCornerShape(16.dp),
+    color = MaterialTheme.colorScheme.surfaceVariant,
     border = androidx.compose.foundation.BorderStroke(
-      width = if (isSpeaking) 2.dp else 1.dp,
-      color = if (isSpeaking || isAdmin) borderColor else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+      width = if (isSpeaking) 2.dp else if (isAdmin) 1.dp else 0.dp,
+      color = ringBorderColor
     )
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+      modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
       Box(
         modifier = Modifier
-          .size(26.dp)
+          .size(28.dp)
           .clip(CircleShape)
           .background(
-            if (isAdmin) SubstrateTheme.customColors.adminGold.copy(alpha = 0.25f)
-            else MaterialTheme.colorScheme.primaryContainer
+            if (isAdmin) RoleAdminGold.copy(alpha = 0.25f)
+            else WhatsAppChatOutgoing
           ),
         contentAlignment = Alignment.Center
       ) {
         Text(
           text = participant.name.take(1).uppercase(),
           style = MaterialTheme.typography.labelSmall,
-          color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onPrimaryContainer,
+          color = if (isAdmin) RoleAdminGold else Color.White,
           fontWeight = FontWeight.Bold
         )
       }
@@ -329,18 +290,17 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Text(
             text = participant.name,
-            style = MaterialTheme.typography.labelSmall,
-            color = if (isAdmin) SubstrateTheme.customColors.adminGold else MaterialTheme.colorScheme.onSurface,
-            fontWeight = if (isSpeaking || isAdmin) FontWeight.Bold else FontWeight.Normal,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (isAdmin) RoleAdminGold else Color.White,
+            fontWeight = if (isSpeaking || isAdmin) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1
           )
 
-          // Distinct Admin Badge next to Siang5680 in voice room user lists
           if (isAdmin) {
             Spacer(modifier = Modifier.width(4.dp))
             Surface(
-              shape = RoundedCornerShape(3.dp),
-              color = SubstrateTheme.customColors.adminGold.copy(alpha = 0.2f)
+              shape = RoundedCornerShape(4.dp),
+              color = RoleAdminGold.copy(alpha = 0.2f)
             ) {
               Row(
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
@@ -349,14 +309,14 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
                 Icon(
                   imageVector = Icons.Default.Shield,
                   contentDescription = null,
-                  tint = SubstrateTheme.customColors.adminGold,
+                  tint = RoleAdminGold,
                   modifier = Modifier.size(9.dp)
                 )
                 Spacer(modifier = Modifier.width(2.dp))
                 Text(
                   text = "ADMIN",
                   style = MaterialTheme.typography.labelSmall,
-                  color = SubstrateTheme.customColors.adminGold,
+                  color = RoleAdminGold,
                   fontWeight = FontWeight.ExtraBold,
                   fontSize = 8.sp
                 )
@@ -365,18 +325,19 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
           }
         }
 
+        // Live Audio level bar
         Row(
           verticalAlignment = Alignment.CenterVertically,
           horizontalArrangement = Arrangement.spacedBy(2.dp),
-          modifier = Modifier.height(10.dp)
+          modifier = Modifier.height(8.dp)
         ) {
           val baseLevel = if (participant.isMuted) 0f else participant.audioLevel
           for (i in 0..3) {
             val barHeight = when (i) {
-              0 -> (4 + baseLevel * 6).dp
-              1 -> (6 + baseLevel * 8).dp
-              2 -> (3 + baseLevel * 7).dp
-              else -> (5 + baseLevel * 5).dp
+              0 -> (3 + baseLevel * 5).dp
+              1 -> (5 + baseLevel * 7).dp
+              2 -> (3 + baseLevel * 6).dp
+              else -> (4 + baseLevel * 4).dp
             }
             Box(
               modifier = Modifier
@@ -384,9 +345,9 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
                 .height(barHeight)
                 .clip(CircleShape)
                 .background(
-                  if (participant.isMuted) SubstrateTheme.customColors.statusMuted
-                  else if (isSpeaking) SubstrateTheme.customColors.statusVoiceActive
-                  else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+                  if (participant.isMuted) StatusCallEndRed
+                  else if (isSpeaking) SubstrateTheme.customColors.statusOnline
+                  else Color.Gray.copy(alpha = 0.4f)
                 )
             )
           }
