@@ -7,74 +7,19 @@ import android.util.Base64
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Call
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DonutLarge
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,27 +35,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
-import com.joseph.substratesmp.data.model.Channel
-import com.joseph.substratesmp.data.model.ChannelType
-import com.joseph.substratesmp.data.model.ChatMessage
-import com.joseph.substratesmp.data.model.StatusUpdate
-import com.joseph.substratesmp.ui.components.ActiveVoiceBar
-import com.joseph.substratesmp.ui.components.AdminControlSheet
-import com.joseph.substratesmp.ui.components.AgoraSettingsDialog
-import com.joseph.substratesmp.ui.components.ChatInputBar
-import com.joseph.substratesmp.ui.components.ChatMessageItem
-import com.joseph.substratesmp.ui.components.CustomDropdownModalSheet
-import com.joseph.substratesmp.ui.components.EmojiPickerView
-import com.joseph.substratesmp.ui.components.GamertagDialog
-import com.joseph.substratesmp.ui.components.SelectContactDialog
-import com.joseph.substratesmp.ui.components.ServerInfoSheet
-import com.joseph.substratesmp.ui.components.SheetOption
-import com.joseph.substratesmp.ui.components.StatusCreatorDialog
-import com.joseph.substratesmp.ui.components.StatusViewerScreen
-import com.joseph.substratesmp.ui.components.TypingBubble
-import com.joseph.substratesmp.ui.components.VideoCallScreen
-import com.joseph.substratesmp.ui.components.dropLastGrapheme
-import com.joseph.substratesmp.ui.components.processAndCompressImage
+import com.joseph.substratesmp.data.model.*
+import com.joseph.substratesmp.ui.components.*
 import com.joseph.substratesmp.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -142,7 +68,6 @@ fun SubstrateApp(
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
   val showSelectContactDialog by viewModel.showSelectContactDialog.collectAsStateWithLifecycle()
 
-  // rememberSaveable ensures the state survives screen rotations
   var currentScreen by rememberSaveable { mutableStateOf("home") }
   var selectedTab by rememberSaveable { mutableIntStateOf(0) }
   var activeFilterChip by rememberSaveable { mutableStateOf("All") }
@@ -151,7 +76,20 @@ fun SubstrateApp(
 
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var showCreateStatusDialog by remember { mutableStateOf(false) }
-  var viewedStatus by remember { mutableStateOf<StatusUpdate?>(null) }
+  
+  // Status Viewer state with smooth animated entry/exit
+  var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
+  var isStatusViewerVisible by remember { mutableStateOf(false) }
+
+  fun openStatus(status: StatusUpdate) {
+    statusToDisplay = status
+    isStatusViewerVisible = true
+  }
+
+  fun closeStatus() {
+    isStatusViewerVisible = false
+  }
+
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
   var viewedImageUrl by remember { mutableStateOf<String?>(null) }
@@ -191,8 +129,10 @@ fun SubstrateApp(
     }
   }
 
-  BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen" || viewedImageUrl != null) {
-    if (viewedImageUrl != null) {
+  BackHandler(enabled = currentScreen == "chat_screen" || currentScreen == "video_call_screen" || viewedImageUrl != null || isStatusViewerVisible) {
+    if (isStatusViewerVisible) {
+      closeStatus()
+    } else if (viewedImageUrl != null) {
       viewedImageUrl = null
     } else if (showEmojiPicker) {
       showEmojiPicker = false
@@ -283,7 +223,6 @@ fun SubstrateApp(
                           Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(13.dp))
                         }
                       }
-                      // Live typing subtitle indicator
                       if (typingUsers.isNotEmpty()) {
                         Text(
                           text = "${typingUsers.first()} is typing...",
@@ -632,11 +571,11 @@ fun SubstrateApp(
                 targetState = selectedTab,
                 transitionSpec = {
                   if (targetState > initialState) {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeOut())
+                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeOut())
                   } else {
-                    (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it } + fadeIn())
-                      .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
+                    (slideInHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { -it } + fadeIn())
+                      .togetherWith(slideOutHorizontally(animationSpec = tween(240, easing = FastOutSlowInEasing)) { it } + fadeOut())
                   }
                 },
                 label = "tab_transition"
@@ -737,8 +676,7 @@ fun SubstrateApp(
                                 ) {
                                   Text(userState.gamertag.take(1).ifBlank { "Y" }.uppercase(), color = Color.White, fontWeight = FontWeight.Bold)
                                   Box(
-                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreen),
-                                    contentAlignment = Alignment.Center
+                                    modifier = Modifier.align(Alignment.BottomEnd).size(18.dp).clip(CircleShape).background(WhatsAppGreen)
                                   ) {
                                     Icon(Icons.Default.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
                                   }
@@ -761,7 +699,7 @@ fun SubstrateApp(
                             Card(
                               shape = RoundedCornerShape(16.dp),
                               colors = CardDefaults.cardColors(containerColor = cardBg),
-                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { viewedStatus = status }.animateItem()
+                              modifier = Modifier.size(width = 110.dp, height = 160.dp).clickable { openStatus(status) }.animateItem()
                             ) {
                               Box(modifier = Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.Center) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -906,6 +844,28 @@ fun SubstrateApp(
     }
   }
 
+  // Smooth Animated Entry & Exit for Status Viewer Screen
+  AnimatedVisibility(
+    visible = isStatusViewerVisible && statusToDisplay != null,
+    enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
+    exit = scaleOut(targetScale = 0.82f, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(200))
+  ) {
+    statusToDisplay?.let { status ->
+      StatusViewerScreen(
+        status = status,
+        isOwnStatus = status.authorGamertag == userState.gamertag,
+        onDismiss = { closeStatus() },
+        onDelete = {
+          viewModel.deleteStatus(status.id)
+          closeStatus()
+        },
+        onReact = { emoji ->
+          viewModel.reactToStatus(status.id, emoji)
+        }
+      )
+    }
+  }
+
   if (showSelectContactDialog) {
     SelectContactDialog(
       members = members,
@@ -958,21 +918,6 @@ fun SubstrateApp(
       onPostStatus = { text, theme, activity, coords ->
         viewModel.postStatus(text, theme, activity, coords)
         showCreateStatusDialog = false
-      }
-    )
-  }
-
-  viewedStatus?.let { status ->
-    StatusViewerScreen(
-      status = status,
-      isOwnStatus = status.authorGamertag == userState.gamertag,
-      onDismiss = { viewedStatus = null },
-      onDelete = {
-        viewModel.deleteStatus(status.id)
-        viewedStatus = null
-      },
-      onReact = { emoji ->
-        viewModel.reactToStatus(status.id, emoji)
       }
     )
   }
