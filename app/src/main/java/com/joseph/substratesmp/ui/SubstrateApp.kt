@@ -17,15 +17,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -37,7 +34,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -51,13 +47,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.joseph.substratesmp.data.model.ChannelType
 import com.joseph.substratesmp.ui.components.ActiveVoiceBar
 import com.joseph.substratesmp.ui.components.AgoraSettingsDialog
 import com.joseph.substratesmp.ui.components.ChannelDrawerContent
@@ -65,7 +59,6 @@ import com.joseph.substratesmp.ui.components.ChatInputBar
 import com.joseph.substratesmp.ui.components.ChatMessageItem
 import com.joseph.substratesmp.ui.components.GamertagDialog
 import com.joseph.substratesmp.ui.components.ServerInfoSheet
-import com.joseph.substratesmp.ui.theme.SubstrateTheme
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -91,7 +84,7 @@ fun SubstrateApp(
   var menuExpanded by remember { mutableStateOf(false) }
   val listState = rememberLazyListState()
 
-  // Auto-scroll to bottom whenever messages update
+  // Auto-scroll to bottom on incoming messages
   LaunchedEffect(messages.size) {
     if (messages.isNotEmpty()) {
       listState.animateScrollToItem(messages.size - 1)
@@ -165,7 +158,6 @@ fun SubstrateApp(
             }
           },
           actions = {
-            // Realm Server Info shortcut
             IconButton(
               onClick = { viewModel.setServerInfoSheetVisible(true) },
               modifier = Modifier.testTag("app_bar_server_info")
@@ -177,7 +169,6 @@ fun SubstrateApp(
               )
             }
 
-            // More Options Dropdown
             Box {
               IconButton(
                 onClick = { menuExpanded = true },
@@ -196,7 +187,12 @@ fun SubstrateApp(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
               ) {
                 DropdownMenuItem(
-                  text = { Text("Gamertag: ${userState.gamertag}") },
+                  text = {
+                    Text(
+                      if (userState.gamertag.isNotBlank()) "Gamertag: ${userState.gamertag}"
+                      else "Set Up Gamertag"
+                    )
+                  },
                   onClick = {
                     menuExpanded = false
                     viewModel.setGamertagDialogVisible(true)
@@ -233,7 +229,7 @@ fun SubstrateApp(
       ) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-        // 1. Scrollable Real-Time Message Stream
+        // 1. Live Real-Time Message Stream (Firestore synced)
         Box(
           modifier = Modifier
             .weight(1f)
@@ -281,7 +277,7 @@ fun SubstrateApp(
           }
         }
 
-        // 2. Active Voice Bar (Docked card when connected to voice channel)
+        // 2. Active Voice Bar (Agora RTC Engine)
         AnimatedVisibility(
           visible = activeVoiceRoom != null,
           enter = slideInVertically { it },
@@ -310,14 +306,13 @@ fun SubstrateApp(
     }
   }
 
-  // Dialogs
-  if (showGamertagDialog) {
+  // Gamertag Setup & Sync Dialog
+  if (showGamertagDialog || userState.needsGamertagSetup) {
     GamertagDialog(
       currentGamertag = userState.gamertag,
-      currentRole = userState.role,
       onDismiss = { viewModel.setGamertagDialogVisible(false) },
-      onSave = { gamertag, role ->
-        viewModel.updateGamertag(gamertag, role)
+      onRegister = { gamertag, onComplete ->
+        viewModel.registerGamertag(gamertag, onComplete)
       }
     )
   }
@@ -326,8 +321,8 @@ fun SubstrateApp(
     AgoraSettingsDialog(
       currentSettings = agoraSettings,
       onDismiss = { viewModel.setAgoraDialogVisible(false) },
-      onSave = { appId, token ->
-        viewModel.voiceManager.updateSettings(appId, token)
+      onSave = { appId, appCert, token ->
+        viewModel.voiceManager.updateSettings(appId, appCert, token)
         viewModel.setAgoraDialogVisible(false)
       }
     )
