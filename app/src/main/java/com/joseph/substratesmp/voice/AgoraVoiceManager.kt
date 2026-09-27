@@ -19,7 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
 data class AgoraSettings(
-  val appId: String = "f2cf0761f7584f48b8d647b7b29c8572",
+  val appId: String = AgoraVoiceManager.DEFAULT_AGORA_APP_ID,
+  val appCertificate: String = AgoraVoiceManager.DEFAULT_AGORA_APP_CERTIFICATE,
   val token: String = "",
   val channelProfile: Int = Constants.CHANNEL_PROFILE_COMMUNICATION
 )
@@ -30,10 +31,12 @@ class AgoraVoiceManager(private val context: Context? = null) {
 
   companion object {
     const val DEFAULT_AGORA_APP_ID = "f2cf0761f7584f48b8d647b7b29c8572"
+    const val DEFAULT_AGORA_APP_CERTIFICATE = "1f85f7a31c4e4c4fb02551414a89b2da"
   }
 
   private var rtcEngine: RtcEngine? = null
-  private var currentGamertag: String = "DiamondMiner42"
+  private var currentGamertag: String = ""
+  private var activeNumericUid: Int = 0
 
   private fun getSafeContext(): Context? {
     val ctx = context?.applicationContext ?: context
@@ -51,6 +54,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
   private val _settings = MutableStateFlow(
     AgoraSettings(
       appId = getPrefs()?.getString("agora_app_id", DEFAULT_AGORA_APP_ID) ?: DEFAULT_AGORA_APP_ID,
+      appCertificate = getPrefs()?.getString("agora_app_certificate", DEFAULT_AGORA_APP_CERTIFICATE) ?: DEFAULT_AGORA_APP_CERTIFICATE,
       token = getPrefs()?.getString("agora_token", "") ?: ""
     )
   )
@@ -61,19 +65,22 @@ class AgoraVoiceManager(private val context: Context? = null) {
       Log.i(TAG, "Live Agora onJoinChannelSuccess: channel=$channel, uid=$uid, elapsed=${elapsed}ms")
       scope.launch {
         val current = _voiceRoomState.value ?: return@launch
+        val isAdmin = currentGamertag.equals("Siang5680", ignoreCase = true)
         val localUser = VoiceParticipant(
           id = "local_$uid",
-          name = "$currentGamertag (You)",
+          name = if (isAdmin) "$currentGamertag (Admin)" else "$currentGamertag (You)",
           isSpeaking = false,
           isMuted = current.isMuted,
           isLocal = true,
+          isAdmin = isAdmin,
           audioLevel = 0.0f
         )
+        val remoteExisting = current.participants.filter { !it.isLocal }
         _voiceRoomState.value = current.copy(
           isConnected = true,
           isConnecting = false,
           statusMessage = "Connected to live Agora channel: $channel",
-          participants = listOf(localUser)
+          participants = listOf(localUser) + remoteExisting
         )
       }
     }
@@ -88,6 +95,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
           isSpeaking = false,
           isMuted = false,
           isLocal = false,
+          isAdmin = false,
           audioLevel = 0.0f
         )
         if (current.participants.none { it.id == newParticipant.id }) {
@@ -127,7 +135,7 @@ class AgoraVoiceManager(private val context: Context? = null) {
 
         val updatedParticipants = current.participants.map { participant ->
           val speakerMatch = speakers.find { sp ->
-            if (participant.isLocal) sp.uid == 0
+            if (participant.isLocal) sp.uid == 0 || sp.uid == activeNumericUid
             else participant.id == "remote_${sp.uid}"
           }
           if (speakerMatch != null && speakerMatch.volume > 5) {
@@ -199,15 +207,15 @@ class AgoraVoiceManager(private val context: Context? = null) {
     }
   }
 
-  fun updateSettings(appId: String, token: String) {
+  fun updateSettings(appId: String, appCertificate: String, token: String) {
     getPrefs()?.edit()
       ?.putString("agora_app_id", appId)
+      ?.putString("agora_app_certificate", appCertificate)
       ?.putString("agora_token", token)
       ?.apply()
 
-    _settings.value = AgoraSettings(appId, token)
+    _settings.value = AgoraSettings(appId, appCertificate, token)
 
-    // Re-initialize engine with updated App ID
     try {
       rtcEngine?.leaveChannel()
       RtcEngine.destroy()
@@ -219,15 +227,28 @@ class AgoraVoiceManager(private val context: Context? = null) {
   fun joinVoiceChannel(channelId: String, channelName: String, localGamertag: String) {
     currentGamertag = localGamertag
 
-    // Ensure engine is initialized
     if (rtcEngine == null) {
       initAgoraEngine()
     }
 
-    // Leave any currently connected channel first
     try {
       rtcEngine?.leaveChannel()
     } catch (_: Throwable) {}
+
+    val isAdmin = localGamertag.equals("Siang5680", ignoreCase = true)
+    // Derive a stable positive 32-bit integer UID from localGamertag
+    val numericUid = (localGamertag.hashCode().toLong() and 0x7FFFFFFFL).toInt().let { if (it <= 0) 10001 else it }
+    activeNumericUid = numericUid
+
+    val pendingLocalUser = VoiceParticipant(
+      id = "local_$numericUid",
+      name = if (isAdmin) "$localGamertag (Admin)" else "$localGamertag (You)",
+      isSpeaking = false,
+      isMuted = false,
+      isLocal = true,
+      isAdmin = isAdmin,
+      audioLevel = 0.0f
+    )
 
     _voiceRoomState.value = ActiveVoiceRoom(
       channelId = channelId,
@@ -238,19 +259,40 @@ class AgoraVoiceManager(private val context: Context? = null) {
       isDeafened = false,
       isSpeakerOn = true,
       isCameraOn = false,
-      participants = emptyList(),
+      participants = listOf(pendingLocalUser),
       appId = _settings.value.appId,
       statusMessage = "Connecting to Agora RTC channel: $channelId..."
     )
 
-    val token = if (_settings.value.token.isNotBlank()) _settings.value.token else null
     val sanitizedChannel = channelId.replace("-", "_")
+    val expirationSeconds = 24 * 3600
+    val privilegeTs = ((System.currentTimeMillis() / 1000) + expirationSeconds).toInt()
 
+    // 1. Generate client-side token locally using RtcTokenBuilder if no custom token was provided
+    val token = if (_settings.value.token.isNotBlank()) {
+      _settings.value.token
+    } else {
+      try {
+        RtcTokenBuilder().buildTokenWithUid(
+          appId = _settings.value.appId,
+          appCertificate = _settings.value.appCertificate,
+          channelName = sanitizedChannel,
+          uid = numericUid,
+          role = RtcTokenBuilder.Role.Role_Publisher,
+          privilegeTs = privilegeTs
+        )
+      } catch (e: Throwable) {
+        Log.e(TAG, "Error generating Agora token client-side: ${e.message}", e)
+        ""
+      }
+    }
+
+    // 2. Pass generated token, sanitized channel, and numeric UID to joinChannel
     try {
       rtcEngine?.setEnableSpeakerphone(true)
       rtcEngine?.muteLocalAudioStream(false)
-      val joinCode = rtcEngine?.joinChannel(token, sanitizedChannel, "", 0)
-      Log.i(TAG, "Live Agora joinChannel($sanitizedChannel) returned result code: $joinCode")
+      val joinCode = rtcEngine?.joinChannel(token, sanitizedChannel, "", numericUid)
+      Log.i(TAG, "Live Agora joinChannel($sanitizedChannel, uid=$numericUid) returned code: $joinCode")
     } catch (e: Throwable) {
       Log.e(TAG, "Live Agora joinChannel error: ${e.message}", e)
       _voiceRoomState.value = _voiceRoomState.value?.copy(
