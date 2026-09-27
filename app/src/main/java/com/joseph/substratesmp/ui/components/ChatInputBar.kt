@@ -83,8 +83,6 @@ import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.StatusCallEndRed
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
-import com.joseph.substratesmp.ui.theme.WhatsAppTextPrimary
-import com.joseph.substratesmp.ui.theme.WhatsAppTextSecondary
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -287,6 +285,7 @@ fun getAudioDurationSeconds(context: Context, uri: Uri): Int {
 fun ChatInputBar(
   channelName: String,
   text: String,
+  isDarkMode: Boolean,
   onTextChanged: (String) -> Unit,
   onSendMessage: (
     content: String,
@@ -320,6 +319,11 @@ fun ChatInputBar(
   var recordingSeconds by remember { mutableIntStateOf(0) }
   var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
   var recordedAudioFile by remember { mutableStateOf<File?>(null) }
+
+  val surfaceColor = if (isDarkMode) Color(0xFF424242) else Color.White
+  val textColor = if (isDarkMode) Color.White else Color.Black
+  val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
+  val menuBgColor = if (isDarkMode) Color(0xFF303030) else Color(0xFFF0F2F5)
 
   val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
@@ -428,7 +432,7 @@ fun ChatInputBar(
         replyingTo?.let { replyTarget ->
           Surface(
             shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
-            color = Color(0xFFF0F2F5),
+            color = menuBgColor,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
             Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -438,13 +442,13 @@ fun ChatInputBar(
                 Text("Replying to ${replyTarget.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
                 Text(
                   replyTarget.content.ifBlank { if (replyTarget.isSticker) "💟 Sticker" else if (replyTarget.imageUrl != null) "📷 Photo" else if (replyTarget.fileUrl != null) "📄 Document" else "🎤 Voice note" },
-                  color = WhatsAppTextSecondary,
+                  color = subTextColor,
                   fontSize = 11.5.sp,
                   maxLines = 1
                 )
               }
               IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = subTextColor, modifier = Modifier.size(16.dp))
               }
             }
           }
@@ -459,7 +463,7 @@ fun ChatInputBar(
         editingMessage?.let { editTarget ->
           Surface(
             shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
-            color = Color(0xFFF0F2F5),
+            color = menuBgColor,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
             Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -467,10 +471,10 @@ fun ChatInputBar(
               Spacer(modifier = Modifier.width(8.dp))
               Column(modifier = Modifier.weight(1f)) {
                 Text("Editing Message", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
-                Text(editTarget.content, color = WhatsAppTextSecondary, fontSize = 11.5.sp, maxLines = 1)
+                Text(editTarget.content, color = subTextColor, fontSize = 11.5.sp, maxLines = 1)
               }
               IconButton(onClick = onCancelEdit, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel edit", tint = WhatsAppTextSecondary, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = "Cancel edit", tint = subTextColor, modifier = Modifier.size(16.dp))
               }
             }
           }
@@ -484,14 +488,18 @@ fun ChatInputBar(
           OutlinedTextField(
             value = coordText,
             onValueChange = { coordText = it },
-            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64, Z: 540)", style = CoordinateTextStyle, color = WhatsAppTextSecondary) },
+            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64, Z: 540)", style = CoordinateTextStyle, color = subTextColor) },
             textStyle = CoordinateTextStyle,
             modifier = Modifier.weight(1f).height(46.dp),
             singleLine = true,
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedTextColor = textColor, unfocusedTextColor = textColor,
+              focusedContainerColor = surfaceColor, unfocusedContainerColor = surfaceColor
+            ),
             shape = RoundedCornerShape(12.dp)
           )
           IconButton(onClick = { showCoordinateInput = false; coordText = "" }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = WhatsAppTextSecondary, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = subTextColor, modifier = Modifier.size(18.dp))
           }
         }
       }
@@ -499,7 +507,7 @@ fun ChatInputBar(
       AnimatedVisibility(visible = showAttachmentMenu) {
         Surface(
           shape = RoundedCornerShape(16.dp),
-          color = Color.White,
+          color = surfaceColor,
           shadowElevation = 3.dp,
           modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
         ) {
@@ -509,7 +517,7 @@ fun ChatInputBar(
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Document", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Document", fontSize = 12.sp, color = WhatsAppTextPrimary)
+              Text("Document", fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; audioLauncher.launch("audio/*") }) {
@@ -517,7 +525,7 @@ fun ChatInputBar(
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AudioFile, contentDescription = "Audio", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Audio", fontSize = 12.sp, color = WhatsAppTextPrimary)
+              Text("Audio", fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
@@ -525,7 +533,7 @@ fun ChatInputBar(
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Image, contentDescription = "Gallery", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Gallery", fontSize = 12.sp, color = WhatsAppTextPrimary)
+              Text("Gallery", fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
@@ -533,7 +541,7 @@ fun ChatInputBar(
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Camera", fontSize = 12.sp, color = WhatsAppTextPrimary)
+              Text("Camera", fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
@@ -541,14 +549,14 @@ fun ChatInputBar(
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Place, contentDescription = "Location", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Location", fontSize = 12.sp, color = WhatsAppTextPrimary)
+              Text("Location", fontSize = 12.sp, color = textColor)
             }
           }
         }
       }
 
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = Color.White, shadowElevation = 1.dp) {
+        Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = surfaceColor, shadowElevation = 1.dp) {
           if (isRecording) {
             Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
               Row(verticalAlignment = Alignment.CenterVertically) {
@@ -556,7 +564,7 @@ fun ChatInputBar(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("HD Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
               }
-              Text("Cancel", color = WhatsAppTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+              Text("Cancel", color = subTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
                 try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
                 recorder = null; isRecording = false; recordedAudioFile?.delete()
               })
@@ -564,20 +572,20 @@ fun ChatInputBar(
           } else {
             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
               IconButton(onClick = onToggleEmojiPicker, modifier = Modifier.size(34.dp)) {
-                Icon(if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied, contentDescription = "Emoji", tint = if (isEmojiPickerVisible) WhatsAppGreenDark else WhatsAppTextSecondary, modifier = Modifier.size(24.dp))
+                Icon(if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied, contentDescription = "Emoji", tint = if (isEmojiPickerVisible) WhatsAppGreenDark else subTextColor, modifier = Modifier.size(24.dp))
               }
               OutlinedTextField(
                 value = text,
                 onValueChange = onTextChanged,
                 modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) onTextFieldFocused() }.testTag("chat_text_input"),
-                placeholder = { Text("Message", color = WhatsAppTextSecondary, fontSize = 15.sp) },
+                placeholder = { Text("Message", color = subTextColor, fontSize = 15.sp) },
                 colors = OutlinedTextFieldDefaults.colors(
                   focusedContainerColor = Color.Transparent,
                   unfocusedContainerColor = Color.Transparent,
                   focusedBorderColor = Color.Transparent,
                   unfocusedBorderColor = Color.Transparent,
-                  focusedTextColor = WhatsAppTextPrimary,
-                  unfocusedTextColor = WhatsAppTextPrimary
+                  focusedTextColor = textColor,
+                  unfocusedTextColor = textColor
                 ),
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = {
@@ -590,10 +598,10 @@ fun ChatInputBar(
                 maxLines = 4
               )
               IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = WhatsAppTextSecondary, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = subTextColor, modifier = Modifier.size(22.dp))
               }
               IconButton(onClick = { cameraLauncher.launch(null) }, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = WhatsAppTextSecondary, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = subTextColor, modifier = Modifier.size(22.dp))
               }
             }
           }
