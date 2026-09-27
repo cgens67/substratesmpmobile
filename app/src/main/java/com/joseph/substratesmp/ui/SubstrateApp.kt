@@ -72,13 +72,14 @@ fun formatChatListTime(timestamp: Long): String {
 fun FloatingBottomNavBar(
   currentScreen: String,
   onNavigate: (String) -> Unit,
-  userInitial: String
+  userInitial: String,
+  modifier: Modifier = Modifier
 ) {
   Surface(
     shape = RoundedCornerShape(32.dp),
     color = Color.White,
     shadowElevation = 8.dp,
-    modifier = Modifier.padding(bottom = 16.dp).height(64.dp)
+    modifier = modifier.height(64.dp)
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 12.dp),
@@ -154,6 +155,7 @@ fun SubstrateApp(
 
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
+  val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
   val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
@@ -180,6 +182,7 @@ fun SubstrateApp(
   }
 
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
+  var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var showEmojiPicker by remember { mutableStateOf(false) }
   var viewedImageUrl by remember { mutableStateOf<String?>(null) }
 
@@ -292,7 +295,9 @@ fun SubstrateApp(
     AnimatedContent(
       targetState = currentScreen,
       transitionSpec = {
-        if (targetState == "profile_screen" || targetState == "settings_screen") {
+        if (!appSettings.smoothAnimations) {
+           fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
+        } else if (targetState == "profile_screen" || targetState == "settings_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
@@ -320,6 +325,8 @@ fun SubstrateApp(
         "settings_screen" -> {
           SettingsScreen(
             userState = userState,
+            appSettings = appSettings,
+            onUpdateSetting = { key, value -> viewModel.updateSetting(key, value) },
             onNavigateBack = { currentScreen = "home" },
             onNavigateProfile = { currentScreen = "profile_screen" }
           )
@@ -399,6 +406,7 @@ fun SubstrateApp(
                   IconButton(onClick = {
                     showEmojiPicker = false
                     replyingToMessage = null
+                    editingMessage = null
                     currentScreen = "home"
                   }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = WhatsAppTextPrimary)
@@ -469,6 +477,11 @@ fun SubstrateApp(
                         canDelete = userState.isAdmin || message.isLocalUser,
                         onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                         onReply = { msg -> replyingToMessage = msg },
+                        onEdit = { msg -> 
+                          editingMessage = msg
+                          chatInputText = msg.content
+                          keyboardController?.show()
+                        },
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
                         modifier = Modifier.animateItem()
@@ -572,28 +585,38 @@ fun SubstrateApp(
                     text = chatInputText,
                     onTextChanged = { chatInputText = it },
                     onSendMessage = { content, coords, img, aud, dur, fileUrl, fileName, isSticker, reply ->
-                      viewModel.sendMessage(
-                        content = content,
-                        coordinates = coords,
-                        imageUrl = img,
-                        audioUrl = aud,
-                        audioDurationSeconds = dur,
-                        fileUrl = fileUrl,
-                        fileName = fileName,
-                        isSticker = isSticker,
-                        replyTo = reply
-                      )
-                      chatInputText = ""
-                      replyingToMessage = null
+                      if (editingMessage != null) {
+                         viewModel.editMessage(editingMessage!!.id, content)
+                         editingMessage = null
+                         chatInputText = ""
+                      } else {
+                        viewModel.sendMessage(
+                          content = content,
+                          coordinates = coords,
+                          imageUrl = img,
+                          audioUrl = aud,
+                          audioDurationSeconds = dur,
+                          fileUrl = fileUrl,
+                          fileName = fileName,
+                          isSticker = isSticker,
+                          replyTo = reply
+                        )
+                        chatInputText = ""
+                        replyingToMessage = null
 
-                      scope.launch {
-                        delay(60L)
-                        val targetIndex = (messages.size + 1).coerceAtLeast(0)
-                        listState.animateScrollToItem(targetIndex)
+                        scope.launch {
+                          delay(60L)
+                          listState.animateScrollToItem((messages.size + 1).coerceAtLeast(0))
+                        }
                       }
                     },
                     replyingTo = replyingToMessage,
                     onCancelReply = { replyingToMessage = null },
+                    editingMessage = editingMessage,
+                    onCancelEdit = {
+                      editingMessage = null
+                      chatInputText = ""
+                    },
                     isEmojiPickerVisible = showEmojiPicker,
                     onToggleEmojiPicker = {
                       showEmojiPicker = !showEmojiPicker
@@ -851,7 +874,8 @@ fun SubstrateApp(
         FloatingBottomNavBar(
           currentScreen = currentScreen,
           onNavigate = { currentScreen = it },
-          userInitial = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?"
+          userInitial = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?",
+          modifier = Modifier.navigationBarsPadding().padding(bottom = 16.dp)
         )
       }
     }
@@ -958,8 +982,7 @@ fun SubstrateApp(
         if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) "Unmute notifications" else "Mute notifications", if (isMuted) "Turn sound back on" else "Silence alerts for this chat", isSelected = isMuted) else null,
         if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) "Remove from Favourites" else "Add to Favourites", if (isFav) "Remove star" else "Keep in Favourites filter", isSelected = isFav) else null,
         if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock" else "Stop receiving messages", isSelected = isBlocked) else null,
-        SheetOption("profile", "Account Profile", "Gamertag: ${userState.gamertag.ifBlank { "Not set" }}", isSelected = false),
-        SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = true),
+        SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = false),
         SheetOption("agora", "Voice Engine Settings", "App ID: ${agoraSettings.appId.take(8)}...", isSelected = false),
         if (userState.isAdmin) SheetOption("admin", "Admin Control Console", "Manage channels and player roles", isSelected = false) else null
       ).filterNotNull(),
@@ -969,7 +992,6 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
-          "profile" -> currentScreen = "profile_screen"
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "agora" -> viewModel.setAgoraDialogVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
