@@ -31,6 +31,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   val messages = chatRepository.messagesFlow
   val mutedChannels = chatRepository.mutedChannels
   val blockedUsers = chatRepository.blockedUsers
+  val favouriteChannels = chatRepository.favouriteChannels
 
   val activeVoiceRoom = voiceManager.voiceRoomState
   val agoraSettings = voiceManager.settings
@@ -94,6 +95,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun toggleBlockUser(gamertag: String): Boolean = chatRepository.toggleBlockUser(gamertag)
   fun isUserBlocked(gamertag: String): Boolean = chatRepository.isUserBlocked(gamertag)
+
+  fun toggleFavourite(channelId: String): Boolean = chatRepository.toggleFavourite(channelId)
+  fun isFavourite(channelId: String): Boolean = chatRepository.isFavourite(channelId)
 
   private fun listenToTyping(channelId: String) {
     typingListener?.remove()
