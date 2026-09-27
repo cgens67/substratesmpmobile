@@ -23,6 +23,7 @@ data class ChatMessage(
   val replyToSender: String? = null,
   val replyToContent: String? = null,
   val readBy: List<String> = emptyList(),
+  val deliveredTo: List<String> = emptyList(),
   val isEdited: Boolean = false
 ) {
   val isAdmin: Boolean
