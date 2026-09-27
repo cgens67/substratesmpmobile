@@ -6,7 +6,9 @@ import android.graphics.BitmapFactory
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
 import android.util.Base64
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
@@ -34,6 +36,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.CameraAlt
@@ -48,6 +51,7 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -104,9 +108,7 @@ fun processAndCompressImage(uri: Uri, context: Context): String? {
     bitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos)
     val bytes = baos.toByteArray()
     "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-  } catch (_: Exception) {
-    null
-  }
+  } catch (_: Exception) { null }
 }
 
 fun compressBitmapDirect(bitmap: Bitmap): String {
@@ -117,11 +119,20 @@ fun compressBitmapDirect(bitmap: Bitmap): String {
     val width = if (ratio > 1) maxDim else (maxDim * ratio).toInt()
     val height = if (ratio > 1) (maxDim / ratio).toInt() else maxDim
     Bitmap.createScaledBitmap(bitmap, width, height, true)
-  } else {
-    bitmap
-  }
+  } else bitmap
   scaled.compress(Bitmap.CompressFormat.JPEG, 75, baos)
   return "data:image/jpeg;base64," + Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
+}
+
+fun getFileName(context: Context, uri: Uri): String {
+  var name = "document.file"
+  context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+    if (cursor.moveToFirst()) {
+      val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+      if (idx >= 0) name = cursor.getString(idx)
+    }
+  }
+  return name
 }
 
 @Composable
@@ -129,7 +140,7 @@ fun ChatInputBar(
   channelName: String,
   text: String,
   onTextChanged: (String) -> Unit,
-  onSendMessage: (content: String, coordinates: String?, imageUrl: String?, audioUrl: String?, audioDuration: Int, isSticker: Boolean, replyTo: ChatMessage?) -> Unit,
+  onSendMessage: (content: String, coordinates: String?, imageUrl: String?, audioUrl: String?, audioDuration: Int, fileUrl: String?, fileName: String?, isSticker: Boolean, replyTo: ChatMessage?) -> Unit,
   replyingTo: ChatMessage? = null,
   onCancelReply: () -> Unit = {},
   isEmojiPickerVisible: Boolean,
@@ -147,23 +158,34 @@ fun ChatInputBar(
   var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
   var recordedAudioFile by remember { mutableStateOf<File?>(null) }
 
-  val galleryLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.GetContent()
-  ) { uri: Uri? ->
+  val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
       val base64Img = processAndCompressImage(uri, context)
-      if (base64Img != null) {
-        onSendMessage("", null, base64Img, null, 0, false, replyingTo)
-      }
+      if (base64Img != null) onSendMessage("", null, base64Img, null, 0, null, null, false, replyingTo)
     }
   }
 
-  val cameraLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.TakePicturePreview()
-  ) { bitmap: Bitmap? ->
+  val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
     if (bitmap != null) {
       val base64Img = compressBitmapDirect(bitmap)
-      onSendMessage("", null, base64Img, null, 0, false, replyingTo)
+      onSendMessage("", null, base64Img, null, 0, null, null, false, replyingTo)
+    }
+  }
+
+  val fileLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    if (uri != null) {
+      try {
+        context.contentResolver.openInputStream(uri)?.use { stream ->
+          if (stream.available() > 800 * 1024) {
+            Toast.makeText(context, "File too large (Max 800KB)", Toast.LENGTH_SHORT).show()
+          } else {
+            val bytes = stream.readBytes()
+            val fileName = getFileName(context, uri)
+            val base64File = "data:application/octet-stream;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
+            onSendMessage("", null, null, null, 0, base64File, fileName, false, replyingTo)
+          }
+        }
+      } catch (_: Exception) {}
     }
   }
 
@@ -177,12 +199,8 @@ fun ChatInputBar(
     }
   }
 
-  Surface(
-    modifier = modifier.fillMaxWidth().testTag("chat_input_bar"),
-    color = Color.Transparent
-  ) {
+  Surface(modifier = modifier.fillMaxWidth().testTag("chat_input_bar"), color = Color.Transparent) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
-      // Smooth Animation when opening or closing "Replying to..."
       AnimatedVisibility(
         visible = replyingTo != null,
         enter = slideInVertically(animationSpec = tween(220)) { it } + expandVertically(animationSpec = tween(220)) + fadeIn(),
@@ -194,16 +212,13 @@ fun ChatInputBar(
             color = Color(0xFFF0F2F5),
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
-            Row(
-              modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
               Box(modifier = Modifier.width(3.dp).height(32.dp).background(WhatsAppGreenDark, RoundedCornerShape(2.dp)))
               Spacer(modifier = Modifier.width(8.dp))
               Column(modifier = Modifier.weight(1f)) {
                 Text("Replying to ${replyTarget.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
                 Text(
-                  replyTarget.content.ifBlank { if (replyTarget.isSticker) "💟 Sticker" else if (replyTarget.imageUrl != null) "📷 Photo" else "🎤 Voice note" },
+                  replyTarget.content.ifBlank { if (replyTarget.isSticker) "💟 Sticker" else if (replyTarget.imageUrl != null) "📷 Photo" else if (replyTarget.fileUrl != null) "📄 Document" else "🎤 Voice note" },
                   color = WhatsAppTextSecondary,
                   fontSize = 11.5.sp,
                   maxLines = 1
@@ -224,7 +239,7 @@ fun ChatInputBar(
           OutlinedTextField(
             value = coordText,
             onValueChange = { coordText = it },
-            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64, Z: 540)", style = CoordinateTextStyle, color = WhatsAppTextSecondary) },
+            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64)", style = CoordinateTextStyle, color = WhatsAppTextSecondary) },
             textStyle = CoordinateTextStyle,
             modifier = Modifier.weight(1f).height(46.dp),
             singleLine = true,
@@ -244,40 +259,33 @@ fun ChatInputBar(
           modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
         ) {
           Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceAround) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-              showAttachmentMenu = false
-              galleryLauncher.launch("image/*")
-            }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; fileLauncher.launch("*/*") }) {
+              Surface(shape = CircleShape, color = Color(0xFF7E57C2), modifier = Modifier.size(46.dp)) {
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Document", tint = Color.White) }
+              }
+              Spacer(modifier = Modifier.height(4.dp))
+              Text("Document", fontSize = 12.sp, color = WhatsAppTextPrimary)
+            }
+
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE91E63), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(Icons.Default.Image, contentDescription = "Gallery", tint = Color.White)
-                }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Image, contentDescription = "Gallery", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text("Gallery", fontSize = 12.sp, color = WhatsAppTextPrimary)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-              showAttachmentMenu = false
-              cameraLauncher.launch(null)
-            }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
               Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White)
-                }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text("Camera", fontSize = 12.sp, color = WhatsAppTextPrimary)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable {
-              showAttachmentMenu = false
-              showCoordinateInput = true
-            }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
               Surface(shape = CircleShape, color = Color(0xFF2196F3), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) {
-                  Icon(Icons.Default.Place, contentDescription = "Coordinates", tint = Color.White)
-                }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Place, contentDescription = "Location", tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
               Text("Location", fontSize = 12.sp, color = WhatsAppTextPrimary)
@@ -287,84 +295,43 @@ fun ChatInputBar(
       }
 
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-          modifier = Modifier.weight(1f),
-          shape = RoundedCornerShape(26.dp),
-          color = Color.White,
-          shadowElevation = 1.dp
-        ) {
+        Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = Color.White, shadowElevation = 1.dp) {
           if (isRecording) {
-            Row(
-              modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-              verticalAlignment = Alignment.CenterVertically,
-              horizontalArrangement = Arrangement.SpaceBetween
-            ) {
+            Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(StatusCallEndRed))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("HD Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
               }
-              Text(
-                "Cancel",
-                color = WhatsAppTextSecondary,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.clickable {
-                  try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
-                  recorder = null
-                  isRecording = false
-                  recordedAudioFile?.delete()
-                }
-              )
+              Text("Cancel", color = WhatsAppTextSecondary, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+                try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
+                recorder = null; isRecording = false; recordedAudioFile?.delete()
+              })
             }
           } else {
-            Row(
-              modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
-              verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
               IconButton(onClick = onToggleEmojiPicker, modifier = Modifier.size(34.dp)) {
-                Icon(
-                  imageVector = if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied,
-                  contentDescription = "Emoji",
-                  tint = if (isEmojiPickerVisible) WhatsAppGreenDark else WhatsAppTextSecondary,
-                  modifier = Modifier.size(24.dp)
-                )
+                Icon(if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied, contentDescription = "Emoji", tint = if (isEmojiPickerVisible) WhatsAppGreenDark else WhatsAppTextSecondary, modifier = Modifier.size(24.dp))
               }
-
               OutlinedTextField(
                 value = text,
                 onValueChange = onTextChanged,
-                modifier = Modifier
-                  .weight(1f)
-                  .onFocusChanged { if (it.isFocused) onTextFieldFocused() }
-                  .testTag("chat_text_input"),
+                modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) onTextFieldFocused() }.testTag("chat_text_input"),
                 placeholder = { Text("Message", color = WhatsAppTextSecondary, fontSize = 15.sp) },
-                colors = OutlinedTextFieldDefaults.colors(
-                  focusedContainerColor = Color.Transparent,
-                  unfocusedContainerColor = Color.Transparent,
-                  focusedBorderColor = Color.Transparent,
-                  unfocusedBorderColor = Color.Transparent,
-                  focusedTextColor = WhatsAppTextPrimary,
-                  unfocusedTextColor = WhatsAppTextPrimary
-                ),
+                colors = OutlinedTextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent),
                 keyboardOptions = KeyboardOptions.Default.copy(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                  onSend = {
-                    if (text.isNotBlank() || coordText.isNotBlank()) {
-                      val coords = if (coordText.isNotBlank()) coordText.trim() else null
-                      onSendMessage(text.trim(), coords, null, null, 0, false, replyingTo)
-                      coordText = ""
-                      showCoordinateInput = false
-                    }
+                keyboardActions = KeyboardActions(onSend = {
+                  if (text.isNotBlank() || coordText.isNotBlank()) {
+                    val coords = if (coordText.isNotBlank()) coordText.trim() else null
+                    onSendMessage(text.trim(), coords, null, null, 0, null, null, false, replyingTo)
+                    coordText = ""; showCoordinateInput = false
                   }
-                ),
+                }),
                 maxLines = 4
               )
-
               IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }, modifier = Modifier.size(34.dp)) {
                 Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = WhatsAppTextSecondary, modifier = Modifier.size(22.dp))
               }
-
               IconButton(onClick = { cameraLauncher.launch(null) }, modifier = Modifier.size(34.dp)) {
                 Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = WhatsAppTextSecondary, modifier = Modifier.size(22.dp))
               }
@@ -373,40 +340,31 @@ fun ChatInputBar(
         }
 
         Spacer(modifier = Modifier.width(6.dp))
-
         val canSend = text.isNotBlank() || coordText.isNotBlank()
 
         FloatingActionButton(
           onClick = {
             if (isRecording) {
               try {
-                recorder?.stop()
-                recorder?.release()
-                recorder = null
-                isRecording = false
+                recorder?.stop(); recorder?.release(); recorder = null; isRecording = false
                 val file = recordedAudioFile
                 if (file != null && file.exists()) {
                   val bytes = file.readBytes()
                   val base64Aud = "data:audio/mp4;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP)
-                  onSendMessage("", null, null, base64Aud, recordingSeconds, false, replyingTo)
+                  onSendMessage("", null, null, base64Aud, recordingSeconds, null, null, false, replyingTo)
                   file.delete()
                 }
               } catch (_: Exception) {}
             } else if (canSend) {
               val coords = if (coordText.isNotBlank()) coordText.trim() else null
-              onSendMessage(text.trim(), coords, null, null, 0, false, replyingTo)
-              coordText = ""
-              showCoordinateInput = false
+              onSendMessage(text.trim(), coords, null, null, 0, null, null, false, replyingTo)
+              coordText = ""; showCoordinateInput = false
             } else {
               try {
                 val tempAudio = File(context.cacheDir, "rec_${System.currentTimeMillis()}.m4a")
                 recordedAudioFile = tempAudio
-                recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                  MediaRecorder(context)
-                } else {
-                  @Suppress("DEPRECATION")
-                  MediaRecorder()
-                }.apply {
+                recorder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) MediaRecorder(context) else @Suppress("DEPRECATION") MediaRecorder()
+                recorder?.apply {
                   setAudioSource(MediaRecorder.AudioSource.MIC)
                   setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                   setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
@@ -417,9 +375,7 @@ fun ChatInputBar(
                   start()
                 }
                 isRecording = true
-              } catch (_: Exception) {
-                isRecording = false
-              }
+              } catch (_: Exception) { isRecording = false }
             }
           },
           modifier = Modifier.size(48.dp).testTag("chat_send_button"),
@@ -428,11 +384,7 @@ fun ChatInputBar(
           contentColor = Color.White,
           elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 2.dp)
         ) {
-          Icon(
-            imageVector = if (isRecording) Icons.Default.Stop else if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
-            contentDescription = "Send",
-            modifier = Modifier.size(22.dp)
-          )
+          Icon(if (isRecording) Icons.Default.Stop else if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic, contentDescription = "Send", modifier = Modifier.size(22.dp))
         }
       }
     }
