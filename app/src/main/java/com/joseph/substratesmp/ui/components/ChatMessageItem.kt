@@ -1,10 +1,14 @@
 package com.joseph.substratesmp.ui.components
 
+import android.graphics.BitmapFactory
 import android.media.MediaPlayer
+import android.util.Base64
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,11 +28,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Reply
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -36,10 +44,10 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -48,6 +56,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -57,7 +66,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
@@ -76,6 +84,8 @@ import kotlin.math.roundToInt
 @Composable
 fun ChatMessageItem(
   message: ChatMessage,
+  canDelete: Boolean = false,
+  onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
@@ -85,7 +95,8 @@ fun ChatMessageItem(
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
 
-  // Voice playback state
+  var showDeleteDialog by remember { mutableStateOf(false) }
+
   var isPlayingAudio by remember { mutableStateOf(false) }
   var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
 
@@ -96,7 +107,21 @@ fun ChatMessageItem(
     }
   }
 
-  // Swipe-to-Reply Drag State
+  // Decodes Base64 data directly into Compose ImageBitmap so photos load instantaneously without Coil errors
+  val imageBitmap = remember(message.imageUrl) {
+    try {
+      if (!message.imageUrl.isNullOrBlank()) {
+        val raw = message.imageUrl.substringAfter("base64,")
+        val bytes = Base64.decode(raw, Base64.NO_WRAP)
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+      } else {
+        null
+      }
+    } catch (_: Exception) {
+      null
+    }
+  }
+
   val offsetX = remember { Animatable(0f) }
 
   val bubbleShape = if (isLocal) {
@@ -110,7 +135,6 @@ fun ChatMessageItem(
       .fillMaxWidth()
       .padding(horizontal = 10.dp, vertical = 2.dp)
   ) {
-    // Reveal reply icon on drag
     if (offsetX.value > 15f) {
       Box(
         modifier = Modifier
@@ -155,33 +179,55 @@ fun ChatMessageItem(
           containerColor = if (isLocal) WhatsAppOutgoingBubble else WhatsAppIncomingBubble
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-        modifier = Modifier.widthIn(min = 90.dp, max = 320.dp)
+        modifier = Modifier
+          .widthIn(min = 90.dp, max = 320.dp)
+          .combinedClickable(
+            onClick = {},
+            onLongClick = {
+              if (canDelete) {
+                showDeleteDialog = true
+              }
+            }
+          )
       ) {
         Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)) {
-          // Sender Header for incoming messages
-          if (!isLocal) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
-              Text(
-                text = message.senderName,
-                style = MaterialTheme.typography.labelMedium,
-                color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
-                fontWeight = FontWeight.Bold,
-                fontSize = 12.5.sp
-              )
-              if (isSenderAdmin) {
-                Spacer(modifier = Modifier.width(4.dp))
-                Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGoldContainer) {
-                  Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(9.dp))
-                    Spacer(modifier = Modifier.width(2.dp))
-                    Text("ADMIN", color = RoleAdminGold, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            if (!isLocal) {
+              Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 2.dp)) {
+                Text(
+                  text = message.senderName,
+                  style = MaterialTheme.typography.labelMedium,
+                  color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 12.5.sp
+                )
+                if (isSenderAdmin) {
+                  Spacer(modifier = Modifier.width(4.dp))
+                  Surface(shape = RoundedCornerShape(4.dp), color = RoleAdminGoldContainer) {
+                    Row(modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
+                      Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(9.dp))
+                      Spacer(modifier = Modifier.width(2.dp))
+                      Text("ADMIN", color = RoleAdminGold, fontSize = 8.sp, fontWeight = FontWeight.ExtraBold)
+                    }
                   }
                 }
+              }
+            } else {
+              Spacer(modifier = Modifier.width(1.dp))
+            }
+
+            // Delete button for Admins or author
+            if (canDelete) {
+              IconButton(onClick = { showDeleteDialog = true }, modifier = Modifier.size(20.dp)) {
+                Icon(Icons.Default.Delete, contentDescription = "Delete Message", tint = Color.Gray.copy(alpha = 0.6f), modifier = Modifier.size(14.dp))
               }
             }
           }
 
-          // Quoted Reply preview inside message
           if (!message.replyToSender.isNullOrBlank()) {
             Surface(
               shape = RoundedCornerShape(6.dp),
@@ -199,10 +245,9 @@ fun ChatMessageItem(
             }
           }
 
-          // Attached Photo View
-          if (!message.imageUrl.isNullOrBlank()) {
-            AsyncImage(
-              model = message.imageUrl,
+          if (imageBitmap != null) {
+            Image(
+              bitmap = imageBitmap,
               contentDescription = "Attached Photo",
               modifier = Modifier
                 .fillMaxWidth()
@@ -213,7 +258,6 @@ fun ChatMessageItem(
             )
           }
 
-          // Voice Note Player View
           if (!message.audioUrl.isNullOrBlank()) {
             Surface(
               shape = RoundedCornerShape(8.dp),
@@ -232,9 +276,9 @@ fun ChatMessageItem(
                     } else {
                       try {
                         if (mediaPlayer == null) {
-                          val rawBytes = android.util.Base64.decode(
+                          val rawBytes = Base64.decode(
                             message.audioUrl.substringAfter("base64,"),
-                            android.util.Base64.NO_WRAP
+                            Base64.NO_WRAP
                           )
                           val tempFile = File(context.cacheDir, "audio_${message.id}.m4a")
                           FileOutputStream(tempFile).use { it.write(rawBytes) }
@@ -262,14 +306,13 @@ fun ChatMessageItem(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
-                  Text("Voice message", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary)
+                  Text("Voice message (HD)", fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = WhatsAppTextPrimary)
                   Text("${message.audioDurationSeconds}s", fontSize = 10.sp, color = WhatsAppTextSecondary)
                 }
               }
             }
           }
 
-          // Message content
           if (message.content.isNotBlank()) {
             Text(
               text = message.content,
@@ -280,7 +323,6 @@ fun ChatMessageItem(
             )
           }
 
-          // Coordinates Attachment Tag
           if (!message.coordinates.isNullOrBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
             Surface(
@@ -298,7 +340,6 @@ fun ChatMessageItem(
             }
           }
 
-          // Timestamp & Delivery Checkmarks
           Row(
             modifier = Modifier.align(Alignment.End).padding(top = 1.dp),
             verticalAlignment = Alignment.CenterVertically
@@ -312,5 +353,30 @@ fun ChatMessageItem(
         }
       }
     }
+  }
+
+  // Admin / Author Delete Confirmation Dialog
+  if (showDeleteDialog) {
+    AlertDialog(
+      onDismissRequest = { showDeleteDialog = false },
+      title = { Text("Delete message?") },
+      text = { Text("Are you sure you want to remove this message for everyone in #${message.channelId}?") },
+      confirmButton = {
+        Button(
+          onClick = {
+            onDeleteMessage(message)
+            showDeleteDialog = false
+          },
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA0038))
+        ) {
+          Text("Delete")
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showDeleteDialog = false }) {
+          Text("Cancel")
+        }
+      }
+    )
   }
 }
