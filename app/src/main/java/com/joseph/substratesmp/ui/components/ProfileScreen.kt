@@ -8,8 +8,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,15 +56,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.repository.AuthUserState
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import java.text.SimpleDateFormat
@@ -108,7 +107,7 @@ fun ProfileScreen(
       verticalAlignment = Alignment.CenterVertically
     ) {
       if (isLoggedIn) {
-        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = textColor)
+        Icon(Icons.Default.MoreVert, contentDescription = null, tint = textColor)
       }
     }
 
@@ -127,13 +126,13 @@ fun ProfileScreen(
     Spacer(modifier = Modifier.height(12.dp))
 
     Text(
-      text = if (isLoggedIn) userState.gamertag else "Guest Profile",
+      text = if (isLoggedIn) userState.gamertag else stringResource(R.string.profile_guest),
       fontSize = 22.sp,
       fontWeight = FontWeight.Medium,
       color = textColor
     )
     Text(
-      text = if (isLoggedIn) "online" else "offline",
+      text = if (isLoggedIn) stringResource(R.string.profile_online) else stringResource(R.string.profile_offline),
       fontSize = 14.sp,
       color = subTextColor
     )
@@ -145,9 +144,9 @@ fun ProfileScreen(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.Center
       ) {
-        ProfileActionButton(icon = Icons.Default.Edit, label = "Edit Info", surfaceColor = surfaceColor, textColor = textColor) { showEditDialog = true }
+        ProfileActionButton(icon = Icons.Default.Edit, label = stringResource(R.string.profile_edit_info), surfaceColor = surfaceColor, textColor = textColor) { showEditDialog = true }
         Spacer(modifier = Modifier.width(16.dp))
-        ProfileActionButton(icon = Icons.Default.Settings, label = "Settings", surfaceColor = surfaceColor, textColor = textColor) { onNavigateSettings() }
+        ProfileActionButton(icon = Icons.Default.Settings, label = stringResource(R.string.nav_settings), surfaceColor = surfaceColor, textColor = textColor) { onNavigateSettings() }
       }
 
       Spacer(modifier = Modifier.height(20.dp))
@@ -163,11 +162,11 @@ fun ProfileScreen(
           modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).border(1.dp, Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(24.dp))
         ) {
           Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-            ProfileInfoRow(value = userState.bio.ifBlank { "No bio added." }, label = "Bio", textColor = textColor, subTextColor = subTextColor)
+            ProfileInfoRow(value = userState.bio.ifBlank { stringResource(R.string.profile_no_bio) }, label = stringResource(R.string.profile_bio_label), textColor = textColor, subTextColor = subTextColor)
             Spacer(modifier = Modifier.height(16.dp))
-            ProfileInfoRow(value = "@${userState.gamertag}", label = "Username", textColor = textColor, subTextColor = subTextColor)
+            ProfileInfoRow(value = "@${userState.gamertag}", label = stringResource(R.string.profile_username_label), textColor = textColor, subTextColor = subTextColor)
             Spacer(modifier = Modifier.height(16.dp))
-            ProfileInfoRow(value = userState.birthday.ifBlank { "Not set" }, label = "Birthday", textColor = textColor, subTextColor = subTextColor)
+            ProfileInfoRow(value = userState.birthday.ifBlank { stringResource(R.string.profile_not_set) }, label = stringResource(R.string.profile_birthday_label), textColor = textColor, subTextColor = subTextColor)
           }
         }
       }
@@ -193,7 +192,7 @@ fun ProfileScreen(
         ) {
           Column(modifier = Modifier.fillMaxWidth().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-              text = if (isLoginMode) "Welcome back!" else "Create your account",
+              text = if (isLoginMode) stringResource(R.string.profile_welcome_back) else stringResource(R.string.profile_create_account),
               fontSize = 18.sp,
               fontWeight = FontWeight.Bold,
               color = textColor
@@ -202,7 +201,7 @@ fun ProfileScreen(
             OutlinedTextField(
               value = gamertagInput,
               onValueChange = { gamertagInput = it; errorMessage = null },
-              label = { Text("Gamertag") },
+              label = { Text(stringResource(R.string.profile_gamertag_label)) },
               singleLine = true,
               shape = RoundedCornerShape(12.dp),
               modifier = Modifier.fillMaxWidth(),
@@ -215,7 +214,7 @@ fun ProfileScreen(
             OutlinedTextField(
               value = passwordInput,
               onValueChange = { passwordInput = it; errorMessage = null },
-              label = { Text("Password") },
+              label = { Text(stringResource(R.string.profile_password_label)) },
               singleLine = true,
               visualTransformation = if (isPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
               trailingIcon = {
@@ -255,13 +254,13 @@ fun ProfileScreen(
               colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark)
             ) {
               if (isLoading) CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-              else Text(if (isLoginMode) "Log In" else "Register", fontSize = 16.sp, color = Color.White)
+              else Text(if (isLoginMode) stringResource(R.string.profile_login) else stringResource(R.string.profile_register), fontSize = 16.sp, color = Color.White)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-              text = if (isLoginMode) "Don't have an account? Register" else "Already have an account? Log In",
+              text = if (isLoginMode) stringResource(R.string.profile_prompt_register) else stringResource(R.string.profile_prompt_login),
               color = Color(0xFF00A3FF),
               fontSize = 14.sp,
               fontWeight = FontWeight.Medium,
@@ -284,26 +283,26 @@ fun ProfileScreen(
       containerColor = surfaceColor,
       titleContentColor = textColor,
       textContentColor = textColor,
-      title = { Text("Edit Profile Info", fontWeight = FontWeight.Bold) },
+      title = { Text(stringResource(R.string.profile_edit_info), fontWeight = FontWeight.Bold) },
       text = {
         Column {
           OutlinedTextField(
             value = editBio,
             onValueChange = { editBio = it },
-            label = { Text("Bio") },
+            label = { Text(stringResource(R.string.profile_bio_label)) },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = textColor, unfocusedTextColor = textColor)
           )
           Spacer(modifier = Modifier.height(12.dp))
           
           OutlinedTextField(
-            value = editBirthday.ifBlank { "Select date" },
+            value = editBirthday.ifBlank { stringResource(R.string.profile_select_date) },
             onValueChange = {},
             readOnly = true,
-            label = { Text("Birthday") },
+            label = { Text(stringResource(R.string.profile_birthday_label)) },
             trailingIcon = {
               IconButton(onClick = { showDatePicker = true }) {
-                Icon(Icons.Default.CalendarMonth, contentDescription = "Pick Birthday", tint = WhatsAppGreenDark)
+                Icon(Icons.Default.CalendarMonth, contentDescription = null, tint = WhatsAppGreenDark)
               }
             },
             modifier = Modifier
@@ -324,10 +323,10 @@ fun ProfileScreen(
             onUpdateProfile(editBio, editBirthday)
             showEditDialog = false
           }
-        ) { Text("Save", color = Color.White) }
+        ) { Text(stringResource(R.string.action_save), color = Color.White) }
       },
       dismissButton = {
-        TextButton(onClick = { showEditDialog = false }) { Text("Cancel", color = subTextColor) }
+        TextButton(onClick = { showEditDialog = false }) { Text(stringResource(R.string.action_cancel), color = subTextColor) }
       }
     )
 
@@ -347,12 +346,12 @@ fun ProfileScreen(
             }
             showDatePicker = false
           }) {
-            Text("OK", color = WhatsAppGreenDark, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.action_ok), color = WhatsAppGreenDark, fontWeight = FontWeight.Bold)
           }
         },
         dismissButton = {
           TextButton(onClick = { showDatePicker = false }) {
-            Text("Cancel", color = subTextColor)
+            Text(stringResource(R.string.action_cancel), color = subTextColor)
           }
         },
         colors = DatePickerDefaults.colors(containerColor = surfaceColor)
@@ -382,19 +381,17 @@ fun ProfileScreen(
 
 @Composable
 fun ProfileActionButton(icon: ImageVector, label: String, surfaceColor: Color, textColor: Color, onClick: () -> Unit) {
-  val interactionSource = remember { MutableInteractionSource() }
-  val isPressed by interactionSource.collectIsPressedAsState()
-  val scale = if (isPressed) 0.95f else 1f
+  val pillShape = RoundedCornerShape(16.dp)
 
   Surface(
-    shape = RoundedCornerShape(16.dp),
+    shape = pillShape,
     color = surfaceColor,
     shadowElevation = 2.dp,
+    onClick = onClick,
     modifier = Modifier
       .width(110.dp)
       .height(70.dp)
-      .scale(scale)
-      .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+      .clip(pillShape)
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
