@@ -25,7 +25,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -143,9 +142,9 @@ fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label
   Surface(
     shape = itemShape,
     color = bgColor,
-    onClick = onClick, // Binds ripple strictly to itemShape
+    onClick = onClick,
     modifier = Modifier
-      .clip(itemShape) // Eliminates rectangular touch ripples
+      .clip(itemShape)
       .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
   ) {
     Row(
@@ -747,6 +746,7 @@ fun SubstrateApp(
                     channelName = activeChannel.name,
                     text = chatInputText,
                     isDarkMode = isDarkMode,
+                    isDm = activeChannel.isDm,
                     members = members,
                     onTextChanged = { chatInputText = it },
                     onSendMessage = { content, coords, img, aud, dur, fileUrl, fileName, isSticker, reply ->
