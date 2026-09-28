@@ -35,11 +35,13 @@ fun InstagramNoteComposerDialog(
     musicName: String?,
     musicArtist: String?,
     musicPreview: String?,
-    musicArtwork: String?
+    musicArtwork: String?,
+    musicStartMs: Int
   ) -> Unit
 ) {
   var thoughtText by remember { mutableStateOf("") }
   var selectedTrack by remember { mutableStateOf<MusicTrack?>(null) }
+  var selectedStartOffsetMs by remember { mutableIntStateOf(0) }
   var showMusicPicker by remember { mutableStateOf(false) }
 
   val maxChars = 60
@@ -91,7 +93,8 @@ fun InstagramNoteComposerDialog(
                   selectedTrack?.title,
                   selectedTrack?.artist,
                   selectedTrack?.previewUrl,
-                  selectedTrack?.artworkUrl
+                  selectedTrack?.artworkUrl,
+                  selectedStartOffsetMs
                 )
                 onDismiss()
               }
@@ -164,14 +167,14 @@ fun InstagramNoteComposerDialog(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                  text = "${selectedTrack!!.title} • 30s",
-                  fontSize = 11.5.sp,
+                  text = "${selectedTrack!!.title} • starts at ${selectedStartOffsetMs / 1000}s",
+                  fontSize = 11.sp,
                   fontWeight = FontWeight.SemiBold,
                   color = blueAccent,
                   maxLines = 1
                 )
                 Spacer(modifier = Modifier.width(4.dp))
-                IconButton(onClick = { selectedTrack = null }, modifier = Modifier.size(18.dp)) {
+                IconButton(onClick = { selectedTrack = null; selectedStartOffsetMs = 0 }, modifier = Modifier.size(18.dp)) {
                   Icon(Icons.Default.Close, contentDescription = null, tint = subTextColor, modifier = Modifier.size(12.dp))
                 }
               }
@@ -224,7 +227,7 @@ fun InstagramNoteComposerDialog(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Add Music Action Button (30s Audio Clip)
+        // Add Music Action Button
         Surface(
           shape = RoundedCornerShape(16.dp),
           color = if (isDarkMode) Color(0xFF2C2F36) else Color(0xFFF2F4F7),
@@ -256,7 +259,7 @@ fun InstagramNoteComposerDialog(
                 maxLines = 1
               )
               Text(
-                text = if (selectedTrack != null) selectedTrack!!.artist else "Pick soundtrack or hits",
+                text = if (selectedTrack != null) "${selectedTrack!!.artist} (Starts at ${selectedStartOffsetMs / 1000}s)" else "Search hits, Minecraft OST & choose section",
                 fontSize = 12.sp,
                 color = subTextColor,
                 maxLines = 1
@@ -270,9 +273,11 @@ fun InstagramNoteComposerDialog(
 
   if (showMusicPicker) {
     StatusMusicSelectorSheet(
+      isDarkMode = isDarkMode,
       onDismiss = { showMusicPicker = false },
-      onSelectTrack = { track ->
+      onSelectTrack = { track, startOffsetMs ->
         selectedTrack = track
+        selectedStartOffsetMs = startOffsetMs
         showMusicPicker = false
       }
     )
