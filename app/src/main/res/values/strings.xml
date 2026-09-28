@@ -134,4 +134,32 @@
     <string name="edit_channel_info_title">Edit Channel Info</string>
     <string name="channel_name_label">Channel Name</string>
     <string name="channel_desc_label">Description</string>
+
+    <!-- Dropdown Menu -->
+    <string name="menu_mute_notifications">Mute notifications</string>
+    <string name="menu_unmute_notifications">Unmute notifications</string>
+    <string name="menu_mute_sub">Silence alerts for this chat</string>
+    <string name="menu_unmute_sub">Turn sound back on</string>
+    <string name="menu_add_favourites">Add to Favourites</string>
+    <string name="menu_remove_favourites">Remove from Favourites</string>
+    <string name="menu_add_fav_sub">Keep at top of Favourites filter</string>
+    <string name="menu_remove_fav_sub">Remove star</string>
+    <string name="menu_block_user">Block %1$s</string>
+    <string name="menu_unblock_user">Unblock %1$s</string>
+    <string name="menu_block_sub">Stop receiving messages</string>
+    <string name="menu_unblock_sub">Allow messages</string>
+    <string name="menu_server_ip">Bedrock Server IP</string>
+    <string name="menu_admin_console">Admin Control Console</string>
+    <string name="menu_admin_console_sub">Manage channels and player roles</string>
+    <string name="copied_server_ip">Server IP copied to clipboard</string>
+    <string name="copied_channel_name">Channel name copied</string>
+    <string name="copied_text">Text copied</string>
+    <string name="downloading_file_chunks">Downloading file chunks…</string>
+    <string name="saved_to_downloads">Saved to Downloads: %1$s</string>
+    <string name="download_failed">Download failed: %1$s</string>
+    <string name="menu_lock_admin">Lock for Admins only</string>
+    <string name="menu_unlock_all">Unlock for all members</string>
+    <string name="lang_english">English</string>
+    <string name="lang_chinese">Chinese</string>
+    <string name="lang_malay">Malay</string>
 </resources>
