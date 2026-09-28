@@ -85,7 +85,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -203,10 +205,11 @@ fun MessageBodyText(
     ClickableText(
       text = annotatedString,
       modifier = modifier,
-      style = MaterialTheme.typography.bodyMedium.copy(
+      style = TextStyle(
         color = textColor,
         lineHeight = 18.sp,
-        fontSize = 14.5.sp
+        fontSize = 14.5.sp,
+        platformStyle = PlatformTextStyle(includeFontPadding = false)
       ),
       onClick = { offset ->
         annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -230,8 +233,11 @@ fun MessageBodyText(
     Text(
       text = text,
       color = textColor,
-      lineHeight = 18.sp,
-      fontSize = 14.5.sp,
+      style = TextStyle(
+        fontSize = 14.5.sp,
+        lineHeight = 18.sp,
+        platformStyle = PlatformTextStyle(includeFontPadding = false)
+      ),
       modifier = modifier
     )
   }
@@ -546,10 +552,13 @@ fun ChatMessageItem(
 
   val offsetX = remember { Animatable(0f) }
 
-  // Clean, symmetrical modern rounded corners (prevents lopsided crushed-corner artifact)
-  val bubbleShape = RoundedCornerShape(16.dp)
+  val bubbleShape = if (isLocal) {
+    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
+  } else {
+    RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp)
+  }
 
-  // Detect if message is a short single-line string to format inline with centered alignment
+  // Detect short single-line messages to display content and timestamp side-by-side with matched baselines
   val isShortSingleLine = remember(message, translatedText, isLocationRequest) {
     !isLocationRequest &&
       translatedText == null &&
@@ -559,7 +568,7 @@ fun ChatMessageItem(
       message.audioUrl == null &&
       message.fileUrl == null &&
       !message.isSticker &&
-      message.content.length <= 24 &&
+      message.content.length <= 18 &&
       !message.content.contains('\n')
   }
 
@@ -653,7 +662,15 @@ fun ChatMessageItem(
               contentScale = ContentScale.Fit
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(message.formattedTime, fontSize = 9.5.sp, color = timeAndTickColor)
+              Text(
+                text = message.formattedTime, 
+                fontSize = 10.sp, 
+                style = TextStyle(
+                  platformStyle = PlatformTextStyle(includeFontPadding = false),
+                  lineHeight = 11.sp
+                ),
+                color = timeAndTickColor
+              )
               if (isLocal) {
                 Spacer(modifier = Modifier.width(3.dp))
                 val tickIcon = when {
@@ -684,10 +701,10 @@ fun ChatMessageItem(
               )
           ) {
             if (isShortSingleLine) {
-              // Compact single-line row: Center-aligned baseline with comfortable end padding
+              // Compact inline layout: text and timestamp sit level at the bottom
               Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 6.dp)
+                verticalAlignment = Alignment.Bottom,
+                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
               ) {
                 MessageBodyText(
                   text = message.content,
@@ -696,25 +713,34 @@ fun ChatMessageItem(
                   isDarkMode = isDarkMode,
                   onUserClick = onUserClick
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(7.dp))
                 Row(
-                  verticalAlignment = Alignment.CenterVertically
+                  verticalAlignment = Alignment.CenterVertically,
+                  modifier = Modifier.padding(bottom = 0.5.dp)
                 ) {
                   if (message.isEdited) {
                     Text(
                       text = stringResource(R.string.label_edited), 
-                      fontSize = 9.5.sp, 
+                      fontSize = 9.sp, 
+                      style = TextStyle(
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                        lineHeight = 10.sp
+                      ),
                       color = timeAndTickColor, 
-                      modifier = Modifier.padding(end = 3.dp)
+                      modifier = Modifier.padding(end = 2.dp)
                     )
                   }
                   Text(
                     text = message.formattedTime, 
                     color = timeAndTickColor, 
-                    fontSize = 11.sp
+                    fontSize = 10.sp,
+                    style = TextStyle(
+                      platformStyle = PlatformTextStyle(includeFontPadding = false),
+                      lineHeight = 11.sp
+                    )
                   )
                   if (isLocal) {
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
                     val tickIcon = when {
                       isRead -> Icons.Default.DoneAll
                       isDelivered -> Icons.Default.DoneAll
@@ -724,14 +750,13 @@ fun ChatMessageItem(
                       imageVector = tickIcon,
                       contentDescription = null,
                       tint = timeAndTickColor,
-                      modifier = Modifier.size(14.dp)
+                      modifier = Modifier.size(13.dp)
                     )
                   }
                 }
               }
             } else {
-              // Multi-line layout with spacious padding
-              Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)) {
+              Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
                 if (!isLocal) {
                   Row(
                     verticalAlignment = Alignment.CenterVertically, 
@@ -784,19 +809,19 @@ fun ChatMessageItem(
                       .clip(RoundedCornerShape(8.dp))
                       .clickable { onImageClick(message.imageUrl!!) }
                       .padding(bottom = 4.dp),
-                  contentScale = ContentScale.Crop
-                )
-              } else if (gifUrl != null) {
-                AsyncImage(
-                  model = gifUrl,
-                  imageLoader = imageLoader,
-                  contentDescription = stringResource(R.string.channel_gifs_tab),
-                  modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 240.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable { onImageClick(gifUrl) }
-                    .padding(bottom = 4.dp),
+                    contentScale = ContentScale.Crop
+                  )
+                } else if (gifUrl != null) {
+                  AsyncImage(
+                    model = gifUrl,
+                    imageLoader = imageLoader,
+                    contentDescription = stringResource(R.string.channel_gifs_tab),
+                    modifier = Modifier
+                      .fillMaxWidth()
+                      .heightIn(max = 240.dp)
+                      .clip(RoundedCornerShape(8.dp))
+                      .clickable { onImageClick(gifUrl) }
+                      .padding(bottom = 4.dp),
                   contentScale = ContentScale.Crop
                 )
               }
@@ -1003,12 +1028,20 @@ fun ChatMessageItem(
                       ) {
                         Text(
                           text = formatDuration(currentAudioPos),
-                          fontSize = 11.sp,
+                          fontSize = 10.5.sp,
+                          style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            lineHeight = 11.sp
+                          ),
                           color = timeAndTickColor
                         )
                         Text(
                           text = if (totalAudioDur > 0) formatDuration(totalAudioDur) else "--:--",
-                          fontSize = 11.sp,
+                          fontSize = 10.5.sp,
+                          style = TextStyle(
+                            platformStyle = PlatformTextStyle(includeFontPadding = false),
+                            lineHeight = 11.sp
+                          ),
                           color = timeAndTickColor
                         )
                       }
@@ -1061,11 +1094,33 @@ fun ChatMessageItem(
                 }
               }
 
-              Row(modifier = Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+              Row(
+                modifier = Modifier
+                  .align(Alignment.End)
+                  .padding(top = 2.dp), 
+                verticalAlignment = Alignment.CenterVertically
+              ) {
                 if (message.isEdited) {
-                  Text(stringResource(R.string.label_edited), fontSize = 9.sp, color = timeAndTickColor, modifier = Modifier.padding(end = 4.dp))
+                  Text(
+                    text = stringResource(R.string.label_edited), 
+                    fontSize = 9.sp, 
+                    style = TextStyle(
+                      platformStyle = PlatformTextStyle(includeFontPadding = false),
+                      lineHeight = 10.sp
+                    ),
+                    color = timeAndTickColor, 
+                    modifier = Modifier.padding(end = 4.dp)
+                  )
                 }
-                Text(message.formattedTime, color = timeAndTickColor, fontSize = 10.sp)
+                Text(
+                  text = message.formattedTime, 
+                  color = timeAndTickColor, 
+                  fontSize = 10.5.sp,
+                  style = TextStyle(
+                    platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    lineHeight = 11.sp
+                  )
+                )
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
                   val tickIcon = when {
@@ -1077,7 +1132,7 @@ fun ChatMessageItem(
                     imageVector = tickIcon,
                     contentDescription = null,
                     tint = timeAndTickColor,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(14.dp)
                   )
                 }
               }
