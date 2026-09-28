@@ -1,3 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Substrate SMP</string>
+    <string name="default_server_ip">mc.substratesmp.net:19132</string>
+    <string name="default_server_domain">mc.substratesmp.net</string>
+
+    <!-- General & Actions -->
+    <string name="action_cancel">Cancel</string>
+    <string name="action_save">Save</string>
+    <string name="action_done">Done</string>
+    <string name="action_ok">OK</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_search">Search</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_send">Send</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_message">Message</string>
+
+    <!-- Chat & Messaging -->
+    <string name="chat_today">Today</string>
+    <string name="chat_yesterday">Yesterday</string>
+    <string name="message_placeholder">Message</string>
+    <string name="message_options">Message Options</string>
+    <string name="action_reply">Reply</string>
+    <string name="action_translate_message">Translate Message</string>
+    <string name="action_copy_text">Copy Text</string>
+    <string name="action_delete_everyone">Delete for everyone</string>
+    <string name="translate_to_english">Translate to English</string>
+    <string name="translate_to_chinese">Translate to Chinese</string>
+    <string name="translate_to_malay">Translate to Malay</string>
+    <string name="label_translated">Translated</string>
+    <string name="label_edited">Edited</string>
+    <string name="label_voice_message_hd">Voice message (HD)</string>
+    <string name="label_audio_file">Audio file</string>
+    <string name="label_document">Document</string>
+    <string name="label_tap_to_download">Tap to download</string>
+    <string name="replying_to">Replying to %1$s</string>
+    <string name="editing_message">Editing Message</string>
+    <string name="coordinates_placeholder">Coordinates (e.g. X: -120, Y: 64, Z: 540)</string>
+    <string name="typing_indicator">%1$s is typing…</string>
+    <string name="direct_message">Direct Message</string>
+    <string name="admin_badge">ADMIN</string>
+
+    <!-- Mentions & Attachments -->
+    <string name="mention_header">Mention</string>
+    <string name="attach_document">Document</string>
+    <string name="attach_audio">Audio</string>
+    <string name="attach_gallery">Gallery</string>
+    <string name="attach_camera">Camera</string>
+    <string name="attach_location">Location</string>
+    <string name="recording_indicator">HD Recording %1$ds</string>
+
+    <!-- Navigation & Tabs -->
+    <string name="nav_chats">Chats</string>
+    <string name="nav_contacts">Contacts</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_profile">Profile</string>
+    <string name="chip_all">All</string>
+    <string name="chip_unread">Unread</string>
+    <string name="chip_favourites">Favourites</string>
+    <string name="chip_groups">Groups</string>
+
+    <!-- Channel List & Status -->
+    <string name="no_unread_chats">No unread chats</string>
+    <string name="no_favourite_chats">No favourite chats yet. Long-press any chat to star it.</string>
+    <string name="no_group_channels">No group channels found</string>
+    <string name="no_chats_found">No chats found</string>
+    <string name="blocked_user_banner">You blocked this player. Tap to unblock.</string>
+    <string name="admin_only_banner">Only server Admins can send messages in this channel.</string>
+    <string name="pm_tag">• PM</string>
+
+    <!-- Settings Screen -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_search_hint">Search settings…</string>
+    <string name="settings_account">Account</string>
+    <string name="settings_account_sub">Number, Username, Bio</string>
+    <string name="settings_appearance">Appearance</string>
+    <string name="settings_appearance_sub">Wallpaper, Dark Mode, Animations</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="settings_privacy_policy_sub">Firebase, ImgBB, Agora.io</string>
+    <string name="settings_language">Language</string>
+    <string name="settings_appearance_dialog_title">Appearance Settings</string>
+    <string name="settings_dark_mode">Dark Mode</string>
+    <string name="settings_smooth_animations">Smooth Animations</string>
+    <string name="settings_auto_translate_title">Auto-Translate Messages</string>
+    <string name="settings_auto_translate_sub">Automatically translate incoming messages to your language</string>
+    <string name="settings_select_language">Select App Language</string>
+    <string name="settings_language_dialog_title">Language &amp; Translation</string>
+
+    <!-- Profile & User Profile -->
+    <string name="profile_guest">Guest Profile</string>
+    <string name="profile_online">online</string>
+    <string name="profile_offline">offline</string>
+    <string name="profile_edit_info">Edit Info</string>
+    <string name="profile_bio_label">Bio</string>
+    <string name="profile_birthday_label">Birthday</string>
+    <string name="profile_username_label">Username</string>
+    <string name="profile_no_bio">No bio added.</string>
+    <string name="profile_not_set">Not set</string>
+    <string name="profile_select_date">Select date</string>
+    <string name="profile_role_prefix">Bedrock Role: %1$s</string>
+    <string name="profile_welcome_back">Welcome back!</string>
+    <string name="profile_create_account">Create your account</string>
+    <string name="profile_gamertag_label">Gamertag</string>
+    <string name="profile_password_label">Password</string>
+    <string name="profile_login">Log In</string>
+    <string name="profile_register">Register</string>
+    <string name="profile_prompt_register">Don\'t have an account? Register</string>
+    <string name="profile_prompt_login">Already have an account? Log In</string>
+    <string name="user_action_mute">Mute</string>
+    <string name="user_action_unmute">Unmute</string>
+    <string name="user_action_favorite">Favorite</string>
+    <string name="user_action_favorited">Favorited</string>
+    <string name="user_action_block">Block</string>
+    <string name="user_action_unblock">Unblock</string>
+
+    <!-- Channel Info Screen -->
+    <string name="channel_members_tab">Members</string>
+    <string name="channel_media_tab">Media</string>
+    <string name="channel_files_tab">Files</string>
+    <string name="channel_links_tab">Links</string>
+    <string name="channel_music_tab">Music</string>
+    <string name="channel_gifs_tab">GIFs</string>
+    <string name="channel_action_leave">Leave</string>
+    <string name="channel_add_members">Add Members</string>
+    <string name="channel_members_count">%1$d members</string>
+    <string name="no_media_yet">No media shared yet</string>
+    <string name="no_files_yet">No files shared yet</string>
+    <string name="no_links_yet">No links shared yet</string>
+    <string name="no_audio_yet">No audio shared yet</string>
+    <string name="no_gifs_yet">No stickers or GIFs shared yet</string>
+    <string name="edit_channel_info_title">Edit Channel Info</string>
+    <string name="channel_name_label">Channel Name</string>
+    <string name="channel_desc_label">Description</string>
 </resources>
