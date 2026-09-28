@@ -132,7 +132,7 @@ fun FloatingBottomNavBar(
   val surfaceColor = if (isDarkMode) Color(0xFF2E2E2E) else Color.White
   val borderColor = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFDDE0E5)
   val pillShape = RoundedCornerShape(32.dp)
-  
+
   Surface(
     shape = pillShape,
     color = surfaceColor,
@@ -245,11 +245,11 @@ fun SubstrateApp(
 
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var longPressedChannel by remember { mutableStateOf<Channel?>(null) }
-  
+
   // Instagram Note State
   var activeNoteToView by remember { mutableStateOf<StatusUpdate?>(null) }
   var showNoteComposer by remember { mutableStateOf(false) }
-  
+
   var viewedUser by remember { mutableStateOf<String?>(null) }
   var shouldForceScrollToBottom by remember { mutableStateOf(false) }
   var showInviteToCallDialog by remember { mutableStateOf(false) }
@@ -415,7 +415,7 @@ fun SubstrateApp(
       targetState = currentScreen,
       transitionSpec = {
         if (!appSettings.smoothAnimations) {
-           fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
+          fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
         } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
@@ -470,7 +470,7 @@ fun SubstrateApp(
             }
           )
         }
-        
+
         "settings_screen" -> {
           SettingsScreen(
             userState = userState,
@@ -482,14 +482,14 @@ fun SubstrateApp(
             onNavigatePrivacy = { currentScreen = "privacy_policy_screen" }
           )
         }
-        
+
         "privacy_policy_screen" -> {
           PrivacyPolicyScreen(
             isDarkMode = isDarkMode,
             onNavigateBack = { currentScreen = "settings_screen" }
           )
         }
-        
+
         "user_profile_screen" -> {
           val targetGamertag = viewedUser ?: "Unknown"
           val targetMember = members.find { it.gamertag.equals(targetGamertag, ignoreCase = true) }
@@ -534,7 +534,7 @@ fun SubstrateApp(
             onToggleBlock = { viewModel.toggleBlockUser(targetGamertag) }
           )
         }
-        
+
         "contacts" -> {
           if (userState.gamertag.isBlank()) {
             LaunchedEffect(Unit) {
@@ -597,9 +597,9 @@ fun SubstrateApp(
                     Column(modifier = Modifier.weight(1f, fill = false)) {
                       Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                          activeChannel.name, 
-                          fontWeight = FontWeight.Bold, 
-                          color = textColor, 
+                          activeChannel.name,
+                          fontWeight = FontWeight.Bold,
+                          color = textColor,
                           fontSize = 17.sp,
                           maxLines = 1,
                           overflow = TextOverflow.Ellipsis
@@ -742,7 +742,7 @@ fun SubstrateApp(
                         isDelivered = isDelivered,
                         canDelete = userState.isAdmin || message.isLocalUser,
                         isSenderDeleted = deletedGamertags.contains(message.senderName.lowercase().trim()),
-                        onUserClick = { name -> 
+                        onUserClick = { name ->
                           if (!deletedGamertags.contains(name.lowercase().trim())) {
                             viewedUser = name
                             currentScreen = "user_profile_screen"
@@ -750,7 +750,7 @@ fun SubstrateApp(
                         },
                         onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                         onReply = { msg -> replyingToMessage = msg },
-                        onEdit = { msg -> 
+                        onEdit = { msg ->
                           editingMessage = msg
                           chatInputText = msg.content
                           keyboardController?.show()
@@ -879,9 +879,9 @@ fun SubstrateApp(
                     onTextChanged = { chatInputText = it },
                     onSendMessage = { content, coords, img, aud, dur, fileUrl, fileName, isSticker, reply ->
                       if (editingMessage != null) {
-                         viewModel.editMessage(editingMessage!!.id, content)
-                         editingMessage = null
-                         chatInputText = ""
+                        viewModel.editMessage(editingMessage!!.id, content)
+                        editingMessage = null
+                        chatInputText = ""
                       } else {
                         shouldForceScrollToBottom = true
                         viewModel.sendMessage(
@@ -1029,14 +1029,14 @@ fun SubstrateApp(
                       modifier = Modifier.clip(chipShape)
                     ) {
                       Text(
-                        chip, 
+                        chip,
                         color = if (isSelected) {
                           if (isDarkMode) Color.White else WhatsAppGreenDark
                         } else {
                           subTextColor
-                        }, 
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), 
+                        },
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
                         fontSize = 13.sp
                       )
                     }
@@ -1046,7 +1046,7 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
-              // INSTAGRAM NOTES TRAY (Floating Thought Bubbles & 30s Songs)
+              // Instagram Notes Tray on top of the chats list
               InstagramNotesTray(
                 notes = statuses,
                 currentGamertag = userState.gamertag,
@@ -1223,8 +1223,8 @@ fun SubstrateApp(
                       }
                     }
                     HorizontalDivider(
-                      color = if (isDarkMode) Color(0xFF333333) else menuLightBorder, 
-                      thickness = 0.5.dp, 
+                      color = if (isDarkMode) Color(0xFF333333) else menuLightBorder,
+                      thickness = 0.5.dp,
                       modifier = Modifier.padding(start = 82.dp)
                     )
                   }
@@ -1367,14 +1367,14 @@ fun SubstrateApp(
     )
   }
 
-  // Instagram Note Composer
+  // Instagram Note Composer Dialog
   if (showNoteComposer) {
     InstagramNoteComposerDialog(
       currentGamertag = userState.gamertag,
       isDarkMode = isDarkMode,
       onDismiss = { showNoteComposer = false },
-      onShareNote = { thought, mName, mArtist, mPreview, mArtwork ->
-        viewModel.postStatus(thought, "EMERALD", "Note", null, mName, mArtist, mPreview, mArtwork)
+      onShareNote = { thought, mName, mArtist, mPreview, mArtwork, mStartMs ->
+        viewModel.postStatus(thought, "EMERALD", "Note", null, mName, mArtist, mPreview, mArtwork, mStartMs)
         showNoteComposer = false
       }
     )
