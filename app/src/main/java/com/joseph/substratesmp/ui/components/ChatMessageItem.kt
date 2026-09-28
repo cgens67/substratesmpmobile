@@ -54,10 +54,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -125,6 +125,7 @@ fun formatDuration(ms: Int): String {
 fun MessageBodyText(
   text: String,
   textColor: Color,
+  isLocal: Boolean,
   isDarkMode: Boolean,
   onUserClick: (String) -> Unit = {},
   modifier: Modifier = Modifier
@@ -134,9 +135,23 @@ fun MessageBodyText(
   val hasSpecialTokens = remember(text) { tokenRegex.containsMatchIn(text) }
 
   if (hasSpecialTokens) {
-    val linkColor = if (isDarkMode) Color(0xFF64B5F6) else Color(0xFF0277BD)
-    val mentionColor = if (isDarkMode) Color(0xFF80CBC4) else Color(0xFF00796B)
-    val mentionBg = if (isDarkMode) Color(0xFF004D40).copy(alpha = 0.45f) else Color(0xFFE0F2F1)
+    val linkColor = if (isLocal) {
+      Color.White
+    } else {
+      if (isDarkMode) Color(0xFF64B5F6) else Color(0xFF0277BD)
+    }
+
+    val mentionColor = if (isLocal) {
+      Color.White
+    } else {
+      if (isDarkMode) Color(0xFF80CBC4) else Color(0xFF00796B)
+    }
+
+    val mentionBg = if (isLocal) {
+      Color.White.copy(alpha = 0.22f)
+    } else {
+      if (isDarkMode) Color(0xFF004D40).copy(alpha = 0.45f) else Color(0xFFE0F2F1)
+    }
 
     val annotatedString = remember(text, textColor, linkColor, mentionColor, mentionBg) {
       buildAnnotatedString {
@@ -237,7 +252,7 @@ fun ChatMessageItem(
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
 
-  // EXACT CHAT BUBBLE & TEXT COLORS MATCHING SCREENSHOTS
+  // Matches chat theme colors from screenshots
   val bubbleColor = if (isLocal) {
     if (isDarkMode) ChatDarkOutgoingBubble else ChatLightOutgoingBubble
   } else {
@@ -256,7 +271,9 @@ fun ChatMessageItem(
     if (isDarkMode) ChatDarkIncomingTime else ChatLightIncomingTime
   }
 
-  val dialogBg = if (isDarkMode) Color(0xFF303030) else Color.White
+  // Consistent dialog colors independent of isLocal state
+  val dialogBg = if (isDarkMode) Color(0xFF262628) else Color.White
+  val dialogTextColor = if (isDarkMode) Color.White else Color(0xFF111B21)
 
   var isMessageVisible by remember { mutableStateOf(true) }
   var showOptionsDialog by remember { mutableStateOf(false) }
@@ -370,9 +387,15 @@ fun ChatMessageItem(
     regex.find(message.content)?.value
   }
 
+  // Suppress rendering raw text if message is strictly an image/GIF URL
+  val isSolelyUrl = remember(message.content, gifUrl, message.imageUrl) {
+    val trimmed = message.content.trim()
+    (gifUrl != null && trimmed.equals(gifUrl, ignoreCase = true)) ||
+      (!message.imageUrl.isNullOrBlank() && trimmed.equals(message.imageUrl, ignoreCase = true))
+  }
+
   val offsetX = remember { Animatable(0f) }
 
-  // Telegram signature shape: incoming points top-left, outgoing points top-right
   val bubbleShape = if (isLocal) {
     RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomEnd = 16.dp, bottomStart = 16.dp)
   } else {
@@ -561,7 +584,7 @@ fun ChatMessageItem(
                       try {
                         val fileUrl = message.fileUrl
                         val base64Data = if (fileUrl.startsWith("chunked:")) {
-                          Toast.makeText(context, "Downloading file chunks…", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(context, stringResource(R.string.downloading_file_chunks), Toast.LENGTH_SHORT).show()
                           val snapshot = FirebaseFirestore.getInstance()
                             .collection("channels")
                             .document(message.channelId)
@@ -579,9 +602,9 @@ fun ChatMessageItem(
                         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
                         val file = File(downloadsDir, message.fileName ?: "document.file")
                         FileOutputStream(file).use { it.write(bytes) }
-                        Toast.makeText(context, "Saved to Downloads: ${file.name}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.saved_to_downloads, file.name), Toast.LENGTH_LONG).show()
                       } catch (e: Exception) {
-                        Toast.makeText(context, "Download failed: ${e.message}", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, context.getString(R.string.download_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
                       }
                     }
                   }
@@ -768,10 +791,12 @@ fun ChatMessageItem(
                 }
               }
 
-              if (message.content.isNotBlank()) {
+              // Do not display raw URL string if message is purely a GIF or image link
+              if (message.content.isNotBlank() && !isSolelyUrl) {
                 MessageBodyText(
                   text = message.content,
                   textColor = textColor,
+                  isLocal = isLocal,
                   isDarkMode = isDarkMode,
                   onUserClick = onUserClick
                 )
@@ -787,6 +812,7 @@ fun ChatMessageItem(
                 MessageBodyText(
                   text = translatedText,
                   textColor = textColor,
+                  isLocal = isLocal,
                   isDarkMode = isDarkMode,
                   onUserClick = onUserClick,
                   modifier = Modifier.padding(top = 2.dp)
@@ -841,18 +867,20 @@ fun ChatMessageItem(
     if (showTranslateMenu) {
       AlertDialog(
         onDismissRequest = { showTranslateMenu = false; showOptionsDialog = false },
-        containerColor = dialogBg, titleContentColor = textColor, textContentColor = textColor,
-        title = { Text(stringResource(R.string.action_translate_message), fontWeight = FontWeight.Bold) },
+        containerColor = dialogBg, 
+        titleContentColor = dialogTextColor, 
+        textContentColor = dialogTextColor,
+        title = { Text(stringResource(R.string.action_translate_message), fontWeight = FontWeight.Bold, color = dialogTextColor) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { onTranslate(message.id, "en"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text(stringResource(R.string.translate_to_english), fontSize = 16.sp, color = textColor)
+              Text(stringResource(R.string.translate_to_english), fontSize = 16.sp, color = dialogTextColor)
             }
             TextButton(onClick = { onTranslate(message.id, "zh"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text(stringResource(R.string.translate_to_chinese), fontSize = 16.sp, color = textColor)
+              Text(stringResource(R.string.translate_to_chinese), fontSize = 16.sp, color = dialogTextColor)
             }
             TextButton(onClick = { onTranslate(message.id, "ms"); showTranslateMenu = false; showOptionsDialog = false }) {
-              Text(stringResource(R.string.translate_to_malay), fontSize = 16.sp, color = textColor)
+              Text(stringResource(R.string.translate_to_malay), fontSize = 16.sp, color = dialogTextColor)
             }
           }
         },
@@ -863,30 +891,32 @@ fun ChatMessageItem(
     } else {
       AlertDialog(
         onDismissRequest = { showOptionsDialog = false },
-        containerColor = dialogBg, titleContentColor = textColor, textContentColor = textColor,
-        title = { Text(stringResource(R.string.message_options), fontWeight = FontWeight.Bold) },
+        containerColor = dialogBg, 
+        titleContentColor = dialogTextColor, 
+        textContentColor = dialogTextColor,
+        title = { Text(stringResource(R.string.message_options), fontWeight = FontWeight.Bold, color = dialogTextColor) },
         text = {
           Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
-              Text(stringResource(R.string.action_reply), fontSize = 16.sp, color = textColor)
+              Text(stringResource(R.string.action_reply), fontSize = 16.sp, color = dialogTextColor)
             }
-            if (message.isLocalUser && message.content.isNotBlank()) {
+            if (message.isLocalUser && message.content.isNotBlank() && !isSolelyUrl) {
               TextButton(onClick = { onEdit(message); showOptionsDialog = false }) {
-                Text(stringResource(R.string.action_edit), fontSize = 16.sp, color = textColor)
+                Text(stringResource(R.string.action_edit), fontSize = 16.sp, color = dialogTextColor)
               }
             }
-            if (message.content.isNotBlank()) {
+            if (message.content.isNotBlank() && !isSolelyUrl) {
               TextButton(onClick = { showTranslateMenu = true }) {
-                Text(stringResource(R.string.action_translate_message), fontSize = 16.sp, color = textColor)
+                Text(stringResource(R.string.action_translate_message), fontSize = 16.sp, color = dialogTextColor)
               }
             }
-            if (message.content.isNotBlank() || !message.coordinates.isNullOrBlank()) {
+            if ((message.content.isNotBlank() && !isSolelyUrl) || !message.coordinates.isNullOrBlank()) {
               TextButton(onClick = {
                 val copyText = if (message.content.isNotBlank()) message.content else message.coordinates ?: ""
                 clipboardManager.setText(AnnotatedString(copyText))
                 showOptionsDialog = false
               }) {
-                Text(stringResource(R.string.action_copy_text), fontSize = 16.sp, color = textColor)
+                Text(stringResource(R.string.action_copy_text), fontSize = 16.sp, color = dialogTextColor)
               }
             }
             if (canDelete) {
