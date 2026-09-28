@@ -99,12 +99,13 @@ fun FloatingBottomNavBar(
   modifier: Modifier = Modifier
 ) {
   val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val pillShape = RoundedCornerShape(32.dp)
   
   Surface(
-    shape = RoundedCornerShape(32.dp),
+    shape = pillShape,
     color = surfaceColor,
     shadowElevation = 8.dp,
-    modifier = modifier.height(64.dp)
+    modifier = modifier.height(64.dp).clip(pillShape)
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 12.dp),
@@ -137,11 +138,15 @@ fun FloatingBottomNavBar(
 fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, isSelected: Boolean, isDarkMode: Boolean, customIcon: @Composable (() -> Unit)? = null, onClick: () -> Unit) {
   val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else Color(0xFFE1F5FE)) else Color.Transparent
   val contentColor = if (isSelected) (if (isDarkMode) Color(0xFFD8FDD2) else Color(0xFF0288D1)) else (if (isDarkMode) Color.LightGray else Color.Gray)
+  val itemShape = RoundedCornerShape(20.dp)
 
   Surface(
-    shape = RoundedCornerShape(20.dp),
+    shape = itemShape,
     color = bgColor,
-    modifier = Modifier.clickable(onClick = onClick).animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
+    onClick = onClick, // Binds ripple strictly to itemShape
+    modifier = Modifier
+      .clip(itemShape) // Eliminates rectangular touch ripples
+      .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
   ) {
     Row(
       modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
@@ -742,6 +747,7 @@ fun SubstrateApp(
                     channelName = activeChannel.name,
                     text = chatInputText,
                     isDarkMode = isDarkMode,
+                    members = members,
                     onTextChanged = { chatInputText = it },
                     onSendMessage = { content, coords, img, aud, dur, fileUrl, fileName, isSticker, reply ->
                       if (editingMessage != null) {
