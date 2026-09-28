@@ -29,9 +29,12 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -39,6 +42,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Send
+import androidx.compose.material.icons.filled.AlternateEmail
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.CameraAlt
@@ -49,10 +53,12 @@ import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.SentimentSatisfied
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -80,6 +86,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
+import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.StatusCallEndRed
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenTeal
@@ -97,6 +104,14 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+
+data class MentionOption(
+  val tag: String,
+  val label: String,
+  val description: String,
+  val roleColor: Color,
+  val isRole: Boolean
+)
 
 object ImgBbUploader {
   const val IMGBB_API_KEY = "0925de674792b45903b6bbcf57fbd976"
@@ -286,6 +301,7 @@ fun ChatInputBar(
   channelName: String,
   text: String,
   isDarkMode: Boolean,
+  members: List<AdminMember> = emptyList(),
   onTextChanged: (String) -> Unit,
   onSendMessage: (
     content: String,
@@ -324,6 +340,34 @@ fun ChatInputBar(
   val textColor = if (isDarkMode) Color.White else Color.Black
   val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
   val menuBgColor = if (isDarkMode) Color(0xFF303030) else Color(0xFFF0F2F5)
+
+  // @Mention detection logic
+  val activeMentionQuery = remember(text) {
+    val atIdx = text.lastIndexOf('@')
+    if (atIdx != -1 && (atIdx == 0 || text[atIdx - 1].isWhitespace())) {
+      val candidate = text.substring(atIdx + 1)
+      if (!candidate.any { it.isWhitespace() }) candidate else null
+    } else null
+  }
+
+  val mentionOptions = remember(members, activeMentionQuery) {
+    if (activeMentionQuery == null) emptyList()
+    else {
+      val baseRoles = listOf(
+        MentionOption("@everyone", "everyone", "Notify everyone in this channel", Color(0xFF53BDEB), true),
+        MentionOption("@admin", "admin", "Notify all Server Admins", RoleAdminGold, true),
+        MentionOption("@mod", "mod", "Notify all Moderators", Color(0xFF00A884), true),
+        MentionOption("@builder", "builder", "Notify all Builders", Color(0xFF9C27B0), true),
+        MentionOption("@member", "member", "Notify all Members", Color(0xFF4CAF50), true)
+      )
+      val memberOptions = members.map {
+        MentionOption("@${it.gamertag}", it.gamertag, "Role: ${it.role}", if (it.isAdmin) RoleAdminGold else WhatsAppGreenDark, false)
+      }
+      (baseRoles + memberOptions).filter {
+        it.tag.contains(activeMentionQuery, ignoreCase = true) || it.label.contains(activeMentionQuery, ignoreCase = true)
+      }
+    }
+  }
 
   val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
     if (uri != null) {
@@ -424,6 +468,94 @@ fun ChatInputBar(
 
   Surface(modifier = modifier.fillMaxWidth().testTag("chat_input_bar"), color = Color.Transparent) {
     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp)) {
+      
+      // Mention Autocomplete Suggestions Box
+      AnimatedVisibility(
+        visible = mentionOptions.isNotEmpty(),
+        enter = slideInVertically { it } + expandVertically() + fadeIn(),
+        exit = slideOutVertically { it } + shrinkVertically() + fadeOut()
+      ) {
+        Surface(
+          shape = RoundedCornerShape(16.dp),
+          color = surfaceColor,
+          shadowElevation = 6.dp,
+          modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp, vertical = 4.dp)
+        ) {
+          Column(modifier = Modifier.padding(vertical = 4.dp)) {
+            Text(
+              text = "Mention",
+              fontSize = 11.5.sp,
+              fontWeight = FontWeight.Bold,
+              color = subTextColor,
+              modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+            )
+            HorizontalDivider(color = subTextColor.copy(alpha = 0.2f), thickness = 0.5.dp)
+            LazyColumn(
+              modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 190.dp)
+            ) {
+              items(mentionOptions) { option ->
+                Row(
+                  modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                      val atIdx = text.lastIndexOf('@')
+                      if (atIdx != -1) {
+                        val beforeAt = text.substring(0, atIdx)
+                        onTextChanged("$beforeAt${option.tag} ")
+                      }
+                    }
+                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                  verticalAlignment = Alignment.CenterVertically
+                ) {
+                  Box(
+                    modifier = Modifier
+                      .size(32.dp)
+                      .clip(CircleShape)
+                      .background(option.roleColor.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                  ) {
+                    if (option.isRole) {
+                      Icon(
+                        imageVector = if (option.tag == "@everyone") Icons.Default.AlternateEmail else Icons.Default.Shield,
+                        contentDescription = null,
+                        tint = option.roleColor,
+                        modifier = Modifier.size(16.dp)
+                      )
+                    } else {
+                      Text(
+                        text = option.label.take(1).uppercase(),
+                        fontWeight = FontWeight.Bold,
+                        color = option.roleColor,
+                        fontSize = 14.sp
+                      )
+                    }
+                  }
+                  Spacer(modifier = Modifier.width(10.dp))
+                  Column {
+                    Text(
+                      text = option.tag,
+                      fontWeight = FontWeight.Bold,
+                      color = textColor,
+                      fontSize = 14.sp
+                    )
+                    Text(
+                      text = option.description,
+                      color = subTextColor,
+                      fontSize = 11.5.sp
+                    )
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
       AnimatedVisibility(
         visible = replyingTo != null,
         enter = slideInVertically(animationSpec = tween(220)) { it } + expandVertically(animationSpec = tween(220)) + fadeIn(),
@@ -512,7 +644,7 @@ fun ChatInputBar(
           modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
         ) {
           Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceAround) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; fileLauncher.launch("*/*") }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; fileLauncher.launch("*/*") }) {
               Surface(shape = CircleShape, color = Color(0xFF7E57C2), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Document", tint = Color.White) }
               }
@@ -520,7 +652,7 @@ fun ChatInputBar(
               Text("Document", fontSize = 12.sp, color = textColor)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; audioLauncher.launch("audio/*") }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; audioLauncher.launch("audio/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE65100), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AudioFile, contentDescription = "Audio", tint = Color.White) }
               }
@@ -528,7 +660,7 @@ fun ChatInputBar(
               Text("Audio", fontSize = 12.sp, color = textColor)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE91E63), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Image, contentDescription = "Gallery", tint = Color.White) }
               }
@@ -536,7 +668,7 @@ fun ChatInputBar(
               Text("Gallery", fontSize = 12.sp, color = textColor)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
               Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White) }
               }
@@ -544,7 +676,7 @@ fun ChatInputBar(
               Text("Camera", fontSize = 12.sp, color = textColor)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
               Surface(shape = CircleShape, color = Color(0xFF2196F3), modifier = Modifier.size(46.dp)) {
                 Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Place, contentDescription = "Location", tint = Color.White) }
               }
@@ -564,7 +696,7 @@ fun ChatInputBar(
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("HD Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
               }
-              Text("Cancel", color = subTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable {
+              Text("Cancel", color = subTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
                 try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
                 recorder = null; isRecording = false; recordedAudioFile?.delete()
               })
@@ -578,7 +710,7 @@ fun ChatInputBar(
                 value = text,
                 onValueChange = onTextChanged,
                 modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) onTextFieldFocused() }.testTag("chat_text_input"),
-                placeholder = { Text("Message", color = subTextColor, fontSize = 15.sp) },
+                placeholder = { Text("Message (type @ for mention)", color = subTextColor, fontSize = 15.sp) },
                 colors = OutlinedTextFieldDefaults.colors(
                   focusedContainerColor = Color.Transparent,
                   unfocusedContainerColor = Color.Transparent,
