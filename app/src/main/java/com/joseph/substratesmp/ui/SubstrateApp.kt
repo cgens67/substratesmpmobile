@@ -141,14 +141,16 @@ fun FloatingBottomNavBar(
     modifier = modifier.height(64.dp).clip(pillShape)
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 8.dp),
+      modifier = Modifier.padding(horizontal = 12.dp),
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically
     ) {
       NavBarPillItem(icon = Icons.Default.ChatBubble, label = stringResource(R.string.nav_chats), isSelected = currentScreen == "home", isDarkMode = isDarkMode) { onNavigate("home") }
-      NavBarPillItem(icon = Icons.Default.HistoryToggleOff, label = "Status", isSelected = currentScreen == "status_screen", isDarkMode = isDarkMode) { onNavigate("status_screen") }
+      Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(icon = Icons.Default.Person, label = stringResource(R.string.nav_contacts), isSelected = currentScreen == "contacts", isDarkMode = isDarkMode) { onNavigate("contacts") }
+      Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(icon = Icons.Default.Settings, label = stringResource(R.string.nav_settings), isSelected = currentScreen == "settings_screen", isDarkMode = isDarkMode) { onNavigate("settings_screen") }
+      Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(
         icon = null,
         label = stringResource(R.string.nav_profile),
@@ -180,7 +182,7 @@ fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label
       .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+      modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
       if (customIcon != null) customIcon() else Icon(imageVector = icon!!, contentDescription = label, tint = contentColor, modifier = Modifier.size(20.dp))
@@ -244,9 +246,9 @@ fun SubstrateApp(
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var longPressedChannel by remember { mutableStateOf<Channel?>(null) }
   
-  var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
-  var isStatusViewerVisible by remember { mutableStateOf(false) }
-  var showStatusCreatorDialog by remember { mutableStateOf(false) }
+  // Instagram Note State
+  var activeNoteToView by remember { mutableStateOf<StatusUpdate?>(null) }
+  var showNoteComposer by remember { mutableStateOf(false) }
   
   var viewedUser by remember { mutableStateOf<String?>(null) }
   var shouldForceScrollToBottom by remember { mutableStateOf(false) }
@@ -280,15 +282,6 @@ fun SubstrateApp(
 
   val todayText = stringResource(R.string.chat_today)
   val yesterdayText = stringResource(R.string.chat_yesterday)
-
-  fun openStatus(status: StatusUpdate) {
-    statusToDisplay = status
-    isStatusViewerVisible = true
-  }
-
-  fun closeStatus() {
-    isStatusViewerVisible = false
-  }
 
   var replyingToMessage by remember { mutableStateOf<ChatMessage?>(null) }
   var editingMessage by remember { mutableStateOf<ChatMessage?>(null) }
@@ -370,9 +363,9 @@ fun SubstrateApp(
     }
   }
 
-  BackHandler(enabled = currentScreen != "home" || viewedImageUrl != null || isStatusViewerVisible) {
-    if (isStatusViewerVisible) {
-      closeStatus()
+  BackHandler(enabled = currentScreen != "home" || viewedImageUrl != null || activeNoteToView != null) {
+    if (activeNoteToView != null) {
+      activeNoteToView = null
     } else if (viewedImageUrl != null) {
       viewedImageUrl = null
     } else if (showEmojiPicker) {
@@ -385,7 +378,7 @@ fun SubstrateApp(
       currentScreen = "settings_screen"
     } else if (currentScreen == "user_profile_screen") {
       currentScreen = "chat_screen"
-    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts" || currentScreen == "status_screen") {
+    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts") {
       currentScreen = "home"
     } else {
       currentScreen = "home"
@@ -423,7 +416,7 @@ fun SubstrateApp(
       transitionSpec = {
         if (!appSettings.smoothAnimations) {
            fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
-        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen" || targetState == "status_screen") {
+        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
@@ -437,22 +430,6 @@ fun SubstrateApp(
       label = "screen_transition"
     ) { screen ->
       when (screen) {
-        "status_screen" -> {
-          StatusScreen(
-            statuses = statuses,
-            currentGamertag = userState.gamertag,
-            isDarkMode = isDarkMode,
-            onOpenStatus = { openStatus(it) },
-            onPostStatusClick = {
-              if (userState.gamertag.isBlank()) {
-                viewModel.setGamertagDialogVisible(true)
-              } else {
-                showStatusCreatorDialog = true
-              }
-            }
-          )
-        }
-
         "channel_info_screen" -> {
           ChannelInfoScreen(
             channel = activeChannel,
@@ -1069,6 +1046,26 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
+              // INSTAGRAM NOTES TRAY (Floating Thought Bubbles & 30s Songs)
+              InstagramNotesTray(
+                notes = statuses,
+                currentGamertag = userState.gamertag,
+                isDarkMode = isDarkMode,
+                onOpenNote = { activeNoteToView = it },
+                onAddNote = {
+                  if (userState.gamertag.isBlank()) {
+                    viewModel.setGamertagDialogVisible(true)
+                  } else {
+                    showNoteComposer = true
+                  }
+                }
+              )
+
+              HorizontalDivider(
+                color = if (isDarkMode) Color(0xFF333333) else menuLightBorder,
+                thickness = 0.5.dp
+              )
+
               val allLabel = stringResource(R.string.chip_all)
               val unreadLabel = stringResource(R.string.chip_unread)
               val favsLabel = stringResource(R.string.chip_favourites)
@@ -1240,7 +1237,7 @@ fun SubstrateApp(
       }
     }
 
-    if (currentScreen in listOf("home", "status_screen", "profile_screen", "settings_screen", "contacts")) {
+    if (currentScreen in listOf("home", "profile_screen", "settings_screen", "contacts")) {
       Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         FloatingBottomNavBar(
           currentScreen = currentScreen,
@@ -1350,33 +1347,35 @@ fun SubstrateApp(
     )
   }
 
-  androidx.compose.animation.AnimatedVisibility(
-    visible = isStatusViewerVisible && statusToDisplay != null,
-    enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
-    exit = scaleOut(targetScale = 0.82f, animationSpec = spring(dampingRatio = 0.9f, stiffness = Spring.StiffnessMedium)) + fadeOut(tween(200))
-  ) {
-    statusToDisplay?.let { status ->
-      StatusViewerScreen(
-        status = status,
-        isOwnStatus = status.authorGamertag == userState.gamertag,
-        onDismiss = { closeStatus() },
-        onDelete = {
-          viewModel.deleteStatus(status.id)
-          closeStatus()
-        },
-        onReact = { emoji ->
-          viewModel.reactToStatus(status.id, emoji)
-        }
-      )
-    }
+  // Instagram Note Viewer Popover
+  activeNoteToView?.let { note ->
+    InstagramNoteViewerDialog(
+      note = note,
+      isOwnNote = note.authorGamertag.equals(userState.gamertag, ignoreCase = true),
+      isDarkMode = isDarkMode,
+      onDismiss = { activeNoteToView = null },
+      onDeleteNote = { id -> viewModel.deleteStatus(id) },
+      onReplyNote = { recipientTag, msgText ->
+        viewModel.startPrivateChat(recipientTag)
+        currentScreen = "chat_screen"
+        viewModel.sendMessage(
+          content = "💭 Replied to note: \"$msgText\"",
+          coordinates = null
+        )
+      },
+      onEditNote = { showNoteComposer = true }
+    )
   }
 
-  if (showStatusCreatorDialog) {
-    StatusCreatorDialog(
-      onDismiss = { showStatusCreatorDialog = false },
-      onPostStatus = { text, theme, activity, coords, mName, mArtist, mPreview, mArtwork ->
-        viewModel.postStatus(text, theme, activity, coords, mName, mArtist, mPreview, mArtwork)
-        showStatusCreatorDialog = false
+  // Instagram Note Composer
+  if (showNoteComposer) {
+    InstagramNoteComposerDialog(
+      currentGamertag = userState.gamertag,
+      isDarkMode = isDarkMode,
+      onDismiss = { showNoteComposer = false },
+      onShareNote = { thought, mName, mArtist, mPreview, mArtwork ->
+        viewModel.postStatus(thought, "EMERALD", "Note", null, mName, mArtist, mPreview, mArtwork)
+        showNoteComposer = false
       }
     )
   }
@@ -1428,7 +1427,7 @@ fun SubstrateApp(
         if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted) else null,
         if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav) else null,
         if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, recipient) else stringResource(R.string.menu_block_user, recipient), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked) else null,
-        SheetOption("post_status", "Post Status Update", "Share realm activity, build updates or base coordinates", isSelected = false),
+        SheetOption("post_note", "Leave a Note", "Share a thought & 30s music clip above your avatar", isSelected = false),
         SheetOption("server", stringResource(R.string.menu_server_ip), stringResource(R.string.default_server_ip), isSelected = false),
         if (userState.isAdmin) SheetOption("admin", stringResource(R.string.menu_admin_console), stringResource(R.string.menu_admin_console_sub), isSelected = false) else null
       ).filterNotNull(),
@@ -1439,7 +1438,10 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
-          "post_status" -> showStatusCreatorDialog = true
+          "post_note" -> {
+            if (userState.gamertag.isBlank()) viewModel.setGamertagDialogVisible(true)
+            else showNoteComposer = true
+          }
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
         }
