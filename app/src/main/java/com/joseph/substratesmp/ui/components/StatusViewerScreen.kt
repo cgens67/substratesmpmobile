@@ -1,52 +1,33 @@
 package com.joseph.substratesmp.ui.components
 
+import android.media.MediaPlayer
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
@@ -62,6 +43,31 @@ fun StatusViewerScreen(
   val clipboardManager = LocalClipboardManager.current
   val progress = remember { Animatable(0f) }
 
+  var isMuted by remember { mutableStateOf(false) }
+  var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
+
+  // Background Music Playback
+  LaunchedEffect(status.id, status.musicPreviewUrl) {
+    if (!status.musicPreviewUrl.isNullOrBlank()) {
+      try {
+        mediaPlayer = MediaPlayer().apply {
+          setDataSource(status.musicPreviewUrl)
+          isLooping = true
+          prepareAsync()
+          setOnPreparedListener { it.start() }
+        }
+      } catch (_: Exception) {}
+    }
+  }
+
+  DisposableEffect(Unit) {
+    onDispose {
+      mediaPlayer?.stop()
+      mediaPlayer?.release()
+      mediaPlayer = null
+    }
+  }
+
   val gradientBrush = when (status.backgroundTheme) {
     "CRIMSON" -> Brush.verticalGradient(listOf(Color(0xFF8B0000), Color(0xFFFF4500)))
     "END_VOID" -> Brush.verticalGradient(listOf(Color(0xFF2E0854), Color(0xFF6A0DAD)))
@@ -75,7 +81,7 @@ fun StatusViewerScreen(
     progress.snapTo(0f)
     progress.animateTo(
       targetValue = 1f,
-      animationSpec = tween(durationMillis = 6500, easing = LinearEasing)
+      animationSpec = tween(durationMillis = 8500, easing = LinearEasing)
     )
     onDismiss()
   }
@@ -156,7 +162,19 @@ fun StatusViewerScreen(
           }
         }
 
-        Row {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          if (!status.musicPreviewUrl.isNullOrBlank()) {
+            IconButton(onClick = {
+              isMuted = !isMuted
+              if (isMuted) mediaPlayer?.setVolume(0f, 0f) else mediaPlayer?.setVolume(1f, 1f)
+            }) {
+              Icon(
+                imageVector = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                contentDescription = "Mute",
+                tint = Color.White
+              )
+            }
+          }
           if (isOwnStatus && onDelete != null) {
             IconButton(onClick = onDelete) {
               Icon(Icons.Default.Delete, contentDescription = "Delete Status", tint = Color.White)
@@ -164,6 +182,41 @@ fun StatusViewerScreen(
           }
           IconButton(onClick = onDismiss) {
             Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+          }
+        }
+      }
+
+      // Music soundtrack banner sticker
+      if (!status.musicTrackName.isNullOrBlank()) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Surface(
+          shape = RoundedCornerShape(20.dp),
+          color = Color.Black.copy(alpha = 0.45f),
+          modifier = Modifier.padding(horizontal = 4.dp)
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            if (!status.musicArtworkUrl.isNullOrBlank()) {
+              AsyncImage(
+                model = status.musicArtworkUrl,
+                contentDescription = null,
+                modifier = Modifier.size(24.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+            } else {
+              Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color(0xFF00E5FF), modifier = Modifier.size(18.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+            }
+            Text(
+              text = "${status.musicTrackName} • ${status.musicArtistName ?: ""}",
+              color = Color.White,
+              fontWeight = FontWeight.SemiBold,
+              fontSize = 12.sp,
+              maxLines = 1
+            )
           }
         }
       }
