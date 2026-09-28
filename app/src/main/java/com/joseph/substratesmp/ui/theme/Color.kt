@@ -10,10 +10,10 @@ val WhatsAppGreenTeal = Color(0xFF00A884)
 val WhatsAppHeaderGreen = Color(0xFF1DAA61)
 val WhatsAppBackground = Color(0xFFFFFFFF)
 val WhatsAppSearchBackground = Color(0xFFF0F2F5)
-val WhatsAppChatBackground = Color(0xFFEFEAE2) // WhatsApp cream chat wallpaper
-val WhatsAppOutgoingBubble = Color(0xFFD9FDD3) // WhatsApp light green outgoing bubble
-val WhatsAppIncomingBubble = Color(0xFFFFFFFF) // WhatsApp white incoming bubble
-val WhatsAppChatOutgoing = Color(0xFF005C4B) // WhatsApp dark green / call control tint
+val WhatsAppChatBackground = Color(0xFFEFEAE2)
+val WhatsAppOutgoingBubble = Color(0xFFD9FDD3)
+val WhatsAppIncomingBubble = Color(0xFFFFFFFF)
+val WhatsAppChatOutgoing = Color(0xFF005C4B)
 val WhatsAppChatIncoming = Color(0xFF1F2C34)
 val WhatsAppSurfaceHigh = Color(0xFF233138)
 val WhatsAppNavSelectedPill = Color(0xFFD8FDD2)
@@ -24,6 +24,23 @@ val WhatsAppCheckmarkBlue = Color(0xFF53BDEB)
 val WhatsAppCallRed = Color(0xFFEA0038)
 val StatusCallEndRed = Color(0xFFEA0038)
 val WhatsAppDivider = Color(0xFFE9EDEF)
+
+// EXACT CHAT THEME COLORS FROM SCREENSHOTS
+// Dark Mode: Image 1
+val ChatDarkBackground = Color(0xFF161616)
+val ChatDarkIncomingBubble = Color(0xFF262628)
+val ChatDarkOutgoingBubble = Color(0xFF0866C6)
+val ChatDarkDatePill = Color(0xFF2C2C2E)
+val ChatDarkOutgoingTime = Color(0xFF4FA5FF)
+val ChatDarkIncomingTime = Color(0xFF8E8E93)
+
+// Light Mode: Image 2
+val ChatLightBackground = Color(0xFFFFFFFF)
+val ChatLightIncomingBubble = Color(0xFFF2F2F7)
+val ChatLightOutgoingBubble = Color(0xFF0084FF)
+val ChatLightDatePill = Color(0xFFF2F2F7)
+val ChatLightOutgoingTime = Color(0xFFBCE0FD)
+val ChatLightIncomingTime = Color(0xFF8E8E93)
 
 // Minecraft Bedrock & Admin Role Tokens
 val RoleAdminGold = Color(0xFFD48806)
@@ -40,7 +57,7 @@ val StatusCallActive = Color(0xFF00A884)
 val StatusMuted = Color(0xFFEA0038)
 val BedrockGlass = Color(0x331B2333)
 
-// Legacy / Dark Scheme Compatibility Tokens
+// Scheme Tokens
 val CyanPrimary = Color(0xFF00E5FF)
 val CyanOnPrimary = Color(0xFF00363D)
 val CyanPrimaryContainer = Color(0xFF004D56)
