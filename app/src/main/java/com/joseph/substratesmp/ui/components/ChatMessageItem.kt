@@ -252,7 +252,6 @@ fun ChatMessageItem(
   val isLocal = message.isLocalUser
   val isSenderAdmin = message.isAdmin
 
-  // Matches chat theme colors from screenshots
   val bubbleColor = if (isLocal) {
     if (isDarkMode) ChatDarkOutgoingBubble else ChatLightOutgoingBubble
   } else {
@@ -271,7 +270,6 @@ fun ChatMessageItem(
     if (isDarkMode) ChatDarkIncomingTime else ChatLightIncomingTime
   }
 
-  // Consistent dialog colors independent of isLocal state
   val dialogBg = if (isDarkMode) Color(0xFF262628) else Color.White
   val dialogTextColor = if (isDarkMode) Color.White else Color(0xFF111B21)
 
@@ -387,7 +385,6 @@ fun ChatMessageItem(
     regex.find(message.content)?.value
   }
 
-  // Suppress rendering raw text if message is strictly an image/GIF URL
   val isSolelyUrl = remember(message.content, gifUrl, message.imageUrl) {
     val trimmed = message.content.trim()
     (gifUrl != null && trimmed.equals(gifUrl, ignoreCase = true)) ||
@@ -584,7 +581,7 @@ fun ChatMessageItem(
                       try {
                         val fileUrl = message.fileUrl
                         val base64Data = if (fileUrl.startsWith("chunked:")) {
-                          Toast.makeText(context, stringResource(R.string.downloading_file_chunks), Toast.LENGTH_SHORT).show()
+                          Toast.makeText(context, context.getString(R.string.downloading_file_chunks), Toast.LENGTH_SHORT).show()
                           val snapshot = FirebaseFirestore.getInstance()
                             .collection("channels")
                             .document(message.channelId)
@@ -791,7 +788,6 @@ fun ChatMessageItem(
                 }
               }
 
-              // Do not display raw URL string if message is purely a GIF or image link
               if (message.content.isNotBlank() && !isSolelyUrl) {
                 MessageBodyText(
                   text = message.content,
