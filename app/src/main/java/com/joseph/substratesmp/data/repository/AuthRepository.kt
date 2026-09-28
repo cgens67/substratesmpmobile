@@ -24,7 +24,9 @@ data class AuthUserState(
   val isInitialized: Boolean = false,
   val needsGamertagSetup: Boolean = false,
   val bio: String = "",
-  val birthday: String = ""
+  val birthday: String = "",
+  val lastCoordinates: String = "",
+  val lastCoordinatesTimestamp: Long = 0L
 )
 
 class AuthRepository(private val context: Context) {
@@ -54,7 +56,9 @@ class AuthRepository(private val context: Context) {
       isAdmin = prefs.getBoolean("isAdmin", false),
       role = prefs.getString("role", "MEMBER") ?: "MEMBER",
       bio = prefs.getString("bio", "") ?: "",
-      birthday = prefs.getString("birthday", "") ?: ""
+      birthday = prefs.getString("birthday", "") ?: "",
+      lastCoordinates = prefs.getString("lastCoordinates", "") ?: "",
+      lastCoordinatesTimestamp = prefs.getLong("lastCoordinatesTimestamp", 0L)
     )
   )
   val userState: StateFlow<AuthUserState> = _userState.asStateFlow()
@@ -73,6 +77,8 @@ class AuthRepository(private val context: Context) {
         val liveTag = snapshot.getString("gamertag") ?: _userState.value.gamertag
         val liveBio = snapshot.getString("bio") ?: _userState.value.bio
         val liveBirthday = snapshot.getString("birthday") ?: _userState.value.birthday
+        val liveCoords = snapshot.getString("lastCoordinates") ?: _userState.value.lastCoordinates
+        val liveCoordsTs = snapshot.getLong("lastCoordinatesTimestamp") ?: _userState.value.lastCoordinatesTimestamp
 
         prefs.edit()
           .putString("role", liveRole)
@@ -80,6 +86,8 @@ class AuthRepository(private val context: Context) {
           .putString("gamertag", liveTag)
           .putString("bio", liveBio)
           .putString("birthday", liveBirthday)
+          .putString("lastCoordinates", liveCoords)
+          .putLong("lastCoordinatesTimestamp", liveCoordsTs)
           .apply()
 
         _userState.value = _userState.value.copy(
@@ -87,7 +95,9 @@ class AuthRepository(private val context: Context) {
           role = liveRole,
           isAdmin = liveAdmin,
           bio = liveBio,
-          birthday = liveBirthday
+          birthday = liveBirthday,
+          lastCoordinates = liveCoords,
+          lastCoordinatesTimestamp = liveCoordsTs
         )
       }
     }
@@ -100,6 +110,8 @@ class AuthRepository(private val context: Context) {
     var savedRole = prefs.getString("role", "MEMBER") ?: "MEMBER"
     var savedBio = prefs.getString("bio", "") ?: ""
     var savedBirthday = prefs.getString("birthday", "") ?: ""
+    var savedCoords = prefs.getString("lastCoordinates", "") ?: ""
+    var savedCoordsTs = prefs.getLong("lastCoordinatesTimestamp", 0L)
     var isAdmin = false
 
     try {
@@ -112,6 +124,8 @@ class AuthRepository(private val context: Context) {
           savedRole = userDoc.getString("role") ?: savedRole
           savedBio = userDoc.getString("bio") ?: savedBio
           savedBirthday = userDoc.getString("birthday") ?: savedBirthday
+          savedCoords = userDoc.getString("lastCoordinates") ?: savedCoords
+          savedCoordsTs = userDoc.getLong("lastCoordinatesTimestamp") ?: savedCoordsTs
         }
         isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
@@ -131,7 +145,9 @@ class AuthRepository(private val context: Context) {
       isInitialized = true,
       needsGamertagSetup = needsSetup,
       bio = savedBio,
-      birthday = savedBirthday
+      birthday = savedBirthday,
+      lastCoordinates = savedCoords,
+      lastCoordinatesTimestamp = savedCoordsTs
     )
   }
 
@@ -152,6 +168,31 @@ class AuthRepository(private val context: Context) {
       _userState.value = _userState.value.copy(bio = bio, birthday = birthday)
     } catch (e: Exception) {
       Log.e(TAG, "Failed to update profile", e)
+    }
+  }
+
+  suspend fun updateCoordinates(coordinates: String) {
+    val uid = _userState.value.uid
+    val cleanCoords = coordinates.trim()
+    if (uid.isBlank() || cleanCoords.isBlank()) return
+    val now = System.currentTimeMillis()
+    try {
+      firestore.collection("users").document(uid).set(
+        mapOf("lastCoordinates" to cleanCoords, "lastCoordinatesTimestamp" to now),
+        SetOptions.merge()
+      ).await()
+
+      prefs.edit()
+        .putString("lastCoordinates", cleanCoords)
+        .putLong("lastCoordinatesTimestamp", now)
+        .apply()
+
+      _userState.value = _userState.value.copy(
+        lastCoordinates = cleanCoords,
+        lastCoordinatesTimestamp = now
+      )
+    } catch (e: Exception) {
+      Log.e(TAG, "Failed to update user coordinates", e)
     }
   }
 
@@ -195,6 +236,8 @@ class AuthRepository(private val context: Context) {
           "role" to initialRole,
           "bio" to "",
           "birthday" to "",
+          "lastCoordinates" to "",
+          "lastCoordinatesTimestamp" to 0L,
           "createdAt" to System.currentTimeMillis()
         )
       ).await()
@@ -260,6 +303,8 @@ class AuthRepository(private val context: Context) {
       val actualRole = userDoc.getString("role") ?: tagDoc.getString("role") ?: "MEMBER"
       val actualBio = userDoc.getString("bio") ?: ""
       val actualBirthday = userDoc.getString("birthday") ?: ""
+      val actualCoords = userDoc.getString("lastCoordinates") ?: ""
+      val actualCoordsTs = userDoc.getLong("lastCoordinatesTimestamp") ?: 0L
       val isAdmin = actualTag.equals("Siang5680", ignoreCase = true) || actualRole == "ADMIN"
 
       prefs.edit()
@@ -268,6 +313,8 @@ class AuthRepository(private val context: Context) {
         .putBoolean("isAdmin", isAdmin)
         .putString("bio", actualBio)
         .putString("birthday", actualBirthday)
+        .putString("lastCoordinates", actualCoords)
+        .putLong("lastCoordinatesTimestamp", actualCoordsTs)
         .apply()
 
       _userState.value = AuthUserState(
@@ -279,7 +326,9 @@ class AuthRepository(private val context: Context) {
         isInitialized = true,
         needsGamertagSetup = false,
         bio = actualBio,
-        birthday = actualBirthday
+        birthday = actualBirthday,
+        lastCoordinates = actualCoords,
+        lastCoordinatesTimestamp = actualCoordsTs
       )
 
       startLiveUserListener(uid)
