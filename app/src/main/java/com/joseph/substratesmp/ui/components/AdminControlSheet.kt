@@ -66,7 +66,9 @@ data class AdminMember(
   val role: String,
   val isAdmin: Boolean,
   val bio: String = "",
-  val birthday: String = ""
+  val birthday: String = "",
+  val lastCoordinates: String = "",
+  val lastCoordinatesTimestamp: Long = 0L
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
