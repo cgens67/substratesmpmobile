@@ -199,12 +199,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     val myTag = userState.value.gamertag.trim()
     if (myTag.isBlank() || targetGamertag.isBlank()) return
 
-    val target = _members.value.find { it.gamertag.equals(targetGamertag, ignoreCase = true) }
-    val lastKnownCoords = target?.lastCoordinates?.ifBlank { null }
-
+    // Secret base protection: coordinates remain null until target explicitly chooses to share
     sendMessage(
       content = "📍 Location Request",
-      coordinates = lastKnownCoords,
+      coordinates = null,
       isLocationRequest = true,
       locationTargetGamertag = targetGamertag
     )
