@@ -112,6 +112,7 @@ import com.joseph.substratesmp.ui.theme.ChatLightOutgoingTime
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
+import com.joseph.substratesmp.ui.theme.WhatsAppCheckmarkBlue
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -252,20 +253,31 @@ fun LocationRequestCard(
 
   val targetGamertag = message.locationTargetGamertag ?: message.replyToSender ?: ""
   val isTargetMe = targetGamertag.isNotBlank() && targetGamertag.equals(currentGamertag, ignoreCase = true)
+  var isDeclined by remember { mutableStateOf(false) }
 
   Card(
     shape = RoundedCornerShape(16.dp),
     colors = CardDefaults.cardColors(containerColor = cardBg),
     border = BorderStroke(1.dp, borderColor),
-    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+    modifier = Modifier
+      .fillMaxWidth()
+      .padding(vertical = 4.dp)
   ) {
     Column(modifier = Modifier.padding(14.dp)) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
-          modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFF00A884).copy(alpha = 0.18f)),
+          modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(Color(0xFF00A884).copy(alpha = 0.18f)),
           contentAlignment = Alignment.Center
         ) {
-          Icon(Icons.Default.Explore, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(22.dp))
+          Icon(
+            imageVector = Icons.Default.Explore,
+            contentDescription = null,
+            tint = WhatsAppGreenDark,
+            modifier = Modifier.size(22.dp)
+          )
         }
         Spacer(modifier = Modifier.width(10.dp))
         Column {
@@ -302,15 +314,13 @@ fun LocationRequestCard(
             Row(verticalAlignment = Alignment.CenterVertically) {
               Icon(Icons.Default.Place, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(16.dp))
               Spacer(modifier = Modifier.width(6.dp))
-              Column {
-                Text(
-                  text = stringResource(R.string.location_last_known, message.coordinates),
-                  style = CoordinateTextStyle,
-                  color = textColor,
-                  fontSize = 13.sp,
-                  fontWeight = FontWeight.SemiBold
-                )
-              }
+              Text(
+                text = stringResource(R.string.location_last_known, message.coordinates),
+                style = CoordinateTextStyle,
+                color = textColor,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold
+              )
             }
             IconButton(
               onClick = { clipboardManager.setText(AnnotatedString(message.coordinates)) },
@@ -322,28 +332,47 @@ fun LocationRequestCard(
         }
       } else {
         Text(
-          text = stringResource(R.string.location_no_coords),
+          text = if (isDeclined) "Request declined." else stringResource(R.string.location_no_coords),
           fontSize = 12.5.sp,
           color = subTextColor
         )
       }
 
-      if (isTargetMe || (!message.isLocalUser && targetGamertag.isBlank())) {
+      if (!isDeclined && (isTargetMe || (!message.isLocalUser && targetGamertag.isBlank()))) {
         Spacer(modifier = Modifier.height(10.dp))
-        Button(
-          onClick = onSendCurrentLocation,
-          colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
-          shape = RoundedCornerShape(10.dp),
-          modifier = Modifier.fillMaxWidth().height(40.dp)
+        Row(
+          modifier = Modifier.fillMaxWidth(),
+          horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-          Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-          Spacer(modifier = Modifier.width(6.dp))
-          Text(
-            text = stringResource(R.string.action_send_my_location),
-            color = Color.White,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp
-          )
+          Button(
+            onClick = onSendCurrentLocation,
+            colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier
+              .weight(1f)
+              .height(40.dp)
+          ) {
+            Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text(
+              text = stringResource(R.string.action_send_my_location),
+              color = Color.White,
+              fontWeight = FontWeight.Bold,
+              fontSize = 12.5.sp
+            )
+          }
+
+          OutlinedButton(
+            onClick = { isDeclined = true },
+            shape = RoundedCornerShape(10.dp),
+            modifier = Modifier.height(40.dp)
+          ) {
+            Text(
+              text = stringResource(R.string.action_cancel),
+              color = subTextColor,
+              fontSize = 12.5.sp
+            )
+          }
         }
       }
     }
