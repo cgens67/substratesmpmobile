@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Substrate SMP</string>
+    <string name="default_server_ip">mc.substratesmp.net:19132</string>
+    <string name="default_server_domain">mc.substratesmp.net</string>
+
+    <!-- 通用与操作 -->
+    <string name="action_cancel">取消</string>
+    <string name="action_save">保存</string>
+    <string name="action_done">完成</string>
+    <string name="action_ok">确定</string>
+    <string name="action_back">返回</string>
+    <string name="action_close">关闭</string>
+    <string name="action_delete">删除</string>
+    <string name="action_search">搜索</string>
+    <string name="action_edit">编辑</string>
+    <string name="action_send">发送</string>
+    <string name="action_clear">清除</string>
+    <string name="action_message">发消息</string>
+
+    <!-- 聊天与消息 -->
+    <string name="chat_today">今天</string>
+    <string name="chat_yesterday">昨天</string>
+    <string name="message_placeholder">发送消息</string>
+    <string name="message_options">消息选项</string>
+    <string name="action_reply">回复</string>
+    <string name="action_translate_message">翻译消息</string>
+    <string name="action_copy_text">复制文本</string>
+    <string name="action_delete_everyone">为所有人删除</string>
+    <string name="translate_to_english">翻译为英文</string>
+    <string name="translate_to_chinese">翻译为中文</string>
+    <string name="translate_to_malay">翻译为马来文</string>
+    <string name="label_translated">已翻译</string>
+    <string name="label_edited">已编辑</string>
+    <string name="label_voice_message_hd">高清语音留言</string>
+    <string name="label_audio_file">音频文件</string>
+    <string name="label_document">文档</string>
+    <string name="label_tap_to_download">点击下载</string>
+    <string name="replying_to">正在回复 %1$s</string>
+    <string name="editing_message">正在编辑消息</string>
+    <string name="coordinates_placeholder">坐标 (例如 X: -120, Y: 64, Z: 540)</string>
+    <string name="typing_indicator">%1$s 正在输入…</string>
+    <string name="direct_message">私信</string>
+    <string name="admin_badge">管理员</string>
+
+    <!-- 提及与附件 -->
+    <string name="mention_header">提及</string>
+    <string name="attach_document">文档</string>
+    <string name="attach_audio">音频</string>
+    <string name="attach_gallery">图库</string>
+    <string name="attach_camera">相机</string>
+    <string name="attach_location">位置</string>
+    <string name="recording_indicator">高清录音 %1$d秒</string>
+
+    <!-- 导航与标签 -->
+    <string name="nav_chats">聊天</string>
+    <string name="nav_contacts">联系人</string>
+    <string name="nav_settings">设置</string>
+    <string name="nav_profile">个人资料</string>
+    <string name="chip_all">全部</string>
+    <string name="chip_unread">未读</string>
+    <string name="chip_favourites">收藏</string>
+    <string name="chip_groups">群组</string>
+
+    <!-- 列表与状态 -->
+    <string name="no_unread_chats">没有未读聊天</string>
+    <string name="no_favourite_chats">暂无收藏聊天。长按聊天即可收藏。</string>
+    <string name="no_group_channels">未找到群组频道</string>
+    <string name="no_chats_found">未找到相关聊天</string>
+    <string name="blocked_user_banner">您已拉黑此玩家。点击解除拉黑。</string>
+    <string name="admin_only_banner">只有服务器管理员可以在此频道发送消息。</string>
+    <string name="pm_tag">• 私信</string>
+
+    <!-- 设置界面 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_search_hint">搜索设置…</string>
+    <string name="settings_account">账号</string>
+    <string name="settings_account_sub">手机号、用户名、简介</string>
+    <string name="settings_appearance">外观</string>
+    <string name="settings_appearance_sub">壁纸、深色模式、动画</string>
+    <string name="settings_privacy_policy">隐私政策</string>
+    <string name="settings_privacy_policy_sub">Firebase、ImgBB、Agora.io</string>
+    <string name="settings_language">语言</string>
+    <string name="settings_appearance_dialog_title">外观设置</string>
+    <string name="settings_dark_mode">深色模式</string>
+    <string name="settings_smooth_animations">流畅动画</string>
+    <string name="settings_auto_translate_title">自动翻译消息</string>
+    <string name="settings_auto_translate_sub">自动将收到的消息翻译为您选择的语言</string>
+    <string name="settings_select_language">选择应用语言</string>
+    <string name="settings_language_dialog_title">语言与翻译</string>
+
+    <!-- 个人资料 -->
+    <string name="profile_guest">访客资料</string>
+    <string name="profile_online">在线</string>
+    <string name="profile_offline">离线</string>
+    <string name="profile_edit_info">编辑资料</string>
+    <string name="profile_bio_label">简介</string>
+    <string name="profile_birthday_label">生日</string>
+    <string name="profile_username_label">用户名</string>
+    <string name="profile_no_bio">暂无简介。</string>
+    <string name="profile_not_set">未设置</string>
+    <string name="profile_select_date">选择日期</string>
+    <string name="profile_role_prefix">基岩版身份: %1$s</string>
+    <string name="profile_welcome_back">欢迎回来！</string>
+    <string name="profile_create_account">创建您的账号</string>
+    <string name="profile_gamertag_label">玩家名称 (Gamertag)</string>
+    <string name="profile_password_label">密码</string>
+    <string name="profile_login">登录</string>
+    <string name="profile_register">注册</string>
+    <string name="profile_prompt_register">还没有账号？立即注册</string>
+    <string name="profile_prompt_login">已有账号？立即登录</string>
+    <string name="user_action_mute">静音</string>
+    <string name="user_action_unmute">取消静音</string>
+    <string name="user_action_favorite">收藏</string>
+    <string name="user_action_favorited">已收藏</string>
+    <string name="user_action_block">拉黑</string>
+    <string name="user_action_unblock">解除拉黑</string>
+
+    <!-- 频道信息界面 -->
+    <string name="channel_members_tab">成员</string>
+    <string name="channel_media_tab">媒体</string>
+    <string name="channel_files_tab">文件</string>
+    <string name="channel_links_tab">链接</string>
+    <string name="channel_music_tab">音乐</string>
+    <string name="channel_gifs_tab">动图</string>
+    <string name="channel_action_leave">离开</string>
+    <string name="channel_add_members">添加成员</string>
+    <string name="channel_members_count">%1$d 位成员</string>
+    <string name="no_media_yet">暂无分享的媒体</string>
+    <string name="no_files_yet">暂无分享的文件</string>
+    <string name="no_links_yet">暂无分享的链接</string>
+    <string name="no_audio_yet">暂无分享的音频</string>
+    <string name="no_gifs_yet">暂无表情或动图</string>
+    <string name="edit_channel_info_title">编辑频道信息</string>
+    <string name="channel_name_label">频道名称</string>
+    <string name="channel_desc_label">频道描述</string>
+
+    <!-- 下拉菜单 -->
+    <string name="menu_mute_notifications">静音通知</string>
+    <string name="menu_unmute_notifications">取消静音通知</string>
+    <string name="menu_mute_sub">为此聊天关闭声音提醒</string>
+    <string name="menu_unmute_sub">重新开启声音提醒</string>
+    <string name="menu_add_favourites">添加至收藏</string>
+    <string name="menu_remove_favourites">从收藏中移除</string>
+    <string name="menu_add_fav_sub">在收藏筛选器中置顶</string>
+    <string name="menu_remove_fav_sub">取消星标置顶</string>
+    <string name="menu_block_user">拉黑 %1$s</string>
+    <string name="menu_unblock_user">解除拉黑 %1$s</string>
+    <string name="menu_block_sub">停止接收消息</string>
+    <string name="menu_unblock_sub">恢复接收消息</string>
+    <string name="menu_server_ip">基岩版服务器 IP</string>
+    <string name="menu_admin_console">管理员控制台</string>
+    <string name="menu_admin_console_sub">管理频道与玩家身份</string>
+    <string name="copied_server_ip">服务器 IP 已复制到剪贴板</string>
+    <string name="copied_channel_name">频道名称已复制</string>
+    <string name="copied_text">文本已复制</string>
+    <string name="downloading_file_chunks">正在下载文件分块…</string>
+    <string name="saved_to_downloads">已保存至下载文件夹: %1$s</string>
+    <string name="download_failed">下载失败: %1$s</string>
+    <string name="menu_lock_admin">仅限管理员发言</string>
+    <string name="menu_unlock_all">允许所有成员发言</string>
+    <string name="lang_english">英文 (English)</string>
+    <string name="lang_chinese">中文 (Chinese)</string>
+    <string name="lang_malay">马来文 (Malay)</string>
+</resources>
