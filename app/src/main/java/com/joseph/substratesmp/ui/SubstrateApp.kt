@@ -226,6 +226,7 @@ fun SubstrateApp(
   val blockedUsers by viewModel.blockedUsers.collectAsStateWithLifecycle()
   val favouriteChannels by viewModel.favouriteChannels.collectAsStateWithLifecycle()
   val translatedMessages by viewModel.translatedMessages.collectAsStateWithLifecycle()
+  val deletedGamertags by viewModel.deletedGamertags.collectAsStateWithLifecycle()
 
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
   val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
@@ -308,7 +309,7 @@ fun SubstrateApp(
     }
   }
 
-  // GUARANTEED INSTANT SCROLL TO BOTTOM ON CHANNEL OPEN & LOAD
+  // Guaranteed instant scroll to bottom on channel open and load
   var lastLoadedChannelId by remember { mutableStateOf("") }
   var hasScrolledToBottomForChannel by remember { mutableStateOf(false) }
 
@@ -763,9 +764,12 @@ fun SubstrateApp(
                         isRead = isRead,
                         isDelivered = isDelivered,
                         canDelete = userState.isAdmin || message.isLocalUser,
+                        isSenderDeleted = deletedGamertags.contains(message.senderName.lowercase().trim()),
                         onUserClick = { name -> 
-                          viewedUser = name
-                          currentScreen = "user_profile_screen"
+                          if (!deletedGamertags.contains(name.lowercase().trim())) {
+                            viewedUser = name
+                            currentScreen = "user_profile_screen"
+                          }
                         },
                         onDeleteMessage = { msg -> viewModel.deleteMessage(msg.channelId, msg.id) },
                         onReply = { msg -> replyingToMessage = msg },
@@ -1254,7 +1258,7 @@ fun SubstrateApp(
       }
     }
 
-    // FULL SCREEN IMAGE & ANIMATED GIF / STICKER VIEWER
+    // Full screen image and animated GIF or sticker viewer
     val fullScreenImageModel = remember(viewedImageUrl) {
       val url = viewedImageUrl ?: return@remember null
       if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("content://") || url.startsWith("file://")) {
@@ -1305,7 +1309,7 @@ fun SubstrateApp(
     }
   }
 
-  // REAL-TIME INCOMING CALL POPUP BANNER
+  // Real-time incoming call dialog
   incomingCall?.let { call ->
     AlertDialog(
       onDismissRequest = {},
@@ -1370,8 +1374,8 @@ fun SubstrateApp(
   if (showStatusCreatorDialog) {
     StatusCreatorDialog(
       onDismiss = { showStatusCreatorDialog = false },
-      onPostStatus = { text, theme, activity, coords ->
-        viewModel.postStatus(text, theme, activity, coords)
+      onPostStatus = { text, theme, activity, coords, mName, mArtist, mPreview, mArtwork ->
+        viewModel.postStatus(text, theme, activity, coords, mName, mArtist, mPreview, mArtwork)
         showStatusCreatorDialog = false
       }
     )
@@ -1424,6 +1428,7 @@ fun SubstrateApp(
         if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted) else null,
         if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav) else null,
         if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, recipient) else stringResource(R.string.menu_block_user, recipient), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked) else null,
+        SheetOption("post_status", "Post Status Update", "Share realm activity, build updates or base coordinates", isSelected = false),
         SheetOption("server", stringResource(R.string.menu_server_ip), stringResource(R.string.default_server_ip), isSelected = false),
         if (userState.isAdmin) SheetOption("admin", stringResource(R.string.menu_admin_console), stringResource(R.string.menu_admin_console_sub), isSelected = false) else null
       ).filterNotNull(),
@@ -1434,6 +1439,7 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
+          "post_status" -> showStatusCreatorDialog = true
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
         }
