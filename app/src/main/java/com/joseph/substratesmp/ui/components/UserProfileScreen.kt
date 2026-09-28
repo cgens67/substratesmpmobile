@@ -113,7 +113,7 @@ fun UserProfileScreen(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Interactive Actions Row
+    // Interactive Actions Row (properly clipped ripples)
     Row(
       modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
       horizontalArrangement = Arrangement.SpaceEvenly
@@ -184,14 +184,16 @@ fun UserActionPill(
   textColor: Color,
   onClick: () -> Unit
 ) {
+  val pillShape = RoundedCornerShape(16.dp)
   Surface(
-    shape = RoundedCornerShape(16.dp),
+    shape = pillShape,
     color = surfaceColor,
     shadowElevation = 2.dp,
+    onClick = onClick,
     modifier = Modifier
       .width(76.dp)
       .height(64.dp)
-      .clickable(onClick = onClick)
+      .clip(pillShape) // Clips ripple strictly to rounded pill shape
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
