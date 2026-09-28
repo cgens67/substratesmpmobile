@@ -189,6 +189,26 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
+  fun updateCoordinates(coords: String) {
+    viewModelScope.launch {
+      authRepository.updateCoordinates(coords)
+    }
+  }
+
+  fun requestUserLocation(targetGamertag: String, channelId: String = _activeChannel.value.id) {
+    val myTag = userState.value.gamertag.trim()
+    if (myTag.isBlank() || targetGamertag.isBlank()) return
+
+    val target = _members.value.find { it.gamertag.equals(targetGamertag, ignoreCase = true) }
+    val lastKnownCoords = target?.lastCoordinates?.ifBlank { null }
+
+    sendMessage(
+      content = "📍 Location Request",
+      coordinates = lastKnownCoords,
+      replyTo = null
+    )
+  }
+
   fun translateMessage(messageId: String, text: String, targetLangCode: String) {
     viewModelScope.launch(Dispatchers.IO) {
       try {
@@ -472,7 +492,18 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val role = doc.getString("role") ?: if (isAdmin) "ADMIN" else "MEMBER"
               val bio = doc.getString("bio") ?: ""
               val birthday = doc.getString("birthday") ?: ""
-              AdminMember(id = doc.id, gamertag = gamertag, role = role, isAdmin = isAdmin, bio = bio, birthday = birthday)
+              val lastCoords = doc.getString("lastCoordinates") ?: ""
+              val lastCoordsTs = doc.getLong("lastCoordinatesTimestamp") ?: 0L
+              AdminMember(
+                id = doc.id,
+                gamertag = gamertag,
+                role = role,
+                isAdmin = isAdmin,
+                bio = bio,
+                birthday = birthday,
+                lastCoordinates = lastCoords,
+                lastCoordinatesTimestamp = lastCoordsTs
+              )
             }
             _members.value = rawList.distinctBy { it.gamertag.lowercase().trim() }
           }
@@ -500,6 +531,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   fun postStatus(content: String, theme: String, activity: String, coords: String?) {
     if (content.isBlank()) return
     val user = userState.value
+    if (!coords.isNullOrBlank()) {
+      updateCoordinates(coords)
+    }
     firestore.collection("statuses").add(
       hashMapOf(
         "authorGamertag" to user.gamertag,
@@ -686,6 +720,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     setTyping(false)
     val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
     val channelId = _activeChannel.value.id
+
+    // Update user's latest coordinates in profile if coordinates are attached
+    if (!coordinates.isNullOrBlank()) {
+      updateCoordinates(coordinates)
+    }
 
     chatRepository.sendMessage(
       channelId = channelId,
