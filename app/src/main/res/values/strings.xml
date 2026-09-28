@@ -52,6 +52,16 @@
     <string name="attach_location">Location</string>
     <string name="recording_indicator">HD Recording %1$ds</string>
 
+    <!-- Location & Coordinates Tracking -->
+    <string name="location_request_title">Location Request</string>
+    <string name="location_request_from">Requested location from @%1$s</string>
+    <string name="location_last_known">Last known: %1$s</string>
+    <string name="action_send_my_location">Send Current Location</string>
+    <string name="action_request_location">Request Location</string>
+    <string name="action_share_coordinates">Share Coordinates</string>
+    <string name="location_no_coords">No coordinates on record</string>
+    <string name="dialog_choose_location_action">Choose Location Action</string>
+
     <!-- Navigation & Tabs -->
     <string name="nav_chats">Chats</string>
     <string name="nav_contacts">Contacts</string>
