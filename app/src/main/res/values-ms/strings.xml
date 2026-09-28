@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Substrate SMP</string>
+    <string name="default_server_ip">mc.substratesmp.net:19132</string>
+    <string name="default_server_domain">mc.substratesmp.net</string>
+
+    <!-- Tindakan Umum -->
+    <string name="action_cancel">Batal</string>
+    <string name="action_save">Simpan</string>
+    <string name="action_done">Selesai</string>
+    <string name="action_ok">OK</string>
+    <string name="action_back">Kembali</string>
+    <string name="action_close">Tutup</string>
+    <string name="action_delete">Padam</string>
+    <string name="action_search">Cari</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_send">Hantar</string>
+    <string name="action_clear">Kosongkan</string>
+    <string name="action_message">Mesej</string>
+
+    <!-- Sembang & Pemesejan -->
+    <string name="chat_today">Hari Ini</string>
+    <string name="chat_yesterday">Semalam</string>
+    <string name="message_placeholder">Mesej</string>
+    <string name="message_options">Pilihan Mesej</string>
+    <string name="action_reply">Balas</string>
+    <string name="action_translate_message">Terjemah Mesej</string>
+    <string name="action_copy_text">Salin Teks</string>
+    <string name="action_delete_everyone">Padam untuk semua orang</string>
+    <string name="translate_to_english">Terjemah ke Bahasa Inggeris</string>
+    <string name="translate_to_chinese">Terjemah ke Bahasa Cina</string>
+    <string name="translate_to_malay">Terjemah ke Bahasa Melayu</string>
+    <string name="label_translated">Diterjemah</string>
+    <string name="label_edited">Diedit</string>
+    <string name="label_voice_message_hd">Mesej suara (HD)</string>
+    <string name="label_audio_file">Fail audio</string>
+    <string name="label_document">Dokumen</string>
+    <string name="label_tap_to_download">Ketik untuk muat turun</string>
+    <string name="replying_to">Membalas kepada %1$s</string>
+    <string name="editing_message">Mengedit Mesej</string>
+    <string name="coordinates_placeholder">Koordinat (cth. X: -120, Y: 64, Z: 540)</string>
+    <string name="typing_indicator">%1$s sedang menaip…</string>
+    <string name="direct_message">Mesej Peribadi</string>
+    <string name="admin_badge">ADMIN</string>
+
+    <!-- Sebutan & Lampiran -->
+    <string name="mention_header">Sebut</string>
+    <string name="attach_document">Dokumen</string>
+    <string name="attach_audio">Audio</string>
+    <string name="attach_gallery">Galeri</string>
+    <string name="attach_camera">Kamera</string>
+    <string name="attach_location">Lokasi</string>
+    <string name="recording_indicator">Rakaman HD %1$ds</string>
+
+    <!-- Navigasi & Tab -->
+    <string name="nav_chats">Sembang</string>
+    <string name="nav_contacts">Kenalan</string>
+    <string name="nav_settings">Tetapan</string>
+    <string name="nav_profile">Profil</string>
+    <string name="chip_all">Semua</string>
+    <string name="chip_unread">Belum Dibaca</string>
+    <string name="chip_favourites">Kegemaran</string>
+    <string name="chip_groups">Kumpulan</string>
+
+    <!-- Senarai Saluran & Status -->
+    <string name="no_unread_chats">Tiada sembang belum dibaca</string>
+    <string name="no_favourite_chats">Tiada sembang kegemaran lagi. Tekan lama sembang untuk berbintang.</string>
+    <string name="no_group_channels">Tiada saluran kumpulan dijumpai</string>
+    <string name="no_chats_found">Tiada sembang dijumpai</string>
+    <string name="blocked_user_banner">Anda telah menyekat pemain ini. Ketik untuk nyahsekat.</string>
+    <string name="admin_only_banner">Hanya Admin pelayan boleh menghantar mesej di saluran ini.</string>
+    <string name="pm_tag">• PM</string>
+
+    <!-- Skrin Tetapan -->
+    <string name="settings_title">Tetapan</string>
+    <string name="settings_search_hint">Cari tetapan…</string>
+    <string name="settings_account">Akaun</string>
+    <string name="settings_account_sub">Nombor, Nama Pengguna, Bio</string>
+    <string name="settings_appearance">Penampilan</string>
+    <string name="settings_appearance_sub">Kertas Dinding, Mod Gelap, Animasi</string>
+    <string name="settings_privacy_policy">Dasar Privasi</string>
+    <string name="settings_privacy_policy_sub">Firebase, ImgBB, Agora.io</string>
+    <string name="settings_language">Bahasa</string>
+    <string name="settings_appearance_dialog_title">Tetapan Penampilan</string>
+    <string name="settings_dark_mode">Mod Gelap</string>
+    <string name="settings_smooth_animations">Animasi Lancar</string>
+    <string name="settings_auto_translate_title">Terjemah Mesej Automatik</string>
+    <string name="settings_auto_translate_sub">Terjemah mesej masuk secara automatik ke bahasa pilihan anda</string>
+    <string name="settings_select_language">Pilih Bahasa Aplikasi</string>
+    <string name="settings_language_dialog_title">Bahasa &amp; Terjemahan</string>
+
+    <!-- Profil Pengguna -->
+    <string name="profile_guest">Profil Tetamu</string>
+    <string name="profile_online">dalam talian</string>
+    <string name="profile_offline">luar talian</string>
+    <string name="profile_edit_info">Edit Maklumat</string>
+    <string name="profile_bio_label">Bio</string>
+    <string name="profile_birthday_label">Hari Lahir</string>
+    <string name="profile_username_label">Nama Pengguna</string>
+    <string name="profile_no_bio">Tiada bio ditambah.</string>
+    <string name="profile_not_set">Belum ditetapkan</string>
+    <string name="profile_select_date">Pilih tarikh</string>
+    <string name="profile_role_prefix">Peranan Bedrock: %1$s</string>
+    <string name="profile_welcome_back">Selamat kembali!</string>
+    <string name="profile_create_account">Cipta akaun anda</string>
+    <string name="profile_gamertag_label">Gamertag</string>
+    <string name="profile_password_label">Kata Laluan</string>
+    <string name="profile_login">Log Masuk</string>
+    <string name="profile_register">Daftar</string>
+    <string name="profile_prompt_register">Tiada akaun? Daftar</string>
+    <string name="profile_prompt_login">Sudah ada akaun? Log Masuk</string>
+    <string name="user_action_mute">Redam</string>
+    <string name="user_action_unmute">Buka Redam</string>
+    <string name="user_action_favorite">Kegemaran</string>
+    <string name="user_action_favorited">Digemari</string>
+    <string name="user_action_block">Sekat</string>
+    <string name="user_action_unblock">Nyahsekat</string>
+
+    <!-- Skrin Maklumat Saluran -->
+    <string name="channel_members_tab">Ahli</string>
+    <string name="channel_media_tab">Media</string>
+    <string name="channel_files_tab">Fail</string>
+    <string name="channel_links_tab">Pautan</string>
+    <string name="channel_music_tab">Muzik</string>
+    <string name="channel_gifs_tab">GIF</string>
+    <string name="channel_action_leave">Keluar</string>
+    <string name="channel_add_members">Tambah Ahli</string>
+    <string name="channel_members_count">%1$d ahli</string>
+    <string name="no_media_yet">Tiada media dikongsi lagi</string>
+    <string name="no_files_yet">Tiada fail dikongsi lagi</string>
+    <string name="no_links_yet">Tiada pautan dikongsi lagi</string>
+    <string name="no_audio_yet">Tiada audio dikongsi lagi</string>
+    <string name="no_gifs_yet">Tiada pelekat atau GIF dikongsi lagi</string>
+    <string name="edit_channel_info_title">Edit Maklumat Saluran</string>
+    <string name="channel_name_label">Nama Saluran</string>
+    <string name="channel_desc_label">Penerangan</string>
+
+    <!-- Menu Pilihan -->
+    <string name="menu_mute_notifications">Redamkan pemberitahuan</string>
+    <string name="menu_unmute_notifications">Buka redam pemberitahuan</string>
+    <string name="menu_mute_sub">Senyapkan pemberitahuan sembang ini</string>
+    <string name="menu_unmute_sub">Hidupkan semula bunyi pemberitahuan</string>
+    <string name="menu_add_favourites">Tambah ke Kegemaran</string>
+    <string name="menu_remove_favourites">Buang daripada Kegemaran</string>
+    <string name="menu_add_fav_sub">Kekalkan di atas penapis kegemaran</string>
+    <string name="menu_remove_fav_sub">Buang bintang kegemaran</string>
+    <string name="menu_block_user">Sekat %1$s</string>
+    <string name="menu_unblock_user">Nyahsekat %1$s</string>
+    <string name="menu_block_sub">Berhenti menerima mesej</string>
+    <string name="menu_unblock_sub">Benarkan semula mesej</string>
+    <string name="menu_server_ip">IP Pelayan Bedrock</string>
+    <string name="menu_admin_console">Konsol Kawalan Admin</string>
+    <string name="menu_admin_console_sub">Urus saluran dan peranan pemain</string>
+    <string name="copied_server_ip">IP Pelayan disalin ke papan keratan</string>
+    <string name="copied_channel_name">Nama saluran disalin</string>
+    <string name="copied_text">Teks disalin</string>
+    <string name="downloading_file_chunks">Memuat turun bahagian fail…</string>
+    <string name="saved_to_downloads">Disimpan ke Muat Turun: %1$s</string>
+    <string name="download_failed">Muat turun gagal: %1$s</string>
+    <string name="menu_lock_admin">Kunci untuk Admin sahaja</string>
+    <string name="menu_unlock_all">Buka untuk semua ahli</string>
+    <string name="lang_english">Bahasa Inggeris (English)</string>
+    <string name="lang_chinese">Bahasa Cina (Chinese)</string>
+    <string name="lang_malay">Bahasa Melayu (Malay)</string>
+</resources>
