@@ -71,35 +71,39 @@ class AuthRepository(private val context: Context) {
   private fun startLiveUserListener(uid: String) {
     userDocListener?.remove()
     userDocListener = firestore.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
-      if (snapshot != null && snapshot.exists()) {
-        val liveRole = snapshot.getString("role") ?: "MEMBER"
-        val liveAdmin = snapshot.getBoolean("isAdmin") ?: (liveRole == "ADMIN")
-        val liveTag = snapshot.getString("gamertag") ?: _userState.value.gamertag
-        val liveBio = snapshot.getString("bio") ?: _userState.value.bio
-        val liveBirthday = snapshot.getString("birthday") ?: _userState.value.birthday
-        val liveCoords = snapshot.getString("lastCoordinates") ?: _userState.value.lastCoordinates
-        val liveCoordsTs = snapshot.getLong("lastCoordinatesTimestamp") ?: _userState.value.lastCoordinatesTimestamp
-
-        prefs.edit()
-          .putString("role", liveRole)
-          .putBoolean("isAdmin", liveAdmin)
-          .putString("gamertag", liveTag)
-          .putString("bio", liveBio)
-          .putString("birthday", liveBirthday)
-          .putString("lastCoordinates", liveCoords)
-          .putLong("lastCoordinatesTimestamp", liveCoordsTs)
-          .apply()
-
-        _userState.value = _userState.value.copy(
-          gamertag = liveTag,
-          role = liveRole,
-          isAdmin = liveAdmin,
-          bio = liveBio,
-          birthday = liveBirthday,
-          lastCoordinates = liveCoords,
-          lastCoordinatesTimestamp = liveCoordsTs
-        )
+      // INSTANT KICK: If the user document was removed or marked isDeleted = true, kick out immediately!
+      if (snapshot == null || !snapshot.exists() || snapshot.getBoolean("isDeleted") == true) {
+        logout()
+        return@addSnapshotListener
       }
+
+      val liveRole = snapshot.getString("role") ?: "MEMBER"
+      val liveAdmin = snapshot.getBoolean("isAdmin") ?: (liveRole == "ADMIN")
+      val liveTag = snapshot.getString("gamertag") ?: _userState.value.gamertag
+      val liveBio = snapshot.getString("bio") ?: _userState.value.bio
+      val liveBirthday = snapshot.getString("birthday") ?: _userState.value.birthday
+      val liveCoords = snapshot.getString("lastCoordinates") ?: _userState.value.lastCoordinates
+      val liveCoordsTs = snapshot.getLong("lastCoordinatesTimestamp") ?: _userState.value.lastCoordinatesTimestamp
+
+      prefs.edit()
+        .putString("role", liveRole)
+        .putBoolean("isAdmin", liveAdmin)
+        .putString("gamertag", liveTag)
+        .putString("bio", liveBio)
+        .putString("birthday", liveBirthday)
+        .putString("lastCoordinates", liveCoords)
+        .putLong("lastCoordinatesTimestamp", liveCoordsTs)
+        .apply()
+
+      _userState.value = _userState.value.copy(
+        gamertag = liveTag,
+        role = liveRole,
+        isAdmin = liveAdmin,
+        bio = liveBio,
+        birthday = liveBirthday,
+        lastCoordinates = liveCoords,
+        lastCoordinatesTimestamp = liveCoordsTs
+      )
     }
   }
 
@@ -119,14 +123,16 @@ class AuthRepository(private val context: Context) {
       if (currentUser != null && savedGamertag.isNotBlank()) {
         currentUid = currentUser.uid
         val userDoc = firestore.collection("users").document(currentUid).get().await()
-        if (userDoc.exists()) {
-          savedGamertag = userDoc.getString("gamertag") ?: savedGamertag
-          savedRole = userDoc.getString("role") ?: savedRole
-          savedBio = userDoc.getString("bio") ?: savedBio
-          savedBirthday = userDoc.getString("birthday") ?: savedBirthday
-          savedCoords = userDoc.getString("lastCoordinates") ?: savedCoords
-          savedCoordsTs = userDoc.getLong("lastCoordinatesTimestamp") ?: savedCoordsTs
+        if (!userDoc.exists() || userDoc.getBoolean("isDeleted") == true) {
+          logout()
+          return
         }
+        savedGamertag = userDoc.getString("gamertag") ?: savedGamertag
+        savedRole = userDoc.getString("role") ?: savedRole
+        savedBio = userDoc.getString("bio") ?: savedBio
+        savedBirthday = userDoc.getString("birthday") ?: savedBirthday
+        savedCoords = userDoc.getString("lastCoordinates") ?: savedCoords
+        savedCoordsTs = userDoc.getLong("lastCoordinatesTimestamp") ?: savedCoordsTs
         isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
         startLiveUserListener(currentUid)
