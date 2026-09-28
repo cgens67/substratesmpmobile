@@ -13,67 +13,21 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.ClickableText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.InsertDriveFile
 import androidx.compose.material.icons.automirrored.filled.Reply
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.DoneAll
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.Place
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Translate
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
@@ -101,19 +56,7 @@ import coil.decode.ImageDecoderDecoder
 import com.google.firebase.firestore.FirebaseFirestore
 import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.model.ChatMessage
-import com.joseph.substratesmp.ui.theme.ChatDarkIncomingBubble
-import com.joseph.substratesmp.ui.theme.ChatDarkIncomingTime
-import com.joseph.substratesmp.ui.theme.ChatDarkOutgoingBubble
-import com.joseph.substratesmp.ui.theme.ChatDarkOutgoingTime
-import com.joseph.substratesmp.ui.theme.ChatLightIncomingBubble
-import com.joseph.substratesmp.ui.theme.ChatLightIncomingTime
-import com.joseph.substratesmp.ui.theme.ChatLightOutgoingBubble
-import com.joseph.substratesmp.ui.theme.ChatLightOutgoingTime
-import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
-import com.joseph.substratesmp.ui.theme.RoleAdminGold
-import com.joseph.substratesmp.ui.theme.RoleAdminGoldContainer
-import com.joseph.substratesmp.ui.theme.WhatsAppCheckmarkBlue
-import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
+import com.joseph.substratesmp.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -387,6 +330,7 @@ fun ChatMessageItem(
   isRead: Boolean = false,
   isDelivered: Boolean = false,
   canDelete: Boolean = false,
+  isSenderDeleted: Boolean = false,
   onUserClick: (String) -> Unit = {},
   onDeleteMessage: (ChatMessage) -> Unit = {},
   onReply: (ChatMessage) -> Unit = {},
@@ -400,7 +344,13 @@ fun ChatMessageItem(
   val clipboardManager = LocalClipboardManager.current
   val scope = rememberCoroutineScope()
   val isLocal = message.isLocalUser
-  val isSenderAdmin = message.isAdmin
+  val isSenderAdmin = message.isAdmin && !isSenderDeleted
+
+  val displaySenderName = if (isSenderDeleted || message.senderName == "Deleted Account") {
+    "Deleted Account"
+  } else {
+    message.senderName
+  }
 
   val bubbleColor = if (isLocal) {
     if (isDarkMode) ChatDarkOutgoingBubble else ChatLightOutgoingBubble
@@ -542,10 +492,8 @@ fun ChatMessageItem(
   }
 
   val isLocationRequest = message.isLocationRequest || message.content.startsWith("📍 Location Request") || message.content.startsWith("📍 LOCATION_REQUEST")
-
   val offsetX = remember { Animatable(0f) }
 
-  // WhatsApp / Telegram natural tail positions: outgoing points bottom-right, incoming points bottom-left
   val bubbleShape = if (isLocal) {
     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
   } else {
@@ -640,11 +588,12 @@ fun ChatMessageItem(
           ) {
             if (!isLocal) {
               Text(
-                text = message.senderName, 
+                text = displaySenderName, 
                 fontSize = 11.sp, 
+                fontStyle = if (isSenderDeleted) FontStyle.Italic else FontStyle.Normal,
                 fontWeight = FontWeight.Bold, 
-                color = if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
-                modifier = Modifier.padding(bottom = 2.dp).clickable { onUserClick(message.senderName) }
+                color = if (isSenderDeleted) Color.Gray else if (isSenderAdmin) RoleAdminGold else WhatsAppGreenDark,
+                modifier = Modifier.padding(bottom = 2.dp).clickable { if (!isSenderDeleted) onUserClick(message.senderName) }
               )
             }
             AsyncImage(
@@ -686,7 +635,6 @@ fun ChatMessageItem(
               )
           ) {
             if (isShortSingleLine) {
-              // Perfectly baseline-aligned single line message (removes the superscript look)
               Row(
                 modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 5.dp, bottom = 5.dp)
               ) {
@@ -743,11 +691,12 @@ fun ChatMessageItem(
                 if (!isLocal) {
                   Row(
                     verticalAlignment = Alignment.CenterVertically, 
-                    modifier = Modifier.padding(bottom = 4.dp).clickable { onUserClick(message.senderName) }
+                    modifier = Modifier.padding(bottom = 4.dp).clickable { if (!isSenderDeleted) onUserClick(message.senderName) }
                   ) {
                     Text(
-                      text = message.senderName,
-                      color = if (isSenderAdmin) RoleAdminGold else (if (isDarkMode) Color(0xFF4FA5FF) else Color(0xFF007AFF)),
+                      text = displaySenderName,
+                      color = if (isSenderDeleted) Color.Gray else if (isSenderAdmin) RoleAdminGold else (if (isDarkMode) Color(0xFF4FA5FF) else Color(0xFF007AFF)),
+                      fontStyle = if (isSenderDeleted) FontStyle.Italic else FontStyle.Normal,
                       fontWeight = FontWeight.Bold,
                       fontSize = 12.5.sp
                     )
