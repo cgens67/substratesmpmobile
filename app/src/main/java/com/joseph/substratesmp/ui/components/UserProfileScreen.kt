@@ -51,7 +51,7 @@ fun UserProfileScreen(
   isDarkMode: Boolean,
   onNavigateBack: () -> Unit,
   onMessageUser: () -> Unit,
-  onRequestLocation: () -> Unit,
+  onRequestLocation: () -> Unit = {},
   onToggleMute: () -> Unit,
   onToggleFavourite: () -> Unit,
   onToggleBlock: () -> Unit
