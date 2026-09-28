@@ -165,9 +165,14 @@ fun StatusScreen(
                 color = textColor
               )
               Text(
-                text = if (myStatus != null) "Tap to view update • ${formatStatusTime(myStatus.timestamp)}" else "Tap to add realm adventure update",
+                text = if (myStatus != null) {
+                  if (!myStatus.musicTrackName.isNullOrBlank()) "🎵 ${myStatus.musicTrackName} • ${formatStatusTime(myStatus.timestamp)}"
+                  else "Tap to view update • ${formatStatusTime(myStatus.timestamp)}"
+                } else "Tap to add realm adventure update",
                 fontSize = 13.sp,
-                color = subTextColor
+                color = subTextColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
               )
             }
 
@@ -205,7 +210,7 @@ fun StatusScreen(
               Icon(Icons.Default.HistoryToggleOff, contentDescription = null, tint = subTextColor, modifier = Modifier.size(42.dp))
               Spacer(modifier = Modifier.height(8.dp))
               Text("No Recent Status Updates", fontWeight = FontWeight.Bold, color = textColor, fontSize = 15.sp)
-              Text("When friends share updates or base coordinates, they'll appear here.", color = subTextColor, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
+              Text("When friends share updates or soundtracks, they'll appear here.", color = subTextColor, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp))
             }
           }
         }
@@ -273,7 +278,17 @@ fun StatusScreen(
                     color = subTextColor
                   )
                 }
-                if (status.content.isNotBlank()) {
+                if (!status.musicTrackName.isNullOrBlank()) {
+                  Text(
+                    text = "🎵 ${status.musicTrackName} - ${status.musicArtistName ?: ""}",
+                    fontSize = 12.5.sp,
+                    color = Color(0xFF00A884),
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                  )
+                } else if (status.content.isNotBlank()) {
                   Text(
                     text = status.content,
                     fontSize = 13.5.sp,
