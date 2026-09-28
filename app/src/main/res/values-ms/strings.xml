@@ -52,6 +52,16 @@
     <string name="attach_location">Lokasi</string>
     <string name="recording_indicator">Rakaman HD %1$ds</string>
 
+    <!-- Lokasi & Penjejakan Koordinat -->
+    <string name="location_request_title">Permintaan Lokasi</string>
+    <string name="location_request_from">Meminta lokasi daripada @%1$s</string>
+    <string name="location_last_known">Terakhir diketahui: %1$s</string>
+    <string name="action_send_my_location">Hantar Lokasi Semasa</string>
+    <string name="action_request_location">Minta Lokasi</string>
+    <string name="action_share_coordinates">Kongsi Koordinat</string>
+    <string name="location_no_coords">Tiada rekod koordinat</string>
+    <string name="dialog_choose_location_action">Pilih Tindakan Lokasi</string>
+
     <!-- Navigasi & Tab -->
     <string name="nav_chats">Sembang</string>
     <string name="nav_contacts">Kenalan</string>
