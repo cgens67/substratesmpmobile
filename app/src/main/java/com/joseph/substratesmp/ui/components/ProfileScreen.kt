@@ -24,30 +24,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DatePicker
-import androidx.compose.material3.DatePickerDefaults
-import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -82,10 +66,13 @@ fun ProfileScreen(
   onNavigateHome: () -> Unit,
   onUpdateProfile: (String, String) -> Unit,
   onLogin: (String, String, (Result<String>) -> Unit) -> Unit,
-  onRegister: (String, String, (Result<String>) -> Unit) -> Unit
+  onRegister: (String, String, (Result<String>) -> Unit) -> Unit,
+  onLogout: () -> Unit = {}
 ) {
   val animState = remember { MutableTransitionState(false) }.apply { targetState = true }
   var showEditDialog by remember { mutableStateOf(false) }
+  var showProfileMenu by remember { mutableStateOf(false) }
+  var showLogoutConfirmDialog by remember { mutableStateOf(false) }
 
   val isLoggedIn = userState.gamertag.isNotBlank()
 
@@ -107,7 +94,25 @@ fun ProfileScreen(
       verticalAlignment = Alignment.CenterVertically
     ) {
       if (isLoggedIn) {
-        Icon(Icons.Default.MoreVert, contentDescription = null, tint = textColor)
+        Box {
+          IconButton(onClick = { showProfileMenu = true }) {
+            Icon(Icons.Default.MoreVert, contentDescription = "Profile Options", tint = textColor)
+          }
+          DropdownMenu(
+            expanded = showProfileMenu,
+            onDismissRequest = { showProfileMenu = false },
+            modifier = Modifier.background(surfaceColor)
+          ) {
+            DropdownMenuItem(
+              text = { Text("Log Out", color = Color(0xFFEA0038), fontWeight = FontWeight.Bold) },
+              leadingIcon = { Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null, tint = Color(0xFFEA0038)) },
+              onClick = {
+                showProfileMenu = false
+                showLogoutConfirmDialog = true
+              }
+            )
+          }
+        }
       }
     }
 
@@ -270,6 +275,30 @@ fun ProfileScreen(
         }
       }
     }
+  }
+
+  if (showLogoutConfirmDialog) {
+    AlertDialog(
+      onDismissRequest = { showLogoutConfirmDialog = false },
+      title = { Text("Log Out?") },
+      text = { Text("Are you sure you want to log out of @${userState.gamertag}? You will need your password to log back in.") },
+      confirmButton = {
+        Button(
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA0038)),
+          onClick = {
+            showLogoutConfirmDialog = false
+            onLogout()
+          }
+        ) {
+          Text("Log Out", color = Color.White)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { showLogoutConfirmDialog = false }) {
+          Text("Cancel", color = textColor)
+        }
+      }
+    )
   }
 
   if (showEditDialog) {
