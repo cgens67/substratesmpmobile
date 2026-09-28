@@ -27,6 +27,7 @@ import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 
 @Composable
 fun StatusCreatorDialog(
+  isDarkMode: Boolean = false,
   onDismiss: () -> Unit,
   onPostStatus: (
     text: String,
@@ -36,7 +37,8 @@ fun StatusCreatorDialog(
     musicName: String?,
     musicArtist: String?,
     musicPreview: String?,
-    musicArtwork: String?
+    musicArtwork: String?,
+    musicStartMs: Int
   ) -> Unit
 ) {
   var contentText by remember { mutableStateOf("") }
@@ -44,6 +46,7 @@ fun StatusCreatorDialog(
   var selectedTheme by remember { mutableStateOf("EMERALD") }
   var selectedActivity by remember { mutableStateOf("⛏️ Mining") }
   var selectedMusic by remember { mutableStateOf<MusicTrack?>(null) }
+  var selectedStartOffsetMs by remember { mutableIntStateOf(0) }
   var showMusicPicker by remember { mutableStateOf(false) }
 
   val themes = listOf(
@@ -96,7 +99,6 @@ fun StatusCreatorDialog(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Music attachment card / picker
         if (selectedMusic != null) {
           Surface(
             shape = RoundedCornerShape(12.dp),
@@ -116,9 +118,9 @@ fun StatusCreatorDialog(
               Spacer(modifier = Modifier.width(10.dp))
               Column(modifier = Modifier.weight(1f)) {
                 Text(selectedMusic!!.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1)
-                Text(selectedMusic!!.artist, color = Color.Gray, fontSize = 11.5.sp, maxLines = 1)
+                Text("${selectedMusic!!.artist} • Starts at ${selectedStartOffsetMs / 1000}s", color = Color.Gray, fontSize = 11.5.sp, maxLines = 1)
               }
-              IconButton(onClick = { selectedMusic = null }, modifier = Modifier.size(28.dp)) {
+              IconButton(onClick = { selectedMusic = null; selectedStartOffsetMs = 0 }, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Gray, modifier = Modifier.size(18.dp))
               }
             }
@@ -183,7 +185,8 @@ fun StatusCreatorDialog(
               selectedMusic?.title,
               selectedMusic?.artist,
               selectedMusic?.previewUrl,
-              selectedMusic?.artworkUrl
+              selectedMusic?.artworkUrl,
+              selectedStartOffsetMs
             )
             onDismiss()
           }
@@ -201,11 +204,28 @@ fun StatusCreatorDialog(
 
   if (showMusicPicker) {
     StatusMusicSelectorSheet(
+      isDarkMode = isDarkMode,
       onDismiss = { showMusicPicker = false },
-      onSelectTrack = { track ->
+      onSelectTrack = { track, startOffsetMs ->
         selectedMusic = track
+        selectedStartOffsetMs = startOffsetMs
         showMusicPicker = false
       }
     )
   }
+}
+
+// Convenient overload supporting legacy 4-parameter calls
+@Composable
+fun StatusCreatorDialog(
+  onDismiss: () -> Unit,
+  onPostStatus: (text: String, theme: String, activity: String, coords: String?) -> Unit
+) {
+  StatusCreatorDialog(
+    isDarkMode = false,
+    onDismiss = onDismiss,
+    onPostStatus = { text, theme, activity, coords, _, _, _, _, _ ->
+      onPostStatus(text, theme, activity, coords)
+    }
+  )
 }
