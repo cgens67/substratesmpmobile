@@ -879,7 +879,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl != null -> "📷 Photo"
       audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
       fileUrl != null -> "📄 ${fileName ?: "Document"}"
-      coordinates != null && content.isBlank() -> "📍 $coords"
+      coordinates != null && content.isBlank() -> "📍 $coordinates"
       else -> content.trim()
     }
     firestore.collection("channels").document(channelId).set(
