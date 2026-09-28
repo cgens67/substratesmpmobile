@@ -257,7 +257,6 @@ fun SubstrateApp(
     }
   }
 
-  // Instant jump to bottom when first opening chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
       delay(40L)
@@ -265,7 +264,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth scroll when new incoming/sent messages arrive
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -641,6 +639,7 @@ fun SubstrateApp(
                       ChatMessageItem(
                         message = message,
                         translatedText = translation,
+                        currentGamertag = userState.gamertag,
                         isDarkMode = isDarkMode,
                         isRead = isRead,
                         isDelivered = isDelivered,
@@ -658,6 +657,17 @@ fun SubstrateApp(
                         },
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
+                        onSendCurrentLocation = {
+                          // Prompt coordinate input with prefill
+                          chatInputText = ""
+                          shouldForceScrollToBottom = true
+                          if (userState.lastCoordinates.isNotBlank()) {
+                            viewModel.sendMessage(
+                              content = "",
+                              coordinates = userState.lastCoordinates
+                            )
+                          }
+                        },
                         modifier = Modifier.animateItem(
                           fadeInSpec = tween(200),
                           placementSpec = tween(250, easing = FastOutSlowInEasing),
@@ -795,7 +805,7 @@ fun SubstrateApp(
                         val recipient = activeChannel.dmRecipientGamertag ?: activeChannel.name
                         viewModel.requestUserLocation(recipient)
                       } else {
-                        viewModel.sendMessage(content = "📍 Location Request", coordinates = null)
+                        viewModel.sendMessage(content = "📍 Location Request", coordinates = null, isLocationRequest = true)
                       }
                     },
                     replyingTo = replyingToMessage,
