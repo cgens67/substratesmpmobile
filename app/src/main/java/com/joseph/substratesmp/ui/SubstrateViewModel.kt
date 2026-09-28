@@ -205,7 +205,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     sendMessage(
       content = "📍 Location Request",
       coordinates = lastKnownCoords,
-      replyTo = null
+      isLocationRequest = true,
+      locationTargetGamertag = targetGamertag
     )
   }
 
@@ -390,6 +391,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         val preview = when {
+          content.startsWith("📍 Location Request") -> "📍 Location Request"
           sticker -> "💟 Sticker"
           img != null -> "📷 Photo"
           aud != null -> if (dur > 0) "🎤 Voice message" else "🎵 ${fn ?: "Audio file"}"
@@ -707,7 +709,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     fileUrl: String? = null,
     fileName: String? = null,
     isSticker: Boolean = false,
-    replyTo: ChatMessage? = null
+    replyTo: ChatMessage? = null,
+    isLocationRequest: Boolean = false,
+    locationTargetGamertag: String? = null
   ) {
     val user = userState.value
     if (user.gamertag.isBlank()) {
@@ -715,13 +719,12 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       return
     }
     if (_activeChannel.value.isRestrictedToAdmin && !user.isAdmin) return
-    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null && !isLocationRequest) return
 
     setTyping(false)
     val role = if (user.isAdmin || user.gamertag.equals("Siang5680", ignoreCase = true)) "ADMIN" else user.role
     val channelId = _activeChannel.value.id
 
-    // Update user's latest coordinates in profile if coordinates are attached
     if (!coordinates.isNullOrBlank()) {
       updateCoordinates(coordinates)
     }
@@ -740,10 +743,13 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       isSticker = isSticker,
       replyToId = replyTo?.id,
       replyToSender = replyTo?.senderName,
-      replyToContent = replyTo?.content
+      replyToContent = replyTo?.content,
+      isLocationRequest = isLocationRequest,
+      locationTargetGamertag = locationTargetGamertag
     )
 
     val preview = when {
+      isLocationRequest -> "📍 Location Request"
       isSticker -> "💟 Sticker"
       imageUrl != null -> "📷 Photo"
       audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
