@@ -4,37 +4,12 @@ import android.view.SurfaceView
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Cameraswitch
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.joseph.substratesmp.data.model.ActiveVoiceRoom
-import com.joseph.substratesmp.ui.theme.RoleAdminGold
 import com.joseph.substratesmp.ui.theme.StatusCallEndRed
 import com.joseph.substratesmp.voice.AgoraVoiceManager
 
@@ -54,6 +28,7 @@ fun VideoCallScreen(
   voiceRoom: ActiveVoiceRoom,
   voiceManager: AgoraVoiceManager,
   onDisconnect: () -> Unit,
+  onMinimize: () -> Unit = {},
   onAddPerson: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
@@ -98,6 +73,26 @@ fun VideoCallScreen(
       }
     }
 
+    // Top-Left Floating Minimize Button (Keeps call running in background)
+    IconButton(
+      onClick = onMinimize,
+      modifier = Modifier
+        .align(Alignment.TopStart)
+        .statusBarsPadding()
+        .padding(16.dp)
+        .size(42.dp)
+        .clip(CircleShape)
+        .background(Color.Black.copy(alpha = 0.6f))
+    ) {
+      Icon(
+        imageVector = Icons.Default.KeyboardArrowDown,
+        contentDescription = "Minimize Call",
+        tint = Color.White,
+        modifier = Modifier.size(24.dp)
+      )
+    }
+
+    // Local Video View
     AnimatedVisibility(
       visible = voiceRoom.isCameraOn,
       modifier = Modifier
@@ -124,6 +119,7 @@ fun VideoCallScreen(
       }
     }
 
+    // Call Control Pill
     Surface(
       shape = RoundedCornerShape(28.dp),
       color = Color.Black.copy(alpha = 0.75f),
@@ -165,7 +161,6 @@ fun VideoCallScreen(
           Icon(if (voiceRoom.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown, contentDescription = "Speaker", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
-        // Add / Invite People Button to Private Call
         IconButton(
           onClick = onAddPerson,
           modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
