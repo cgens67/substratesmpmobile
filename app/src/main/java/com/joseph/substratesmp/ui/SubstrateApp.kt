@@ -91,6 +91,35 @@ fun formatChatListTime(timestamp: Long, yesterdayText: String): String {
   }
 }
 
+fun isSameDay(ts1: Long, ts2: Long): Boolean {
+  val cal1 = Calendar.getInstance().apply { timeInMillis = ts1 }
+  val cal2 = Calendar.getInstance().apply { timeInMillis = ts2 }
+  return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+         cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
+fun formatDatePill(timestamp: Long, todayText: String, yesterdayText: String): String {
+  if (timestamp <= 0L) return todayText
+  val now = System.currentTimeMillis()
+  val calNow = Calendar.getInstance().apply { timeInMillis = now }
+  val calMsg = Calendar.getInstance().apply { timeInMillis = timestamp }
+
+  val isToday = calNow.get(Calendar.YEAR) == calMsg.get(Calendar.YEAR) &&
+                calNow.get(Calendar.DAY_OF_YEAR) == calMsg.get(Calendar.DAY_OF_YEAR)
+
+  val isYesterday = calNow.get(Calendar.YEAR) == calMsg.get(Calendar.YEAR) &&
+                    calNow.get(Calendar.DAY_OF_YEAR) - calMsg.get(Calendar.DAY_OF_YEAR) == 1
+
+  val isSameYear = calNow.get(Calendar.YEAR) == calMsg.get(Calendar.YEAR)
+
+  return when {
+    isToday -> todayText
+    isYesterday -> yesterdayText
+    isSameYear -> SimpleDateFormat("MMMM d", Locale.getDefault()).format(Date(timestamp))
+    else -> SimpleDateFormat("MMMM d, yyyy", Locale.getDefault()).format(Date(timestamp))
+  }
+}
+
 @Composable
 fun FloatingBottomNavBar(
   currentScreen: String,
@@ -99,13 +128,13 @@ fun FloatingBottomNavBar(
   isDarkMode: Boolean,
   modifier: Modifier = Modifier
 ) {
-  val surfaceColor = if (isDarkMode) Color(0xFF1D1F24) else Color.White
+  val surfaceColor = if (isDarkMode) Color(0xFF2E2E2E) else Color.White
   val pillShape = RoundedCornerShape(32.dp)
   
   Surface(
     shape = pillShape,
     color = surfaceColor,
-    border = if (isDarkMode) BorderStroke(1.dp, Color(0xFF282A30)) else null,
+    border = if (isDarkMode) BorderStroke(1.dp, Color(0xFF3D3D3D)) else null,
     shadowElevation = 8.dp,
     modifier = modifier.height(64.dp).clip(pillShape)
   ) {
@@ -126,7 +155,7 @@ fun FloatingBottomNavBar(
         isSelected = currentScreen == "profile_screen",
         isDarkMode = isDarkMode,
         customIcon = {
-          Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(Color(0xFF1C2228)), contentAlignment = Alignment.Center) {
+          Box(modifier = Modifier.size(24.dp).clip(CircleShape).background(if (isDarkMode) Color(0xFF404040) else Color(0xFF1C2228)), contentAlignment = Alignment.Center) {
             Text(userInitial, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
           }
         },
@@ -139,7 +168,7 @@ fun FloatingBottomNavBar(
 @Composable
 fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, isSelected: Boolean, isDarkMode: Boolean, customIcon: @Composable (() -> Unit)? = null, onClick: () -> Unit) {
   val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF00A884) else Color(0xFFE1F5FE)) else Color.Transparent
-  val contentColor = if (isSelected) (if (isDarkMode) Color.White else Color(0xFF0288D1)) else (if (isDarkMode) Color(0xFF8E9297) else Color.Gray)
+  val contentColor = if (isSelected) (if (isDarkMode) Color.White else Color(0xFF0288D1)) else (if (isDarkMode) Color(0xFFA0A0A5) else Color.Gray)
   val itemShape = RoundedCornerShape(20.dp)
 
   Surface(
@@ -214,12 +243,13 @@ fun SubstrateApp(
   }
 
   val isDarkMode = appSettings.isNightMode
-  val menuDarkBg = Color(0xFF0F1012)
-  val menuDarkSurface = Color(0xFF191A1E)
-  val menuDarkSearch = Color(0xFF1E2024)
-  val menuDarkBorder = Color(0xFF282A30)
-  val menuDarkText = Color(0xFFF2F3F5)
-  val menuDarkSubtext = Color(0xFF8E9297)
+  // REDESIGNED MAIN MENU DARK PALETTE (Anchored around #262626)
+  val menuDarkBg = Color(0xFF262626)
+  val menuDarkSurface = Color(0xFF303030)
+  val menuDarkSearch = Color(0xFF1E1E1E)
+  val menuDarkBorder = Color(0xFF3D3D3D)
+  val menuDarkText = Color(0xFFEDEDED)
+  val menuDarkSubtext = Color(0xFFA0A0A5)
 
   val bgColor = if (isDarkMode) menuDarkBg else Color.White
   val surfaceColor = if (isDarkMode) menuDarkSurface else Color.White
@@ -229,6 +259,9 @@ fun SubstrateApp(
   val chatBgColor = if (isDarkMode) ChatDarkBackground else ChatLightBackground
   val datePillBg = if (isDarkMode) ChatDarkDatePill else ChatLightDatePill
   val datePillTextColor = if (isDarkMode) ChatDarkIncomingTime else ChatLightIncomingTime
+
+  val todayText = stringResource(R.string.chat_today)
+  val yesterdayText = stringResource(R.string.chat_yesterday)
 
   fun openStatus(status: StatusUpdate) {
     statusToDisplay = status
@@ -261,7 +294,12 @@ fun SubstrateApp(
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
       delay(40L)
-      listState.scrollToItem((messages.size + 1).coerceAtLeast(0))
+      val total = listState.layoutInfo.totalItemsCount
+      if (total > 0) {
+        listState.scrollToItem(total - 1)
+      } else {
+        listState.scrollToItem(messages.size)
+      }
     }
   }
 
@@ -619,15 +657,22 @@ fun SubstrateApp(
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                   LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
-                    item {
-                      Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = datePillBg) {
-                          Text(stringResource(R.string.chat_today), color = datePillTextColor, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                    // DYNAMIC DATE PILLS PER CALENDAR DAY
+                    itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
+                      val showDateHeader = index == 0 || !isSameDay(messages[index - 1].timestamp, message.timestamp)
+                      if (showDateHeader) {
+                        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
+                          Surface(shape = RoundedCornerShape(8.dp), color = datePillBg) {
+                            Text(
+                              text = formatDatePill(message.timestamp, todayText, yesterdayText),
+                              color = datePillTextColor,
+                              style = MaterialTheme.typography.labelSmall,
+                              modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                            )
+                          }
                         }
                       }
-                    }
 
-                    items(messages, key = { it.id }) { message ->
                       val isRead = if (activeChannel.isDm) {
                         val recipient = activeChannel.dmRecipientGamertag
                         if (!recipient.isNullOrBlank()) {
@@ -968,7 +1013,6 @@ fun SubstrateApp(
               val unreadLabel = stringResource(R.string.chip_unread)
               val favsLabel = stringResource(R.string.chip_favourites)
               val groupsLabel = stringResource(R.string.chip_groups)
-              val yesterdayText = stringResource(R.string.chat_yesterday)
 
               val filtered = channels.filter { it.type == ChannelType.TEXT }
                 .filter { ch ->
@@ -1044,7 +1088,7 @@ fun SubstrateApp(
                           .background(
                             if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f)
                             else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f)
-                            else if (isDarkMode) Color(0xFF24252A)
+                            else if (isDarkMode) Color(0xFF383838)
                             else WhatsAppNavSelectedPill
                           ),
                         contentAlignment = Alignment.Center
@@ -1121,7 +1165,7 @@ fun SubstrateApp(
                       }
                     }
                     HorizontalDivider(
-                      color = if (isDarkMode) Color(0xFF1F2026) else WhatsAppDivider, 
+                      color = if (isDarkMode) Color(0xFF333333) else WhatsAppDivider, 
                       thickness = 0.5.dp, 
                       modifier = Modifier.padding(start = 82.dp)
                     )
