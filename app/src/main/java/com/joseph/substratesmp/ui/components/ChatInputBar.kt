@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.SentimentSatisfied
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.FloatingActionButtonDefaults
@@ -65,6 +66,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -80,11 +82,13 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.CoordinateTextStyle
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
@@ -316,6 +320,7 @@ fun ChatInputBar(
     isSticker: Boolean,
     replyTo: ChatMessage?
   ) -> Unit,
+  onRequestLocation: () -> Unit = {},
   replyingTo: ChatMessage? = null,
   onCancelReply: () -> Unit = {},
   editingMessage: ChatMessage? = null,
@@ -330,6 +335,7 @@ fun ChatInputBar(
 
   var showAttachmentMenu by remember { mutableStateOf(false) }
   var showCoordinateInput by remember { mutableStateOf(false) }
+  var showLocationActionDialog by remember { mutableStateOf(false) }
   var coordText by remember { mutableStateOf("") }
   var isUploadingImage by remember { mutableStateOf(false) }
 
@@ -490,7 +496,7 @@ fun ChatInputBar(
         ) {
           Column(modifier = Modifier.padding(vertical = 4.dp)) {
             Text(
-              text = "Mention",
+              text = stringResource(R.string.mention_header),
               fontSize = 11.5.sp,
               fontWeight = FontWeight.Bold,
               color = subTextColor,
@@ -503,10 +509,11 @@ fun ChatInputBar(
                 .heightIn(max = 190.dp)
             ) {
               items(mentionOptions) { option ->
+                val pillShape = RoundedCornerShape(8.dp)
                 Row(
                   modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
+                    .clip(pillShape)
                     .clickable {
                       val atIdx = text.lastIndexOf('@')
                       if (atIdx != -1) {
@@ -567,25 +574,36 @@ fun ChatInputBar(
         exit = slideOutVertically(animationSpec = tween(200)) { it } + shrinkVertically(animationSpec = tween(200)) + fadeOut()
       ) {
         replyingTo?.let { replyTarget ->
+          val pillShape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
           Surface(
-            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
+            shape = pillShape,
             color = menuBgColor,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+            modifier = Modifier.fillMaxWidth().clip(pillShape).padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
             Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
               Box(modifier = Modifier.width(3.dp).height(32.dp).background(WhatsAppGreenDark, RoundedCornerShape(2.dp)))
               Spacer(modifier = Modifier.width(8.dp))
               Column(modifier = Modifier.weight(1f)) {
-                Text("Replying to ${replyTarget.senderName}", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
                 Text(
-                  replyTarget.content.ifBlank { if (replyTarget.isSticker) "💟 Sticker" else if (replyTarget.imageUrl != null) "📷 Photo" else if (replyTarget.fileUrl != null) "📄 Document" else "🎤 Voice note" },
+                  text = stringResource(R.string.replying_to, replyTarget.senderName),
+                  fontWeight = FontWeight.Bold, 
+                  color = WhatsAppGreenDark, 
+                  fontSize = 12.sp
+                )
+                Text(
+                  text = replyTarget.content.ifBlank {
+                    if (replyTarget.isSticker) stringResource(R.string.channel_gifs_tab)
+                    else if (replyTarget.imageUrl != null) stringResource(R.string.attach_gallery)
+                    else if (replyTarget.fileUrl != null) stringResource(R.string.label_document)
+                    else stringResource(R.string.label_voice_message_hd)
+                  },
                   color = subTextColor,
                   fontSize = 11.5.sp,
                   maxLines = 1
                 )
               }
               IconButton(onClick = onCancelReply, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel reply", tint = subTextColor, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel), tint = subTextColor, modifier = Modifier.size(16.dp))
               }
             }
           }
@@ -598,20 +616,21 @@ fun ChatInputBar(
         exit = slideOutVertically(animationSpec = tween(200)) { it } + shrinkVertically(animationSpec = tween(200)) + fadeOut()
       ) {
         editingMessage?.let { editTarget ->
+          val pillShape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp)
           Surface(
-            shape = RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp),
+            shape = pillShape,
             color = menuBgColor,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
+            modifier = Modifier.fillMaxWidth().clip(pillShape).padding(horizontal = 4.dp, vertical = 2.dp)
           ) {
             Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
               Icon(Icons.Default.Edit, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(18.dp))
               Spacer(modifier = Modifier.width(8.dp))
               Column(modifier = Modifier.weight(1f)) {
-                Text("Editing Message", fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
+                Text(stringResource(R.string.editing_message), fontWeight = FontWeight.Bold, color = WhatsAppGreenDark, fontSize = 12.sp)
                 Text(editTarget.content, color = subTextColor, fontSize = 11.5.sp, maxLines = 1)
               }
               IconButton(onClick = onCancelEdit, modifier = Modifier.size(24.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cancel edit", tint = subTextColor, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel), tint = subTextColor, modifier = Modifier.size(16.dp))
               }
             }
           }
@@ -625,7 +644,7 @@ fun ChatInputBar(
           OutlinedTextField(
             value = coordText,
             onValueChange = { coordText = it },
-            placeholder = { Text("Coordinates (e.g. X: -120, Y: 64, Z: 540)", style = CoordinateTextStyle, color = subTextColor) },
+            placeholder = { Text(stringResource(R.string.coordinates_placeholder), style = CoordinateTextStyle, color = subTextColor) },
             textStyle = CoordinateTextStyle,
             modifier = Modifier.weight(1f).height(46.dp),
             singleLine = true,
@@ -636,80 +655,101 @@ fun ChatInputBar(
             shape = RoundedCornerShape(12.dp)
           )
           IconButton(onClick = { showCoordinateInput = false; coordText = "" }, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.Default.Close, contentDescription = "Cancel", tint = subTextColor, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_cancel), tint = subTextColor, modifier = Modifier.size(18.dp))
           }
         }
       }
 
       AnimatedVisibility(visible = showAttachmentMenu) {
+        val menuShape = RoundedCornerShape(16.dp)
         Surface(
-          shape = RoundedCornerShape(16.dp),
+          shape = menuShape,
           color = surfaceColor,
           shadowElevation = 3.dp,
-          modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+          modifier = Modifier.fillMaxWidth().clip(menuShape).padding(bottom = 6.dp)
         ) {
           Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.SpaceAround) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; fileLauncher.launch("*/*") }) {
               Surface(shape = CircleShape, color = Color(0xFF7E57C2), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = "Document", tint = Color.White) }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Document", fontSize = 12.sp, color = textColor)
+              Text(stringResource(R.string.attach_document), fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; audioLauncher.launch("audio/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE65100), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AudioFile, contentDescription = "Audio", tint = Color.White) }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.AudioFile, contentDescription = null, tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Audio", fontSize = 12.sp, color = textColor)
+              Text(stringResource(R.string.attach_audio), fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; galleryLauncher.launch("image/*") }) {
               Surface(shape = CircleShape, color = Color(0xFFE91E63), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Image, contentDescription = "Gallery", tint = Color.White) }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Image, contentDescription = null, tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Gallery", fontSize = 12.sp, color = textColor)
+              Text(stringResource(R.string.attach_gallery), fontSize = 12.sp, color = textColor)
             }
 
             Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; cameraLauncher.launch(null) }) {
               Surface(shape = CircleShape, color = Color(0xFF00A884), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = Color.White) }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Camera", fontSize = 12.sp, color = textColor)
+              Text(stringResource(R.string.attach_camera), fontSize = 12.sp, color = textColor)
             }
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable { showAttachmentMenu = false; showCoordinateInput = true }) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable {
+              showAttachmentMenu = false
+              showLocationActionDialog = true
+            }) {
               Surface(shape = CircleShape, color = Color(0xFF2196F3), modifier = Modifier.size(46.dp)) {
-                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Place, contentDescription = "Location", tint = Color.White) }
+                Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.Place, contentDescription = null, tint = Color.White) }
               }
               Spacer(modifier = Modifier.height(4.dp))
-              Text("Location", fontSize = 12.sp, color = textColor)
+              Text(stringResource(R.string.attach_location), fontSize = 12.sp, color = textColor)
             }
           }
         }
       }
 
       Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(26.dp), color = surfaceColor, shadowElevation = 1.dp) {
+        val inputPillShape = RoundedCornerShape(26.dp)
+        Surface(
+          modifier = Modifier.weight(1f).clip(inputPillShape),
+          shape = inputPillShape, 
+          color = surfaceColor, 
+          shadowElevation = 1.dp
+        ) {
           if (isRecording) {
             Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
               Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(10.dp).clip(CircleShape).background(StatusCallEndRed))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("HD Recording ${recordingSeconds}s", fontWeight = FontWeight.Bold, color = StatusCallEndRed, fontSize = 14.sp)
+                Text(
+                  text = stringResource(R.string.recording_indicator, recordingSeconds),
+                  fontWeight = FontWeight.Bold, 
+                  color = StatusCallEndRed, 
+                  fontSize = 14.sp
+                )
               }
-              Text("Cancel", color = subTextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
-                try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
-                recorder = null; isRecording = false; recordedAudioFile?.delete()
-              })
+              Text(
+                text = stringResource(R.string.action_cancel), 
+                color = subTextColor, 
+                fontSize = 13.sp, 
+                fontWeight = FontWeight.Bold, 
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                  try { recorder?.stop(); recorder?.release() } catch (_: Exception) {}
+                  recorder = null; isRecording = false; recordedAudioFile?.delete()
+                }
+              )
             }
           } else {
             Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
               IconButton(onClick = onToggleEmojiPicker, modifier = Modifier.size(34.dp)) {
-                Icon(if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied, contentDescription = "Emoji", tint = if (isEmojiPickerVisible) WhatsAppGreenDark else subTextColor, modifier = Modifier.size(24.dp))
+                Icon(if (isEmojiPickerVisible) Icons.Default.Keyboard else Icons.Default.SentimentSatisfied, contentDescription = null, tint = if (isEmojiPickerVisible) WhatsAppGreenDark else subTextColor, modifier = Modifier.size(24.dp))
               }
               OutlinedTextField(
                 value = text,
@@ -717,7 +757,7 @@ fun ChatInputBar(
                 modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) onTextFieldFocused() }.testTag("chat_text_input"),
                 placeholder = {
                   Text(
-                    text = "Message",
+                    text = stringResource(R.string.message_placeholder),
                     color = subTextColor,
                     fontSize = 15.sp,
                     maxLines = 1,
@@ -743,10 +783,10 @@ fun ChatInputBar(
                 maxLines = 4
               )
               IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = subTextColor, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.AttachFile, contentDescription = null, tint = subTextColor, modifier = Modifier.size(22.dp))
               }
               IconButton(onClick = { cameraLauncher.launch(null) }, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = subTextColor, modifier = Modifier.size(22.dp))
+                Icon(Icons.Default.CameraAlt, contentDescription = null, tint = subTextColor, modifier = Modifier.size(22.dp))
               }
             }
           }
@@ -793,7 +833,7 @@ fun ChatInputBar(
               } catch (_: Exception) { isRecording = false }
             }
           },
-          modifier = Modifier.size(48.dp).testTag("chat_send_button"),
+          modifier = Modifier.size(48.dp).clip(CircleShape).testTag("chat_send_button"),
           shape = CircleShape,
           containerColor = if (isRecording) StatusCallEndRed else WhatsAppGreenTeal,
           contentColor = Color.White,
@@ -804,12 +844,51 @@ fun ChatInputBar(
           } else {
             Icon(
               imageVector = if (isRecording) Icons.Default.Stop else if (canSend) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
-              contentDescription = "Send",
+              contentDescription = stringResource(R.string.action_send),
               modifier = Modifier.size(22.dp)
             )
           }
         }
       }
     }
+  }
+
+  // Action Dialog for Location choices (Share vs Request)
+  if (showLocationActionDialog) {
+    AlertDialog(
+      onDismissRequest = { showLocationActionDialog = false },
+      containerColor = surfaceColor,
+      titleContentColor = textColor,
+      textContentColor = textColor,
+      title = { Text(stringResource(R.string.dialog_choose_location_action), fontWeight = FontWeight.Bold) },
+      text = {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          TextButton(
+            onClick = {
+              showLocationActionDialog = false
+              showCoordinateInput = true
+            },
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(stringResource(R.string.action_share_coordinates), fontSize = 16.sp, color = textColor)
+          }
+
+          TextButton(
+            onClick = {
+              showLocationActionDialog = false
+              onRequestLocation()
+            },
+            modifier = Modifier.fillMaxWidth()
+          ) {
+            Text(stringResource(R.string.action_request_location), fontSize = 16.sp, color = textColor)
+          }
+        }
+      },
+      confirmButton = {
+        TextButton(onClick = { showLocationActionDialog = false }) {
+          Text(stringResource(R.string.action_cancel), color = WhatsAppGreenDark)
+        }
+      }
+    )
   }
 }
