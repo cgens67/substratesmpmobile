@@ -54,10 +54,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -119,30 +119,50 @@ fun MessageBodyText(
   text: String,
   textColor: Color,
   isDarkMode: Boolean,
+  onUserClick: (String) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val uriHandler = LocalUriHandler.current
-  val urlRegex = remember { "(https?://\\S+)".toRegex() }
-  val hasLinks = remember(text) { urlRegex.containsMatchIn(text) }
+  val tokenRegex = remember { "(https?://\\S+|@[a-zA-Z0-9_]+)".toRegex() }
+  val hasSpecialTokens = remember(text) { tokenRegex.containsMatchIn(text) }
 
-  if (hasLinks) {
+  if (hasSpecialTokens) {
     val linkColor = if (isDarkMode) Color(0xFF64B5F6) else Color(0xFF0277BD)
-    val annotatedString = remember(text, textColor, linkColor) {
+    val mentionColor = if (isDarkMode) Color(0xFF80CBC4) else Color(0xFF00796B)
+    val mentionBg = if (isDarkMode) Color(0xFF004D40).copy(alpha = 0.45f) else Color(0xFFE0F2F1)
+
+    val annotatedString = remember(text, textColor, linkColor, mentionColor, mentionBg) {
       buildAnnotatedString {
         var lastIndex = 0
-        for (match in urlRegex.findAll(text)) {
+        for (match in tokenRegex.findAll(text)) {
+          val matchValue = match.value
           append(text.substring(lastIndex, match.range.first))
-          pushStringAnnotation(tag = "URL", annotation = match.value)
-          withStyle(
-            style = SpanStyle(
-              color = linkColor,
-              textDecoration = TextDecoration.Underline,
-              fontWeight = FontWeight.SemiBold
-            )
-          ) {
-            append(match.value)
+
+          if (matchValue.startsWith("http://") || matchValue.startsWith("https://")) {
+            pushStringAnnotation(tag = "URL", annotation = matchValue)
+            withStyle(
+              style = SpanStyle(
+                color = linkColor,
+                textDecoration = TextDecoration.Underline,
+                fontWeight = FontWeight.SemiBold
+              )
+            ) {
+              append(matchValue)
+            }
+            pop()
+          } else if (matchValue.startsWith("@")) {
+            pushStringAnnotation(tag = "MENTION", annotation = matchValue.removePrefix("@"))
+            withStyle(
+              style = SpanStyle(
+                color = mentionColor,
+                background = mentionBg,
+                fontWeight = FontWeight.Bold
+              )
+            ) {
+              append(matchValue)
+            }
+            pop()
           }
-          pop()
           lastIndex = match.range.last + 1
         }
         if (lastIndex < text.length) {
@@ -165,6 +185,15 @@ fun MessageBodyText(
             try {
               uriHandler.openUri(annotation.item)
             } catch (_: Exception) {}
+            return@ClickableText
+          }
+
+        annotatedString.getStringAnnotations(tag = "MENTION", start = offset, end = offset)
+          .firstOrNull()?.let { annotation ->
+            val username = annotation.item
+            if (username.isNotBlank() && !username.equals("everyone", ignoreCase = true) && !username.equals("admin", ignoreCase = true) && !username.equals("mod", ignoreCase = true) && !username.equals("builder", ignoreCase = true) && !username.equals("member", ignoreCase = true)) {
+              onUserClick(username)
+            }
           }
       }
     )
@@ -375,10 +404,12 @@ fun ChatMessageItem(
         if (message.isSticker && (imageBytes != null || !message.imageUrl.isNullOrBlank())) {
           Column(
             horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
-            modifier = Modifier.combinedClickable(
-              onClick = { onImageClick(message.imageUrl!!) },
-              onLongClick = { showOptionsDialog = true }
-            )
+            modifier = Modifier
+              .clip(RoundedCornerShape(12.dp))
+              .combinedClickable(
+                onClick = { onImageClick(message.imageUrl!!) },
+                onLongClick = { showOptionsDialog = true }
+              )
           ) {
             if (!isLocal) {
               Text(
@@ -422,6 +453,7 @@ fun ChatMessageItem(
             elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
             modifier = Modifier
               .widthIn(min = 90.dp, max = 320.dp)
+              .clip(bubbleShape) // Eliminates rectangular touch ripples on press
               .combinedClickable(
                 onClick = {},
                 onLongClick = { showOptionsDialog = true }
@@ -717,7 +749,8 @@ fun ChatMessageItem(
                 MessageBodyText(
                   text = message.content,
                   textColor = textColor,
-                  isDarkMode = isDarkMode
+                  isDarkMode = isDarkMode,
+                  onUserClick = onUserClick
                 )
               }
 
@@ -732,6 +765,7 @@ fun ChatMessageItem(
                   text = translatedText,
                   textColor = textColor,
                   isDarkMode = isDarkMode,
+                  onUserClick = onUserClick,
                   modifier = Modifier.padding(top = 2.dp)
                 )
               }
@@ -760,7 +794,6 @@ fun ChatMessageItem(
                 Text(message.formattedTime, color = subTextColor, fontSize = 10.sp)
                 if (isLocal) {
                   Spacer(modifier = Modifier.width(3.dp))
-                  // 1 tick if sent, 2 ticks if delivered, 2 blue ticks if read
                   val tickIcon = when {
                     isRead -> Icons.Default.DoneAll
                     isDelivered -> Icons.Default.DoneAll
