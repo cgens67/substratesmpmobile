@@ -1,6 +1,6 @@
 package com.joseph.substratesmp.ui.components
 
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.*
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,42 +8,16 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Headphones
-import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.MicOff
-import androidx.compose.material.icons.filled.Shield
-import androidx.compose.material.icons.filled.Videocam
-import androidx.compose.material.icons.filled.VideocamOff
-import androidx.compose.material.icons.filled.VolumeDown
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilledIconButton
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -68,6 +42,8 @@ fun ActiveVoiceBar(
   onDisconnect: () -> Unit,
   modifier: Modifier = Modifier
 ) {
+  var isMinimized by rememberSaveable { mutableStateOf(false) }
+
   val infiniteTransition = rememberInfiniteTransition(label = "pulse_trans")
   val pulseAlpha by infiniteTransition.animateFloat(
     initialValue = 0.5f,
@@ -82,17 +58,18 @@ fun ActiveVoiceBar(
   Card(
     modifier = modifier
       .fillMaxWidth()
-      .padding(horizontal = 10.dp, vertical = 6.dp)
+      .padding(horizontal = 10.dp, vertical = 4.dp)
       .testTag("active_voice_bar"),
-    shape = RoundedCornerShape(20.dp),
+    shape = RoundedCornerShape(18.dp),
     colors = CardDefaults.cardColors(containerColor = Color(0xFF1F2C34)),
     elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
   ) {
     Column(
       modifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 14.dp, vertical = 12.dp)
+        .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
+      // Header Bar (With Minimize/Collapse Toggle Button)
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -122,97 +99,121 @@ fun ActiveVoiceBar(
           }
         }
 
-        FilledIconButton(
-          onClick = onDisconnect,
-          modifier = Modifier.size(38.dp).testTag("voice_disconnect_button"),
-          colors = IconButtonDefaults.filledIconButtonColors(containerColor = StatusCallEndRed)
-        ) {
-          Icon(Icons.Default.CallEnd, contentDescription = "End Call", tint = Color.White, modifier = Modifier.size(18.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          // Minimize / Expand Toggle Button
+          IconButton(
+            onClick = { isMinimized = !isMinimized },
+            modifier = Modifier.size(34.dp)
+          ) {
+            Icon(
+              imageVector = if (isMinimized) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+              contentDescription = if (isMinimized) "Expand" else "Minimize",
+              tint = Color.White,
+              modifier = Modifier.size(20.dp)
+            )
+          }
+
+          Spacer(modifier = Modifier.width(4.dp))
+
+          FilledIconButton(
+            onClick = onDisconnect,
+            modifier = Modifier.size(36.dp).testTag("voice_disconnect_button"),
+            colors = IconButtonDefaults.filledIconButtonColors(containerColor = StatusCallEndRed)
+          ) {
+            Icon(Icons.Default.CallEnd, contentDescription = "End Call", tint = Color.White, modifier = Modifier.size(17.dp))
+          }
         }
       }
 
-      Spacer(modifier = Modifier.height(10.dp))
-
-      LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+      // Collapsible Participant List and Call Controls
+      AnimatedVisibility(
+        visible = !isMinimized,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
       ) {
-        items(voiceRoom.participants) { participant ->
-          SpeakerAvatarPill(participant = participant)
-        }
-      }
+        Column(modifier = Modifier.fillMaxWidth().padding(top = 10.dp)) {
+          LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            items(voiceRoom.participants) { participant ->
+              SpeakerAvatarPill(participant = participant)
+            }
+          }
 
-      Spacer(modifier = Modifier.height(12.dp))
+          Spacer(modifier = Modifier.height(12.dp))
 
-      // High-contrast Call Control Buttons
-      Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        val isMuted = voiceRoom.isMuted
-        IconButton(
-          onClick = onToggleMute,
-          modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(if (isMuted) StatusCallEndRed else Color(0xFF2A3942))
-        ) {
-          Icon(
-            imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-            contentDescription = "Mute",
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-          )
-        }
+          // Call Controls Row
+          Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+          ) {
+            val isMuted = voiceRoom.isMuted
+            IconButton(
+              onClick = onToggleMute,
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(if (isMuted) StatusCallEndRed else Color(0xFF2A3942))
+            ) {
+              Icon(
+                imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                contentDescription = "Mute",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+              )
+            }
 
-        val isSpeaker = voiceRoom.isSpeakerOn
-        IconButton(
-          onClick = onToggleSpeaker,
-          modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(if (isSpeaker) WhatsAppGreenDark else Color(0xFF2A3942))
-        ) {
-          Icon(
-            imageVector = if (isSpeaker) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
-            contentDescription = "Speaker",
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-          )
-        }
+            val isSpeaker = voiceRoom.isSpeakerOn
+            IconButton(
+              onClick = onToggleSpeaker,
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(if (isSpeaker) WhatsAppGreenDark else Color(0xFF2A3942))
+            ) {
+              Icon(
+                imageVector = if (isSpeaker) Icons.Default.VolumeUp else Icons.Default.VolumeDown,
+                contentDescription = "Speaker",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+              )
+            }
 
-        val isCam = voiceRoom.isCameraOn
-        IconButton(
-          onClick = onToggleCamera,
-          modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(if (isCam) WhatsAppGreenDark else Color(0xFF2A3942))
-        ) {
-          Icon(
-            imageVector = if (isCam) Icons.Default.Videocam else Icons.Default.VideocamOff,
-            contentDescription = "Camera",
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-          )
-        }
+            val isCam = voiceRoom.isCameraOn
+            IconButton(
+              onClick = onToggleCamera,
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(if (isCam) WhatsAppGreenDark else Color(0xFF2A3942))
+            ) {
+              Icon(
+                imageVector = if (isCam) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                contentDescription = "Camera",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+              )
+            }
 
-        val isDeaf = voiceRoom.isDeafened
-        IconButton(
-          onClick = onToggleDeafen,
-          modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(if (isDeaf) StatusCallEndRed else Color(0xFF2A3942))
-        ) {
-          Icon(
-            imageVector = if (isDeaf) Icons.Default.VolumeOff else Icons.Default.Headphones,
-            contentDescription = "Deafen",
-            tint = Color.White,
-            modifier = Modifier.size(20.dp)
-          )
+            val isDeaf = voiceRoom.isDeafened
+            IconButton(
+              onClick = onToggleDeafen,
+              modifier = Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(if (isDeaf) StatusCallEndRed else Color(0xFF2A3942))
+            ) {
+              Icon(
+                imageVector = if (isDeaf) Icons.Default.VolumeOff else Icons.Default.Headphones,
+                contentDescription = "Deafen",
+                tint = Color.White,
+                modifier = Modifier.size(20.dp)
+              )
+            }
+          }
         }
       }
     }
