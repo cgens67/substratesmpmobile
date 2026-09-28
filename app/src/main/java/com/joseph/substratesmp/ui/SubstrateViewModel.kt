@@ -578,14 +578,15 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                 content = doc.getString("content") ?: "",
                 timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
                 isAdmin = doc.getBoolean("isAdmin") ?: false,
-                activityTag = doc.getString("activityTag") ?: "Mining",
+                activityTag = doc.getString("activityTag") ?: "Note",
                 backgroundTheme = doc.getString("backgroundTheme") ?: "EMERALD",
                 coordinates = doc.getString("coordinates"),
                 reactionCounts = reactions,
                 musicTrackName = doc.getString("musicTrackName"),
                 musicArtistName = doc.getString("musicArtistName"),
                 musicPreviewUrl = doc.getString("musicPreviewUrl"),
-                musicArtworkUrl = doc.getString("musicArtworkUrl")
+                musicArtworkUrl = doc.getString("musicArtworkUrl"),
+                musicStartTimeMs = doc.getLong("musicStartTimeMs")?.toInt() ?: 0
               )
             }
             _statuses.value = list
@@ -667,15 +668,16 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun postStatus(
     content: String,
-    theme: String,
-    activity: String,
-    coords: String?,
+    theme: String = "EMERALD",
+    activity: String = "Note",
+    coords: String? = null,
     musicName: String? = null,
     musicArtist: String? = null,
     musicPreview: String? = null,
-    musicArtwork: String? = null
+    musicArtwork: String? = null,
+    musicStartMs: Int = 0
   ) {
-    if (content.isBlank()) return
+    if (content.isBlank() && musicName.isNullOrBlank()) return
     val user = userState.value
     if (user.gamertag.isBlank()) {
       _showGamertagDialog.value = true
@@ -697,7 +699,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         "musicTrackName" to musicName,
         "musicArtistName" to musicArtist,
         "musicPreviewUrl" to musicPreview,
-        "musicArtworkUrl" to musicArtwork
+        "musicArtworkUrl" to musicArtwork,
+        "musicStartTimeMs" to musicStartMs
       )
     )
   }
