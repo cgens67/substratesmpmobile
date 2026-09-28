@@ -82,6 +82,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.data.model.ChatMessage
@@ -301,6 +302,7 @@ fun ChatInputBar(
   channelName: String,
   text: String,
   isDarkMode: Boolean,
+  isDm: Boolean = false,
   members: List<AdminMember> = emptyList(),
   onTextChanged: (String) -> Unit,
   onSendMessage: (
@@ -341,17 +343,20 @@ fun ChatInputBar(
   val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
   val menuBgColor = if (isDarkMode) Color(0xFF303030) else Color(0xFFF0F2F5)
 
-  // @Mention detection logic
-  val activeMentionQuery = remember(text) {
-    val atIdx = text.lastIndexOf('@')
-    if (atIdx != -1 && (atIdx == 0 || text[atIdx - 1].isWhitespace())) {
-      val candidate = text.substring(atIdx + 1)
-      if (!candidate.any { it.isWhitespace() }) candidate else null
-    } else null
+  // Mentions disabled in PMs
+  val activeMentionQuery = remember(text, isDm) {
+    if (isDm) null
+    else {
+      val atIdx = text.lastIndexOf('@')
+      if (atIdx != -1 && (atIdx == 0 || text[atIdx - 1].isWhitespace())) {
+        val candidate = text.substring(atIdx + 1)
+        if (!candidate.any { it.isWhitespace() }) candidate else null
+      } else null
+    }
   }
 
-  val mentionOptions = remember(members, activeMentionQuery) {
-    if (activeMentionQuery == null) emptyList()
+  val mentionOptions = remember(members, activeMentionQuery, isDm) {
+    if (isDm || activeMentionQuery == null) emptyList()
     else {
       val baseRoles = listOf(
         MentionOption("@everyone", "everyone", "Notify everyone in this channel", Color(0xFF53BDEB), true),
@@ -471,7 +476,7 @@ fun ChatInputBar(
       
       // Mention Autocomplete Suggestions Box
       AnimatedVisibility(
-        visible = mentionOptions.isNotEmpty(),
+        visible = !isDm && mentionOptions.isNotEmpty(),
         enter = slideInVertically { it } + expandVertically() + fadeIn(),
         exit = slideOutVertically { it } + shrinkVertically() + fadeOut()
       ) {
@@ -710,7 +715,15 @@ fun ChatInputBar(
                 value = text,
                 onValueChange = onTextChanged,
                 modifier = Modifier.weight(1f).onFocusChanged { if (it.isFocused) onTextFieldFocused() }.testTag("chat_text_input"),
-                placeholder = { Text("Message (type @ for mention)", color = subTextColor, fontSize = 15.sp) },
+                placeholder = {
+                  Text(
+                    text = "Message",
+                    color = subTextColor,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                  )
+                },
                 colors = OutlinedTextFieldDefaults.colors(
                   focusedContainerColor = Color.Transparent,
                   unfocusedContainerColor = Color.Transparent,
