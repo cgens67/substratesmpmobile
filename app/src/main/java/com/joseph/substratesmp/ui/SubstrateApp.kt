@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.model.*
 import com.joseph.substratesmp.ui.components.*
 import com.joseph.substratesmp.ui.theme.*
@@ -111,15 +113,15 @@ fun FloatingBottomNavBar(
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically
     ) {
-      NavBarPillItem(icon = Icons.Default.ChatBubble, label = "Chats", isSelected = currentScreen == "home", isDarkMode = isDarkMode) { onNavigate("home") }
+      NavBarPillItem(icon = Icons.Default.ChatBubble, label = stringResource(R.string.nav_chats), isSelected = currentScreen == "home", isDarkMode = isDarkMode) { onNavigate("home") }
       Spacer(modifier = Modifier.width(8.dp))
-      NavBarPillItem(icon = Icons.Default.Person, label = "Contacts", isSelected = currentScreen == "contacts", isDarkMode = isDarkMode) { onNavigate("contacts") }
+      NavBarPillItem(icon = Icons.Default.Person, label = stringResource(R.string.nav_contacts), isSelected = currentScreen == "contacts", isDarkMode = isDarkMode) { onNavigate("contacts") }
       Spacer(modifier = Modifier.width(8.dp))
-      NavBarPillItem(icon = Icons.Default.Settings, label = "Settings", isSelected = currentScreen == "settings_screen", isDarkMode = isDarkMode) { onNavigate("settings_screen") }
+      NavBarPillItem(icon = Icons.Default.Settings, label = stringResource(R.string.nav_settings), isSelected = currentScreen == "settings_screen", isDarkMode = isDarkMode) { onNavigate("settings_screen") }
       Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(
         icon = null,
-        label = "Profile",
+        label = stringResource(R.string.nav_profile),
         isSelected = currentScreen == "profile_screen",
         isDarkMode = isDarkMode,
         customIcon = {
@@ -214,7 +216,11 @@ fun SubstrateApp(
   val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
   val textColor = if (isDarkMode) Color.White else WhatsAppTextPrimary
   val subTextColor = if (isDarkMode) Color.LightGray else WhatsAppTextSecondary
-  val chatBgColor = if (isDarkMode) Color(0xFF1E1E1E) else WhatsAppChatBackground
+
+  // EXACT CHAT BACKGROUND AND TODAY PILL FROM SCREENSHOTS
+  val chatBgColor = if (isDarkMode) ChatDarkBackground else ChatLightBackground
+  val datePillBg = if (isDarkMode) ChatDarkDatePill else ChatLightDatePill
+  val datePillTextColor = if (isDarkMode) ChatDarkIncomingTime else ChatLightIncomingTime
 
   fun openStatus(status: StatusUpdate) {
     statusToDisplay = status
@@ -515,12 +521,12 @@ fun SubstrateApp(
                         }
                         if (isCurrentChannelMuted) {
                           Spacer(modifier = Modifier.width(4.dp))
-                          Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = subTextColor, modifier = Modifier.size(14.dp))
+                          Icon(Icons.Default.VolumeOff, contentDescription = null, tint = subTextColor, modifier = Modifier.size(14.dp))
                         }
                       }
                       if (typingUsers.isNotEmpty()) {
                         Text(
-                          text = "${typingUsers.first()} is typing...",
+                          text = stringResource(R.string.typing_indicator, typingUsers.first()),
                           color = WhatsAppGreenDark,
                           fontWeight = FontWeight.Medium,
                           fontSize = 11.5.sp,
@@ -529,7 +535,7 @@ fun SubstrateApp(
                         )
                       } else {
                         Text(
-                          text = if (activeChannel.isDm) "Direct Message" else "mc.substratesmp.net",
+                          text = if (activeChannel.isDm) stringResource(R.string.direct_message) else stringResource(R.string.default_server_domain),
                           color = subTextColor,
                           fontSize = 11.5.sp,
                           maxLines = 1,
@@ -546,7 +552,7 @@ fun SubstrateApp(
                     editingMessage = null
                     currentScreen = "home"
                   }) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textColor)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = textColor)
                   }
                 },
                 actions = {
@@ -559,7 +565,7 @@ fun SubstrateApp(
                       }
                     }
                   ) {
-                    Icon(Icons.Default.Videocam, contentDescription = "Video Call", tint = textColor)
+                    Icon(Icons.Default.Videocam, contentDescription = null, tint = textColor)
                   }
 
                   IconButton(
@@ -568,11 +574,11 @@ fun SubstrateApp(
                       runWithPermissions { viewModel.selectChannel(vc) }
                     }
                   ) {
-                    Icon(Icons.Default.Call, contentDescription = "Voice Call", tint = textColor)
+                    Icon(Icons.Default.Call, contentDescription = null, tint = textColor)
                   }
 
                   IconButton(onClick = { showMenuDropdownSheet = true }) {
-                    Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = textColor)
+                    Icon(Icons.Default.MoreVert, contentDescription = null, tint = textColor)
                   }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = surfaceColor)
@@ -586,8 +592,8 @@ fun SubstrateApp(
                   LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
                     item {
                       Box(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), contentAlignment = Alignment.Center) {
-                        Surface(shape = RoundedCornerShape(8.dp), color = surfaceColor.copy(alpha = 0.9f)) {
-                          Text("Today", color = subTextColor, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
+                        Surface(shape = RoundedCornerShape(8.dp), color = datePillBg) {
+                          Text(stringResource(R.string.chat_today), color = datePillTextColor, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp))
                         }
                       }
                     }
@@ -681,7 +687,7 @@ fun SubstrateApp(
                       Box(contentAlignment = Alignment.Center) {
                         Icon(
                           imageVector = Icons.Default.KeyboardArrowDown,
-                          contentDescription = "Scroll to bottom",
+                          contentDescription = null,
                           tint = WhatsAppGreenDark,
                           modifier = Modifier.size(24.dp)
                         )
@@ -726,7 +732,7 @@ fun SubstrateApp(
                     ) {
                       Icon(Icons.Default.Block, contentDescription = null, tint = Color(0xFFEA0038))
                       Spacer(modifier = Modifier.width(10.dp))
-                      Text("You blocked this player. Tap to unblock.", style = MaterialTheme.typography.bodySmall, color = Color(0xFFEA0038), fontWeight = FontWeight.Bold)
+                      Text(stringResource(R.string.blocked_user_banner), style = MaterialTheme.typography.bodySmall, color = Color(0xFFEA0038), fontWeight = FontWeight.Bold)
                     }
                   }
                 } else if (activeChannel.isRestrictedToAdmin && !userState.isAdmin) {
@@ -738,7 +744,7 @@ fun SubstrateApp(
                     Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                       Icon(Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold)
                       Spacer(modifier = Modifier.width(10.dp))
-                      Text("Only server Admins can send messages in this channel.", style = MaterialTheme.typography.bodySmall, color = subTextColor)
+                      Text(stringResource(R.string.admin_only_banner), style = MaterialTheme.typography.bodySmall, color = subTextColor)
                     }
                   }
                 } else {
@@ -824,7 +830,7 @@ fun SubstrateApp(
                   verticalAlignment = Alignment.CenterVertically
                 ) {
                   Text(
-                    text = "Substrate SMP",
+                    text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = if (isDarkMode) Color.White else WhatsAppHeaderGreen,
@@ -834,11 +840,11 @@ fun SubstrateApp(
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     if (userState.isAdmin) {
                       IconButton(onClick = { viewModel.setAdminConsoleVisible(true) }) {
-                        Icon(Icons.Default.Shield, contentDescription = "Admin Console", tint = RoleAdminGold)
+                        Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold)
                       }
                     }
                     IconButton(onClick = { showMenuDropdownSheet = true }) {
-                      Icon(Icons.Default.MoreVert, contentDescription = "Menu", tint = textColor)
+                      Icon(Icons.Default.MoreVert, contentDescription = null, tint = textColor)
                     }
                   }
                 }
@@ -849,7 +855,7 @@ fun SubstrateApp(
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(44.dp)
                 ) {
                   Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Search, contentDescription = "Search", tint = subTextColor, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Default.Search, contentDescription = null, tint = subTextColor, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     BasicTextField(
                       value = searchQuery,
@@ -858,19 +864,24 @@ fun SubstrateApp(
                       textStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor, fontSize = 15.sp),
                       singleLine = true,
                       decorationBox = { inner ->
-                        if (searchQuery.isEmpty()) Text("Search", style = MaterialTheme.typography.bodyMedium, color = subTextColor, fontSize = 15.sp)
+                        if (searchQuery.isEmpty()) Text(stringResource(R.string.action_search), style = MaterialTheme.typography.bodyMedium, color = subTextColor, fontSize = 15.sp)
                         inner()
                       }
                     )
                     if (searchQuery.isNotEmpty()) {
                       IconButton(onClick = { searchQuery = "" }, modifier = Modifier.size(24.dp)) {
-                        Icon(Icons.Default.Close, contentDescription = "Clear", tint = subTextColor, modifier = Modifier.size(16.dp))
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.action_clear), tint = subTextColor, modifier = Modifier.size(16.dp))
                       }
                     }
                   }
                 }
 
-                val filterChips = listOf("All", "Unread", "Favourites", "Groups")
+                val filterChips = listOf(
+                  stringResource(R.string.chip_all),
+                  stringResource(R.string.chip_unread),
+                  stringResource(R.string.chip_favourites),
+                  stringResource(R.string.chip_groups)
+                )
                 LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                   items(filterChips) { chip ->
                     val isSelected = activeFilterChip == chip
@@ -888,18 +899,23 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
+              val allLabel = stringResource(R.string.chip_all)
+              val unreadLabel = stringResource(R.string.chip_unread)
+              val favsLabel = stringResource(R.string.chip_favourites)
+              val groupsLabel = stringResource(R.string.chip_groups)
+
               val filtered = channels.filter { it.type == ChannelType.TEXT }
                 .filter { ch ->
                   when (activeFilterChip) {
-                    "Unread" -> {
+                    unreadLabel -> {
                       val isLocalSender = ch.lastMessageSender != null && ch.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
                       val hasUnreadIncoming = !ch.lastMessageIsRead && !isLocalSender && ch.lastMessage != null
                       ch.unreadCount > 0 || hasUnreadIncoming
                     }
-                    "Favourites" -> {
+                    favsLabel -> {
                       favouriteChannels.contains(ch.id) || ch.id == "announcements" || ch.id == "general-chat"
                     }
-                    "Groups" -> {
+                    groupsLabel -> {
                       !ch.isDm
                     }
                     else -> true
@@ -916,10 +932,10 @@ fun SubstrateApp(
                     Box(modifier = Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) {
                       Text(
                         text = when (activeFilterChip) {
-                          "Unread" -> "No unread chats"
-                          "Favourites" -> "No favourite chats yet. Long-press any chat to star it."
-                          "Groups" -> "No group channels found"
-                          else -> "No chats found"
+                          unreadLabel -> stringResource(R.string.no_unread_chats)
+                          favsLabel -> stringResource(R.string.no_favourite_chats)
+                          groupsLabel -> stringResource(R.string.no_group_channels)
+                          else -> stringResource(R.string.no_chats_found)
                         },
                         color = subTextColor,
                         fontSize = 14.sp
@@ -975,7 +991,7 @@ fun SubstrateApp(
                             )
                             if (channel.isDm) {
                               Spacer(modifier = Modifier.width(4.dp))
-                              Text("• PM", color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                              Text(stringResource(R.string.pm_tag), color = WhatsAppGreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             }
                             if (channel.isRestrictedToAdmin) {
                               Spacer(modifier = Modifier.width(4.dp))
@@ -984,7 +1000,7 @@ fun SubstrateApp(
                           }
                           Row(verticalAlignment = Alignment.CenterVertically) {
                             if (isMuted) {
-                              Icon(Icons.Default.VolumeOff, contentDescription = "Muted", tint = subTextColor, modifier = Modifier.size(14.dp))
+                              Icon(Icons.Default.VolumeOff, contentDescription = null, tint = subTextColor, modifier = Modifier.size(14.dp))
                               Spacer(modifier = Modifier.width(4.dp))
                             }
                             if (formattedTime.isNotBlank()) {
@@ -1005,7 +1021,7 @@ fun SubstrateApp(
                             val tickTint = if (isLastMessageRead) WhatsAppCheckmarkBlue else Color(0xFF8696A0)
                             Icon(
                               tickIcon,
-                              contentDescription = if (isLastMessageRead) "Read" else if (channel.lastMessageIsDelivered) "Delivered" else "Sent",
+                              contentDescription = null,
                               tint = tickTint,
                               modifier = Modifier.size(15.dp)
                             )
@@ -1060,14 +1076,14 @@ fun SubstrateApp(
           onClick = { viewedImageUrl = null },
           modifier = Modifier.align(Alignment.TopStart).statusBarsPadding()
         ) {
-          Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+          Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = Color.White)
         }
 
         viewedImageUrl?.let { url ->
           if (url.startsWith("http")) {
             AsyncImage(
               model = url,
-              contentDescription = "Expanded Image",
+              contentDescription = null,
               modifier = Modifier.fillMaxSize(),
               contentScale = ContentScale.Fit
             )
@@ -1078,7 +1094,7 @@ fun SubstrateApp(
             if (bitmap != null) {
               Image(
                 bitmap = bitmap,
-                contentDescription = "Expanded Image",
+                contentDescription = null,
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
               )
