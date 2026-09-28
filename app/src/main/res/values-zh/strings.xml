@@ -52,6 +52,16 @@
     <string name="attach_location">位置</string>
     <string name="recording_indicator">高清录音 %1$d秒</string>
 
+    <!-- 位置与坐标追踪 -->
+    <string name="location_request_title">位置请求</string>
+    <string name="location_request_from">已向 @%1$s 请求位置</string>
+    <string name="location_last_known">最后已知: %1$s</string>
+    <string name="action_send_my_location">发送当前位置</string>
+    <string name="action_request_location">请求位置</string>
+    <string name="action_share_coordinates">分享坐标</string>
+    <string name="location_no_coords">暂无坐标记录</string>
+    <string name="dialog_choose_location_action">选择位置操作</string>
+
     <!-- 导航与标签 -->
     <string name="nav_chats">聊天</string>
     <string name="nav_contacts">联系人</string>
