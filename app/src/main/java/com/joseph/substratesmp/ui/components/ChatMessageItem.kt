@@ -85,9 +85,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -205,11 +203,10 @@ fun MessageBodyText(
     ClickableText(
       text = annotatedString,
       modifier = modifier,
-      style = TextStyle(
+      style = MaterialTheme.typography.bodyMedium.copy(
         color = textColor,
         lineHeight = 18.sp,
-        fontSize = 14.5.sp,
-        platformStyle = PlatformTextStyle(includeFontPadding = false)
+        fontSize = 14.5.sp
       ),
       onClick = { offset ->
         annotatedString.getStringAnnotations(tag = "URL", start = offset, end = offset)
@@ -233,11 +230,7 @@ fun MessageBodyText(
     Text(
       text = text,
       color = textColor,
-      style = TextStyle(
-        fontSize = 14.5.sp,
-        lineHeight = 18.sp,
-        platformStyle = PlatformTextStyle(includeFontPadding = false)
-      ),
+      fontSize = 14.5.sp,
       modifier = modifier
     )
   }
@@ -552,13 +545,13 @@ fun ChatMessageItem(
 
   val offsetX = remember { Animatable(0f) }
 
+  // WhatsApp / Telegram natural tail positions: outgoing points bottom-right, incoming points bottom-left
   val bubbleShape = if (isLocal) {
     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 4.dp, bottomStart = 16.dp)
   } else {
     RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomEnd = 16.dp, bottomStart = 4.dp)
   }
 
-  // Detect short single-line messages to display content and timestamp side-by-side with matched baselines
   val isShortSingleLine = remember(message, translatedText, isLocationRequest) {
     !isLocationRequest &&
       translatedText == null &&
@@ -568,7 +561,7 @@ fun ChatMessageItem(
       message.audioUrl == null &&
       message.fileUrl == null &&
       !message.isSticker &&
-      message.content.length <= 18 &&
+      message.content.length <= 22 &&
       !message.content.contains('\n')
   }
 
@@ -662,15 +655,7 @@ fun ChatMessageItem(
               contentScale = ContentScale.Fit
             )
             Row(verticalAlignment = Alignment.CenterVertically) {
-              Text(
-                text = message.formattedTime, 
-                fontSize = 10.sp, 
-                style = TextStyle(
-                  platformStyle = PlatformTextStyle(includeFontPadding = false),
-                  lineHeight = 11.sp
-                ),
-                color = timeAndTickColor
-              )
+              Text(message.formattedTime, fontSize = 9.5.sp, color = timeAndTickColor)
               if (isLocal) {
                 Spacer(modifier = Modifier.width(3.dp))
                 val tickIcon = when {
@@ -701,43 +686,39 @@ fun ChatMessageItem(
               )
           ) {
             if (isShortSingleLine) {
-              // Compact inline layout: text and timestamp sit level at the bottom
+              // Perfectly baseline-aligned single line message (removes the superscript look)
               Row(
-                verticalAlignment = Alignment.Bottom,
-                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)
+                modifier = Modifier.padding(start = 10.dp, end = 8.dp, top = 5.dp, bottom = 5.dp)
               ) {
-                MessageBodyText(
-                  text = message.content,
-                  textColor = textColor,
-                  isLocal = isLocal,
-                  isDarkMode = isDarkMode,
-                  onUserClick = onUserClick
-                )
-                Spacer(modifier = Modifier.width(7.dp))
+                Box(modifier = Modifier.alignByBaseline()) {
+                  MessageBodyText(
+                    text = message.content,
+                    textColor = textColor,
+                    isLocal = isLocal,
+                    isDarkMode = isDarkMode,
+                    onUserClick = onUserClick
+                  )
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 Row(
-                  verticalAlignment = Alignment.CenterVertically,
-                  modifier = Modifier.padding(bottom = 0.5.dp)
+                  modifier = Modifier.alignByBaseline(),
+                  verticalAlignment = Alignment.CenterVertically
                 ) {
                   if (message.isEdited) {
                     Text(
-                      text = stringResource(R.string.label_edited), 
-                      fontSize = 9.sp, 
-                      style = TextStyle(
-                        platformStyle = PlatformTextStyle(includeFontPadding = false),
-                        lineHeight = 10.sp
-                      ),
-                      color = timeAndTickColor, 
-                      modifier = Modifier.padding(end = 2.dp)
+                      text = stringResource(R.string.label_edited),
+                      fontSize = 10.sp,
+                      color = timeAndTickColor,
+                      modifier = Modifier
+                        .padding(end = 3.dp)
+                        .alignByBaseline()
                     )
                   }
                   Text(
-                    text = message.formattedTime, 
-                    color = timeAndTickColor, 
-                    fontSize = 10.sp,
-                    style = TextStyle(
-                      platformStyle = PlatformTextStyle(includeFontPadding = false),
-                      lineHeight = 11.sp
-                    )
+                    text = message.formattedTime,
+                    color = timeAndTickColor,
+                    fontSize = 11.sp,
+                    modifier = Modifier.alignByBaseline()
                   )
                   if (isLocal) {
                     Spacer(modifier = Modifier.width(3.dp))
@@ -750,13 +731,15 @@ fun ChatMessageItem(
                       imageVector = tickIcon,
                       contentDescription = null,
                       tint = timeAndTickColor,
-                      modifier = Modifier.size(13.dp)
+                      modifier = Modifier
+                        .size(14.dp)
+                        .offset(y = 1.dp)
                     )
                   }
                 }
               }
             } else {
-              Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+              Column(modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp)) {
                 if (!isLocal) {
                   Row(
                     verticalAlignment = Alignment.CenterVertically, 
@@ -822,318 +805,289 @@ fun ChatMessageItem(
                       .clip(RoundedCornerShape(8.dp))
                       .clickable { onImageClick(gifUrl) }
                       .padding(bottom = 4.dp),
-                  contentScale = ContentScale.Crop
-                )
-              }
-
-              if (!message.fileUrl.isNullOrBlank()) {
-                Surface(
-                  shape = RoundedCornerShape(8.dp),
-                  color = Color.Black.copy(alpha = 0.12f),
-                  modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clickable {
-                    scope.launch {
-                      try {
-                        val fileUrl = message.fileUrl
-                        val base64Data = if (fileUrl.startsWith("chunked:")) {
-                          Toast.makeText(context, context.getString(R.string.downloading_file_chunks), Toast.LENGTH_SHORT).show()
-                          val snapshot = FirebaseFirestore.getInstance()
-                            .collection("channels")
-                            .document(message.channelId)
-                            .collection("messages")
-                            .document(message.id)
-                            .collection("fileChunks")
-                            .get()
-                            .await()
-                          snapshot.documents.sortedBy { it.id }.joinToString("") { it.getString("data") ?: "" }
-                        } else {
-                          fileUrl
-                        }
-
-                        val bytes = Base64.decode(base64Data.substringAfter("base64,"), Base64.NO_WRAP)
-                        val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                        val file = File(downloadsDir, message.fileName ?: "document.file")
-                        FileOutputStream(file).use { it.write(bytes) }
-                        Toast.makeText(context, context.getString(R.string.saved_to_downloads, file.name), Toast.LENGTH_LONG).show()
-                      } catch (e: Exception) {
-                        Toast.makeText(context, context.getString(R.string.download_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
-                      }
-                    }
-                  }
-                ) {
-                  Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Surface(shape = CircleShape, color = Color(0xFF7E57C2), modifier = Modifier.size(34.dp)) {
-                      Box(contentAlignment = Alignment.Center) {
-                        Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                      }
-                    }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                      Text(message.fileName ?: stringResource(R.string.label_document), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = textColor, maxLines = 1)
-                      Text(stringResource(R.string.label_tap_to_download), fontSize = 10.sp, color = timeAndTickColor)
-                    }
-                  }
-                }
-              }
-
-              if (!message.audioUrl.isNullOrBlank()) {
-                val isVoiceNote = message.fileName.isNullOrBlank()
-                val audioTitle = if (isVoiceNote) {
-                  stringResource(R.string.label_voice_message_hd)
-                } else {
-                  message.fileName ?: stringResource(R.string.label_audio_file)
+                    contentScale = ContentScale.Crop
+                  )
                 }
 
-                Surface(
-                  shape = RoundedCornerShape(10.dp),
-                  color = Color.Black.copy(alpha = 0.12f),
-                  modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                ) {
-                  Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                  ) {
-                    IconButton(
-                      onClick = {
-                        if (isPlayingAudio) {
-                          mediaPlayer?.pause()
-                          isPlayingAudio = false
-                        } else {
-                          if (mediaPlayer == null) {
-                            loadAndPreparePlayer { player ->
-                              mediaPlayer = player
-                              if (player != null) {
-                                player.start()
-                                isPlayingAudio = true
-                              }
-                            }
+                if (!message.fileUrl.isNullOrBlank()) {
+                  Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color.Black.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp).clickable {
+                      scope.launch {
+                        try {
+                          val fileUrl = message.fileUrl
+                          val base64Data = if (fileUrl.startsWith("chunked:")) {
+                            Toast.makeText(context, context.getString(R.string.downloading_file_chunks), Toast.LENGTH_SHORT).show()
+                            val snapshot = FirebaseFirestore.getInstance()
+                              .collection("channels")
+                              .document(message.channelId)
+                              .collection("messages")
+                              .document(message.id)
+                              .collection("fileChunks")
+                              .get()
+                              .await()
+                            snapshot.documents.sortedBy { it.id }.joinToString("") { it.getString("data") ?: "" }
                           } else {
-                            mediaPlayer?.start()
-                            isPlayingAudio = true
+                            fileUrl
                           }
+
+                          val bytes = Base64.decode(base64Data.substringAfter("base64,"), Base64.NO_WRAP)
+                          val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                          val file = File(downloadsDir, message.fileName ?: "document.file")
+                          FileOutputStream(file).use { it.write(bytes) }
+                          Toast.makeText(context, context.getString(R.string.saved_to_downloads, file.name), Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                          Toast.makeText(context, context.getString(R.string.download_failed, e.message ?: ""), Toast.LENGTH_SHORT).show()
                         }
-                      },
-                      modifier = Modifier.size(42.dp).clip(CircleShape).background(if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100))
-                    ) {
-                      if (isDownloadingAudio) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
-                      } else {
-                        Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
                       }
                     }
+                  ) {
+                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                      Surface(shape = CircleShape, color = Color(0xFF7E57C2), modifier = Modifier.size(34.dp)) {
+                        Box(contentAlignment = Alignment.Center) {
+                          Icon(Icons.AutoMirrored.Filled.InsertDriveFile, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        }
+                      }
+                      Spacer(modifier = Modifier.width(10.dp))
+                      Column {
+                        Text(message.fileName ?: stringResource(R.string.label_document), fontWeight = FontWeight.SemiBold, fontSize = 12.sp, color = textColor, maxLines = 1)
+                        Text(stringResource(R.string.label_tap_to_download), fontSize = 10.sp, color = timeAndTickColor)
+                      }
+                    }
+                  }
+                }
 
-                    Spacer(modifier = Modifier.width(10.dp))
+                if (!message.audioUrl.isNullOrBlank()) {
+                  val isVoiceNote = message.fileName.isNullOrBlank()
+                  val audioTitle = if (isVoiceNote) {
+                    stringResource(R.string.label_voice_message_hd)
+                  } else {
+                    message.fileName ?: stringResource(R.string.label_audio_file)
+                  }
 
-                    Column(modifier = Modifier.weight(1f)) {
-                      Text(
-                        text = audioTitle,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp,
-                        color = textColor,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth()
-                      )
-
-                      Spacer(modifier = Modifier.height(3.dp))
-
-                      BoxWithConstraints(
-                        modifier = Modifier
-                          .fillMaxWidth()
-                          .height(18.dp)
-                          .pointerInput(totalAudioDur) {
-                            detectTapGestures { offset ->
-                              if (mediaPlayer == null) {
-                                loadAndPreparePlayer { player ->
-                                  mediaPlayer = player
-                                  if (player != null && totalAudioDur > 0) {
-                                    val frac = (offset.x / size.width).coerceIn(0f, 1f)
-                                    val seekMs = (frac * totalAudioDur).toInt()
-                                    currentAudioPos = seekMs
-                                    player.seekTo(seekMs)
-                                  }
+                  Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color.Black.copy(alpha = 0.12f),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                  ) {
+                    Row(
+                      modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+                      verticalAlignment = Alignment.CenterVertically
+                    ) {
+                      IconButton(
+                        onClick = {
+                          if (isPlayingAudio) {
+                            mediaPlayer?.pause()
+                            isPlayingAudio = false
+                          } else {
+                            if (mediaPlayer == null) {
+                              loadAndPreparePlayer { player ->
+                                mediaPlayer = player
+                                if (player != null) {
+                                  player.start()
+                                  isPlayingAudio = true
                                 }
-                              } else if (totalAudioDur > 0) {
-                                val frac = (offset.x / size.width).coerceIn(0f, 1f)
-                                val seekMs = (frac * totalAudioDur).toInt()
-                                currentAudioPos = seekMs
-                                mediaPlayer?.seekTo(seekMs)
                               }
+                            } else {
+                              mediaPlayer?.start()
+                              isPlayingAudio = true
                             }
                           }
-                          .pointerInput(totalAudioDur) {
-                            detectHorizontalDragGestures(
-                              onDragStart = { offset ->
-                                isUserSeeking = true
+                        },
+                        modifier = Modifier.size(42.dp).clip(CircleShape).background(if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100))
+                      ) {
+                        if (isDownloadingAudio) {
+                          CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Color.White)
+                        } else {
+                          Icon(if (isPlayingAudio) Icons.Default.Pause else Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                        }
+                      }
+
+                      Spacer(modifier = Modifier.width(10.dp))
+
+                      Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                          text = audioTitle,
+                          fontWeight = FontWeight.SemiBold,
+                          fontSize = 13.sp,
+                          color = textColor,
+                          maxLines = 1,
+                          overflow = TextOverflow.Ellipsis,
+                          modifier = Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(modifier = Modifier.height(3.dp))
+
+                        BoxWithConstraints(
+                          modifier = Modifier
+                            .fillMaxWidth()
+                            .height(18.dp)
+                            .pointerInput(totalAudioDur) {
+                              detectTapGestures { offset ->
                                 if (mediaPlayer == null) {
-                                  loadAndPreparePlayer { player -> mediaPlayer = player }
-                                }
-                                seekFraction = (offset.x / size.width).coerceIn(0f, 1f)
-                              },
-                              onHorizontalDrag = { change, _ ->
-                                val frac = (change.position.x / size.width).coerceIn(0f, 1f)
-                                seekFraction = frac
-                                if (totalAudioDur > 0) {
-                                  currentAudioPos = (seekFraction * totalAudioDur).toInt()
-                                }
-                              },
-                              onDragEnd = {
-                                isUserSeeking = false
-                                if (totalAudioDur > 0) {
-                                  val seekMs = (seekFraction * totalAudioDur).toInt()
+                                  loadAndPreparePlayer { player ->
+                                    mediaPlayer = player
+                                    if (player != null && totalAudioDur > 0) {
+                                      val frac = (offset.x / size.width).coerceIn(0f, 1f)
+                                      val seekMs = (frac * totalAudioDur).toInt()
+                                      currentAudioPos = seekMs
+                                      player.seekTo(seekMs)
+                                    }
+                                  }
+                                } else if (totalAudioDur > 0) {
+                                  val frac = (offset.x / size.width).coerceIn(0f, 1f)
+                                  val seekMs = (frac * totalAudioDur).toInt()
                                   currentAudioPos = seekMs
                                   mediaPlayer?.seekTo(seekMs)
                                 }
-                              },
-                              onDragCancel = { isUserSeeking = false }
-                            )
-                          },
-                        contentAlignment = Alignment.CenterStart
-                      ) {
-                        val progressFraction = if (isUserSeeking) seekFraction
-                        else if (totalAudioDur > 0) (currentAudioPos.toFloat() / totalAudioDur.toFloat()).coerceIn(0f, 1f)
-                        else 0f
+                              }
+                            }
+                            .pointerInput(totalAudioDur) {
+                              detectHorizontalDragGestures(
+                                onDragStart = { offset ->
+                                  isUserSeeking = true
+                                  if (mediaPlayer == null) {
+                                    loadAndPreparePlayer { player -> mediaPlayer = player }
+                                  }
+                                  seekFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                                },
+                                onHorizontalDrag = { change, _ ->
+                                  val frac = (change.position.x / size.width).coerceIn(0f, 1f)
+                                  seekFraction = frac
+                                  if (totalAudioDur > 0) {
+                                    currentAudioPos = (seekFraction * totalAudioDur).toInt()
+                                  }
+                                },
+                                onDragEnd = {
+                                  isUserSeeking = false
+                                  if (totalAudioDur > 0) {
+                                    val seekMs = (seekFraction * totalAudioDur).toInt()
+                                    currentAudioPos = seekMs
+                                    mediaPlayer?.seekTo(seekMs)
+                                  }
+                                },
+                                onDragCancel = { isUserSeeking = false }
+                              )
+                            },
+                          contentAlignment = Alignment.CenterStart
+                        ) {
+                          val progressFraction = if (isUserSeeking) seekFraction
+                          else if (totalAudioDur > 0) (currentAudioPos.toFloat() / totalAudioDur.toFloat()).coerceIn(0f, 1f)
+                          else 0f
 
-                        val trackColor = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100)
+                          val trackColor = if (isVoiceNote) WhatsAppGreenDark else Color(0xFFE65100)
 
-                        Box(
-                          modifier = Modifier
-                            .fillMaxWidth()
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(Color.Gray.copy(alpha = 0.3f))
-                        )
+                          Box(
+                            modifier = Modifier
+                              .fillMaxWidth()
+                              .height(4.dp)
+                              .clip(CircleShape)
+                              .background(Color.Gray.copy(alpha = 0.3f))
+                          )
 
-                        Box(
-                          modifier = Modifier
-                            .fillMaxWidth(progressFraction)
-                            .height(4.dp)
-                            .clip(CircleShape)
-                            .background(trackColor)
-                        )
+                          Box(
+                            modifier = Modifier
+                              .fillMaxWidth(progressFraction)
+                              .height(4.dp)
+                              .clip(CircleShape)
+                              .background(trackColor)
+                          )
 
-                        val thumbOffset = ((maxWidth - 12.dp) * progressFraction)
-                        Box(
-                          modifier = Modifier
-                            .offset(x = thumbOffset)
-                            .size(12.dp)
-                            .clip(CircleShape)
-                            .background(trackColor)
-                        )
-                      }
+                          val thumbOffset = ((maxWidth - 12.dp) * progressFraction)
+                          Box(
+                            modifier = Modifier
+                              .offset(x = thumbOffset)
+                              .size(12.dp)
+                              .clip(CircleShape)
+                              .background(trackColor)
+                          )
+                        }
 
-                      Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                      ) {
-                        Text(
-                          text = formatDuration(currentAudioPos),
-                          fontSize = 10.5.sp,
-                          style = TextStyle(
-                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                            lineHeight = 11.sp
-                          ),
-                          color = timeAndTickColor
-                        )
-                        Text(
-                          text = if (totalAudioDur > 0) formatDuration(totalAudioDur) else "--:--",
-                          fontSize = 10.5.sp,
-                          style = TextStyle(
-                            platformStyle = PlatformTextStyle(includeFontPadding = false),
-                            lineHeight = 11.sp
-                          ),
-                          color = timeAndTickColor
-                        )
+                        Row(
+                          modifier = Modifier.fillMaxWidth(),
+                          horizontalArrangement = Arrangement.SpaceBetween,
+                          verticalAlignment = Alignment.CenterVertically
+                        ) {
+                          Text(
+                            text = formatDuration(currentAudioPos),
+                            fontSize = 11.sp,
+                            color = timeAndTickColor
+                          )
+                          Text(
+                            text = if (totalAudioDur > 0) formatDuration(totalAudioDur) else "--:--",
+                            fontSize = 11.sp,
+                            color = timeAndTickColor
+                          )
+                        }
                       }
                     }
                   }
                 }
-              }
 
-              if (message.content.isNotBlank() && !isSolelyUrl) {
-                MessageBodyText(
-                  text = message.content,
-                  textColor = textColor,
-                  isLocal = isLocal,
-                  isDarkMode = isDarkMode,
-                  onUserClick = onUserClick
-                )
-              }
-
-              if (translatedText != null) {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.Gray.copy(alpha = 0.3f))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                  Icon(Icons.Default.Translate, contentDescription = null, tint = timeAndTickColor, modifier = Modifier.size(12.dp))
-                  Spacer(modifier = Modifier.width(4.dp))
-                  Text(text = stringResource(R.string.label_translated), fontSize = 10.sp, color = timeAndTickColor, fontWeight = FontWeight.Bold)
+                if (message.content.isNotBlank() && !isSolelyUrl) {
+                  MessageBodyText(
+                    text = message.content,
+                    textColor = textColor,
+                    isLocal = isLocal,
+                    isDarkMode = isDarkMode,
+                    onUserClick = onUserClick
+                  )
                 }
-                MessageBodyText(
-                  text = translatedText,
-                  textColor = textColor,
-                  isLocal = isLocal,
-                  isDarkMode = isDarkMode,
-                  onUserClick = onUserClick,
-                  modifier = Modifier.padding(top = 2.dp)
-                )
-              }
 
-              if (!message.coordinates.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(4.dp))
-                Surface(
-                  shape = RoundedCornerShape(8.dp),
-                  color = if (isLocal) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.08f),
-                  modifier = Modifier.clickable { clipboardManager.setText(AnnotatedString(message.coordinates)) }
-                ) {
-                  Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Place, contentDescription = null, tint = if (isLocal) Color.White else WhatsAppGreenDark, modifier = Modifier.size(13.dp))
+                if (translatedText != null) {
+                  HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Color.Gray.copy(alpha = 0.3f))
+                  Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.Translate, contentDescription = null, tint = timeAndTickColor, modifier = Modifier.size(12.dp))
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text(message.coordinates, style = CoordinateTextStyle, color = if (isLocal) Color.White else WhatsAppGreenDark, fontSize = 11.5.sp)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, tint = timeAndTickColor, modifier = Modifier.size(12.dp))
+                    Text(text = stringResource(R.string.label_translated), fontSize = 10.sp, color = timeAndTickColor, fontWeight = FontWeight.Bold)
                   }
+                  MessageBodyText(
+                    text = translatedText,
+                    textColor = textColor,
+                    isLocal = isLocal,
+                    isDarkMode = isDarkMode,
+                    onUserClick = onUserClick,
+                    modifier = Modifier.padding(top = 2.dp)
+                  )
                 }
-              }
 
-              Row(
-                modifier = Modifier
-                  .align(Alignment.End)
-                  .padding(top = 2.dp), 
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                if (message.isEdited) {
-                  Text(
-                    text = stringResource(R.string.label_edited), 
-                    fontSize = 9.sp, 
-                    style = TextStyle(
-                      platformStyle = PlatformTextStyle(includeFontPadding = false),
-                      lineHeight = 10.sp
-                    ),
-                    color = timeAndTickColor, 
-                    modifier = Modifier.padding(end = 4.dp)
-                  )
-                }
-                Text(
-                  text = message.formattedTime, 
-                  color = timeAndTickColor, 
-                  fontSize = 10.5.sp,
-                  style = TextStyle(
-                    platformStyle = PlatformTextStyle(includeFontPadding = false),
-                    lineHeight = 11.sp
-                  )
-                )
-                if (isLocal) {
-                  Spacer(modifier = Modifier.width(3.dp))
-                  val tickIcon = when {
-                    isRead -> Icons.Default.DoneAll
-                    isDelivered -> Icons.Default.DoneAll
-                    else -> Icons.Default.Check
+                if (!message.coordinates.isNullOrBlank()) {
+                  Spacer(modifier = Modifier.height(4.dp))
+                  Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isLocal) Color.White.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.08f),
+                    modifier = Modifier.clickable { clipboardManager.setText(AnnotatedString(message.coordinates)) }
+                  ) {
+                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                      Icon(Icons.Default.Place, contentDescription = null, tint = if (isLocal) Color.White else WhatsAppGreenDark, modifier = Modifier.size(13.dp))
+                      Spacer(modifier = Modifier.width(4.dp))
+                      Text(message.coordinates, style = CoordinateTextStyle, color = if (isLocal) Color.White else WhatsAppGreenDark, fontSize = 11.5.sp)
+                      Spacer(modifier = Modifier.width(6.dp))
+                      Icon(Icons.Default.ContentCopy, contentDescription = null, tint = timeAndTickColor, modifier = Modifier.size(12.dp))
+                    }
                   }
-                  Icon(
-                    imageVector = tickIcon,
-                    contentDescription = null,
-                    tint = timeAndTickColor,
-                    modifier = Modifier.size(14.dp)
-                  )
+                }
+
+                Row(modifier = Modifier.align(Alignment.End).padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                  if (message.isEdited) {
+                    Text(stringResource(R.string.label_edited), fontSize = 9.sp, color = timeAndTickColor, modifier = Modifier.padding(end = 4.dp))
+                  }
+                  Text(message.formattedTime, color = timeAndTickColor, fontSize = 10.sp)
+                  if (isLocal) {
+                    Spacer(modifier = Modifier.width(3.dp))
+                    val tickIcon = when {
+                      isRead -> Icons.Default.DoneAll
+                      isDelivered -> Icons.Default.DoneAll
+                      else -> Icons.Default.Check
+                    }
+                    Icon(
+                      imageVector = tickIcon,
+                      contentDescription = null,
+                      tint = timeAndTickColor,
+                      modifier = Modifier.size(15.dp)
+                    )
+                  }
                 }
               }
             }
