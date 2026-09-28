@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -191,7 +192,7 @@ fun InstagramNoteViewerDialog(
           modifier = Modifier
             .size(76.dp)
             .clip(CircleShape)
-            .background(if (note.isAdmin) RoleAdminGold else if (isDarkMode) Color(0xFF383C44) else Color(0xFFE5E7EB))
+            .background(if (note.isAdmin) RoleAdminGold else if (isDarkMode) Color(0xFF383838) else Color(0xFFE5E7EB))
             .border(2.dp, if (note.isAdmin) RoleAdminGold else blueAccent, CircleShape),
           contentAlignment = Alignment.Center
         ) {
@@ -317,11 +318,11 @@ fun InstagramNoteViewerDialog(
                 modifier = Modifier.weight(1f),
                 textStyle = MaterialTheme.typography.bodyMedium.copy(color = textColor, fontSize = 14.sp),
                 singleLine = true,
-                decorationBox = { inner ->
+                decorationBox = { innerTextField ->
                   if (replyText.isEmpty()) {
                     Text("Reply to ${note.authorGamertag}...", color = subTextColor, fontSize = 14.sp)
                   }
-                  inner()
+                  innerTextField()
                 }
               )
 
