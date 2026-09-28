@@ -70,7 +70,7 @@ suspend fun LazyListState.smoothScrollToBottom() {
   }
 }
 
-fun formatChatListTime(timestamp: Long): String {
+fun formatChatListTime(timestamp: Long, yesterdayText: String): String {
   if (timestamp <= 0L) return ""
   val now = System.currentTimeMillis()
   val diff = now - timestamp
@@ -85,7 +85,7 @@ fun formatChatListTime(timestamp: Long): String {
 
   return when {
     isToday -> SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(timestamp))
-    isYesterday -> "Yesterday"
+    isYesterday -> yesterdayText
     diff < 7 * 24 * 3600 * 1000L -> SimpleDateFormat("EEEE", Locale.getDefault()).format(Date(timestamp))
     else -> SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(timestamp))
   }
@@ -99,12 +99,13 @@ fun FloatingBottomNavBar(
   isDarkMode: Boolean,
   modifier: Modifier = Modifier
 ) {
-  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+  val surfaceColor = if (isDarkMode) Color(0xFF1D1F24) else Color.White
   val pillShape = RoundedCornerShape(32.dp)
   
   Surface(
     shape = pillShape,
     color = surfaceColor,
+    border = if (isDarkMode) BorderStroke(1.dp, Color(0xFF282A30)) else null,
     shadowElevation = 8.dp,
     modifier = modifier.height(64.dp).clip(pillShape)
   ) {
@@ -137,8 +138,8 @@ fun FloatingBottomNavBar(
 
 @Composable
 fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, isSelected: Boolean, isDarkMode: Boolean, customIcon: @Composable (() -> Unit)? = null, onClick: () -> Unit) {
-  val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else Color(0xFFE1F5FE)) else Color.Transparent
-  val contentColor = if (isSelected) (if (isDarkMode) Color(0xFFD8FDD2) else Color(0xFF0288D1)) else (if (isDarkMode) Color.LightGray else Color.Gray)
+  val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF00A884) else Color(0xFFE1F5FE)) else Color.Transparent
+  val contentColor = if (isSelected) (if (isDarkMode) Color.White else Color(0xFF0288D1)) else (if (isDarkMode) Color(0xFF8E9297) else Color.Gray)
   val itemShape = RoundedCornerShape(20.dp)
 
   Surface(
@@ -212,12 +213,19 @@ fun SubstrateApp(
   }
 
   val isDarkMode = appSettings.isNightMode
-  val bgColor = if (isDarkMode) Color(0xFF121212) else Color.White
-  val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
-  val textColor = if (isDarkMode) Color.White else WhatsAppTextPrimary
-  val subTextColor = if (isDarkMode) Color.LightGray else WhatsAppTextSecondary
+  // REDESIGNED MAIN MENU DARK PALETTE
+  val menuDarkBg = Color(0xFF0F1012)
+  val menuDarkSurface = Color(0xFF191A1E)
+  val menuDarkSearch = Color(0xFF1E2024)
+  val menuDarkBorder = Color(0xFF282A30)
+  val menuDarkText = Color(0xFFF2F3F5)
+  val menuDarkSubtext = Color(0xFF8E9297)
 
-  // EXACT CHAT BACKGROUND AND TODAY PILL FROM SCREENSHOTS
+  val bgColor = if (isDarkMode) menuDarkBg else Color.White
+  val surfaceColor = if (isDarkMode) menuDarkSurface else Color.White
+  val textColor = if (isDarkMode) menuDarkText else WhatsAppTextPrimary
+  val subTextColor = if (isDarkMode) menuDarkSubtext else WhatsAppTextSecondary
+
   val chatBgColor = if (isDarkMode) ChatDarkBackground else ChatLightBackground
   val datePillBg = if (isDarkMode) ChatDarkDatePill else ChatLightDatePill
   val datePillTextColor = if (isDarkMode) ChatDarkIncomingTime else ChatLightIncomingTime
@@ -250,7 +258,6 @@ fun SubstrateApp(
     }
   }
 
-  // Instant jump to bottom when first entering chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
       delay(40L)
@@ -258,7 +265,6 @@ fun SubstrateApp(
     }
   }
 
-  // Smooth scroll when new incoming/sent messages arrive
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -660,7 +666,7 @@ fun SubstrateApp(
                     }
 
                     item {
-                      Spacer(modifier = Modifier.height(6.dp))
+                      Spacer(modifier = Modifier.height(16.dp))
                     }
                   }
 
@@ -833,7 +839,7 @@ fun SubstrateApp(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkMode) Color.White else WhatsAppHeaderGreen,
+                    color = if (isDarkMode) Color(0xFF00A884) else WhatsAppHeaderGreen,
                     fontSize = 24.sp
                   )
 
@@ -851,7 +857,8 @@ fun SubstrateApp(
 
                 Surface(
                   shape = RoundedCornerShape(24.dp),
-                  color = surfaceColor,
+                  color = if (isDarkMode) menuDarkSearch else surfaceColor,
+                  border = if (isDarkMode) BorderStroke(1.dp, menuDarkBorder) else null,
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(44.dp)
                 ) {
                   Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -887,11 +894,25 @@ fun SubstrateApp(
                     val isSelected = activeFilterChip == chip
                     Surface(
                       shape = RoundedCornerShape(18.dp),
-                      color = if (isSelected) (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill) else surfaceColor,
-                      border = if (isSelected) null else androidx.compose.foundation.BorderStroke(1.dp, if (isDarkMode) Color.Gray else Color(0xFFE9EDEF)),
+                      color = if (isSelected) {
+                        if (isDarkMode) Color(0xFF00A884) else WhatsAppNavSelectedPill
+                      } else {
+                        if (isDarkMode) menuDarkSurface else surfaceColor
+                      },
+                      border = if (isSelected) null else BorderStroke(1.dp, if (isDarkMode) menuDarkBorder else Color(0xFFE9EDEF)),
                       modifier = Modifier.clickable { activeFilterChip = chip }
                     ) {
-                      Text(chip, color = if (isSelected) (if (isDarkMode) Color.White else WhatsAppGreenDark) else subTextColor, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), fontSize = 13.sp)
+                      Text(
+                        chip, 
+                        color = if (isSelected) {
+                          if (isDarkMode) Color.White else WhatsAppGreenDark
+                        } else {
+                          subTextColor
+                        }, 
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, 
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp), 
+                        fontSize = 13.sp
+                      )
                     }
                   }
                 }
@@ -903,6 +924,7 @@ fun SubstrateApp(
               val unreadLabel = stringResource(R.string.chip_unread)
               val favsLabel = stringResource(R.string.chip_favourites)
               val groupsLabel = stringResource(R.string.chip_groups)
+              val yesterdayText = stringResource(R.string.chat_yesterday)
 
               val filtered = channels.filter { it.type == ChannelType.TEXT }
                 .filter { ch ->
@@ -946,7 +968,7 @@ fun SubstrateApp(
                   items(filtered, key = { it.id }) { channel ->
                     val isMuted = mutedChannels.contains(channel.id)
                     val isLocalSender = channel.lastMessageSender != null && channel.lastMessageSender.equals(userState.gamertag, ignoreCase = true)
-                    val formattedTime = formatChatListTime(channel.lastMessageTimestamp)
+                    val formattedTime = formatChatListTime(channel.lastMessageTimestamp, yesterdayText)
                     val isLastMessageRead = channel.lastMessageIsRead
 
                     val displayPreview = when {
@@ -972,10 +994,26 @@ fun SubstrateApp(
                       verticalAlignment = Alignment.CenterVertically
                     ) {
                       Box(
-                        modifier = Modifier.size(52.dp).clip(CircleShape).background(if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f) else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f) else (if (isDarkMode) Color(0xFF005C4B) else WhatsAppNavSelectedPill)),
+                        modifier = Modifier
+                          .size(52.dp)
+                          .clip(CircleShape)
+                          .background(
+                            if (channel.id == "announcements") Color(0xFFEA0038).copy(alpha = 0.12f)
+                            else if (channel.isDm) RoleAdminGold.copy(alpha = 0.15f)
+                            else if (isDarkMode) Color(0xFF24252A)
+                            else WhatsAppNavSelectedPill
+                          ),
                         contentAlignment = Alignment.Center
                       ) {
-                        Text(channel.name.take(1).uppercase(), color = if (channel.id == "announcements") Color(0xFFEA0038) else if (channel.isDm) RoleAdminGold else (if (isDarkMode) Color.White else WhatsAppGreenDark), fontWeight = FontWeight.Bold, fontSize = 20.sp)
+                        Text(
+                          channel.name.take(1).uppercase(),
+                          color = if (channel.id == "announcements") Color(0xFFEA0038)
+                          else if (channel.isDm) RoleAdminGold
+                          else if (isDarkMode) Color(0xFF00A884)
+                          else WhatsAppGreenDark,
+                          fontWeight = FontWeight.Bold,
+                          fontSize = 20.sp
+                        )
                       }
                       Spacer(modifier = Modifier.width(14.dp))
                       Column(modifier = Modifier.weight(1f)) {
@@ -1038,7 +1076,11 @@ fun SubstrateApp(
                         }
                       }
                     }
-                    HorizontalDivider(color = if (isDarkMode) Color.Gray.copy(alpha=0.3f) else WhatsAppDivider, thickness = 0.5.dp, modifier = Modifier.padding(start = 82.dp))
+                    HorizontalDivider(
+                      color = if (isDarkMode) Color(0xFF1F2026) else WhatsAppDivider, 
+                      thickness = 0.5.dp, 
+                      modifier = Modifier.padding(start = 82.dp)
+                    )
                   }
                 }
                 item { Spacer(modifier = Modifier.height(100.dp)) }
@@ -1134,10 +1176,10 @@ fun SubstrateApp(
 
     CustomDropdownModalSheet(
       options = listOf(
-        SheetOption("mute", if (isMuted) "Unmute notifications" else "Mute notifications", if (isMuted) "Turn sound back on" else "Silence alerts for this chat", isSelected = isMuted),
-        SheetOption("fav", if (isFav) "Remove from Favourites" else "Add to Favourites", if (isFav) "Remove star" else "Keep at top of Favourites filter", isSelected = isFav),
+        SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted),
+        SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav),
         if (ch.isDm && ch.dmRecipientGamertag != null) {
-          SheetOption("block", if (isBlocked) "Unblock ${ch.dmRecipientGamertag}" else "Block ${ch.dmRecipientGamertag}", if (isBlocked) "Allow messages" else "Stop receiving messages", isSelected = isBlocked)
+          SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, ch.dmRecipientGamertag!!) else stringResource(R.string.menu_block_user, ch.dmRecipientGamertag!!), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked)
         } else null
       ).filterNotNull(),
       isDarkMode = isDarkMode,
@@ -1161,11 +1203,11 @@ fun SubstrateApp(
 
     CustomDropdownModalSheet(
       options = listOf(
-        if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) "Unmute notifications" else "Mute notifications", if (isMuted) "Turn sound back on" else "Silence alerts for this chat", isSelected = isMuted) else null,
-        if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) "Remove from Favourites" else "Add to Favourites", if (isFav) "Remove star" else "Keep in Favourites filter", isSelected = isFav) else null,
-        if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) "Unblock $recipient" else "Block $recipient", if (isBlocked) "Tap to unblock" else "Stop receiving messages", isSelected = isBlocked) else null,
-        SheetOption("server", "Bedrock Server IP", "mc.substratesmp.net:19132", isSelected = false),
-        if (userState.isAdmin) SheetOption("admin", "Admin Control Console", "Manage channels and player roles", isSelected = false) else null
+        if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted) else null,
+        if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav) else null,
+        if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, recipient) else stringResource(R.string.menu_block_user, recipient), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked) else null,
+        SheetOption("server", stringResource(R.string.menu_server_ip), stringResource(R.string.default_server_ip), isSelected = false),
+        if (userState.isAdmin) SheetOption("admin", stringResource(R.string.menu_admin_console), stringResource(R.string.menu_admin_console_sub), isSelected = false) else null
       ).filterNotNull(),
       isDarkMode = isDarkMode,
       onDismiss = { showMenuDropdownSheet = false },
