@@ -3,7 +3,7 @@ package com.joseph.substratesmp.data.model
 data class StatusUpdate(
   val id: String = "",
   val authorGamertag: String = "",
-  val content: String = "", // Instagram Note thought text (e.g. "Mining Ancient Cities ⛏️")
+  val content: String = "",
   val timestamp: Long = System.currentTimeMillis(),
   val isAdmin: Boolean = false,
   val activityTag: String = "Note",
@@ -12,6 +12,7 @@ data class StatusUpdate(
   val reactionCounts: Map<String, Int> = emptyMap(),
   val musicTrackName: String? = null,
   val musicArtistName: String? = null,
-  val musicPreviewUrl: String? = null, // 30-second audio stream URL
-  val musicArtworkUrl: String? = null
+  val musicPreviewUrl: String? = null,
+  val musicArtworkUrl: String? = null,
+  val musicStartTimeMs: Int = 0 // Custom section start offset selected by user
 )
