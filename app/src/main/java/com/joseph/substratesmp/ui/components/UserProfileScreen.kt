@@ -45,6 +45,7 @@ fun UserProfileScreen(
   birthday: String,
   lastCoordinates: String = "",
   lastCoordinatesTimestamp: Long = 0L,
+  isViewerAdmin: Boolean = false,
   isMuted: Boolean,
   isFavourite: Boolean,
   isBlocked: Boolean,
@@ -125,10 +126,12 @@ fun UserProfileScreen(
 
     Spacer(modifier = Modifier.height(20.dp))
 
-    // Interactive Action Pills
+    // Responsive 5-pill action row with clipped ripples
     Row(
-      modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-      horizontalArrangement = Arrangement.SpaceEvenly
+      modifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 12.dp),
+      horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
       UserActionPill(
         icon = Icons.Default.Chat,
@@ -136,15 +139,17 @@ fun UserProfileScreen(
         tint = WhatsAppGreenDark,
         surfaceColor = surfaceColor,
         textColor = textColor,
-        onClick = onMessageUser
+        onClick = onMessageUser,
+        modifier = Modifier.weight(1f)
       )
       UserActionPill(
         icon = Icons.Default.Place,
-        label = stringResource(R.string.action_request_location),
+        label = stringResource(R.string.attach_location),
         tint = Color(0xFF0288D1),
         surfaceColor = surfaceColor,
         textColor = textColor,
-        onClick = onRequestLocation
+        onClick = onRequestLocation,
+        modifier = Modifier.weight(1f)
       )
       UserActionPill(
         icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
@@ -152,7 +157,8 @@ fun UserProfileScreen(
         tint = if (isMuted) Color(0xFFEA0038) else WhatsAppGreenDark,
         surfaceColor = surfaceColor,
         textColor = textColor,
-        onClick = onToggleMute
+        onClick = onToggleMute,
+        modifier = Modifier.weight(1f)
       )
       UserActionPill(
         icon = if (isFavourite) Icons.Default.Star else Icons.Default.StarBorder,
@@ -160,7 +166,8 @@ fun UserProfileScreen(
         tint = if (isFavourite) Color(0xFFFFB300) else textColor,
         surfaceColor = surfaceColor,
         textColor = textColor,
-        onClick = onToggleFavourite
+        onClick = onToggleFavourite,
+        modifier = Modifier.weight(1f)
       )
       UserActionPill(
         icon = Icons.Default.Block,
@@ -168,13 +175,13 @@ fun UserProfileScreen(
         tint = if (isBlocked) Color(0xFFEA0038) else textColor,
         surfaceColor = surfaceColor,
         textColor = textColor,
-        onClick = onToggleBlock
+        onClick = onToggleBlock,
+        modifier = Modifier.weight(1f)
       )
     }
 
     Spacer(modifier = Modifier.height(22.dp))
 
-    // Profile Details Card
     Card(
       shape = RoundedCornerShape(24.dp),
       colors = CardDefaults.cardColors(containerColor = surfaceColor),
@@ -206,45 +213,37 @@ fun UserProfileScreen(
           subTextColor = subTextColor
         )
 
-        // Minecraft Coordinates Card
-        Spacer(modifier = Modifier.height(16.dp))
-        Column {
+        if (isViewerAdmin && lastCoordinates.isNotBlank()) {
+          Spacer(modifier = Modifier.height(16.dp))
           Text(
-            text = stringResource(R.string.attach_location),
-            fontSize = 13.sp,
-            color = subTextColor
+            text = "Base Coordinates (Admin Only):",
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            color = RoleAdminGold
           )
           Spacer(modifier = Modifier.height(4.dp))
-          if (lastCoordinates.isNotBlank()) {
-            Surface(
-              shape = RoundedCornerShape(8.dp),
-              color = Color.Black.copy(alpha = 0.08f),
-              modifier = Modifier.clickable {
-                clipboardManager.setText(AnnotatedString(lastCoordinates))
-              }
-            ) {
-              Row(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-              ) {
-                Icon(Icons.Default.Place, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(16.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                  text = lastCoordinates,
-                  style = CoordinateTextStyle,
-                  color = WhatsAppGreenDark,
-                  fontSize = 13.sp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = subTextColor, modifier = Modifier.size(14.dp))
-              }
+          Surface(
+            shape = RoundedCornerShape(8.dp),
+            color = Color.Black.copy(alpha = 0.08f),
+            modifier = Modifier.clickable {
+              clipboardManager.setText(AnnotatedString(lastCoordinates))
             }
-          } else {
-            Text(
-              text = stringResource(R.string.location_no_coords),
-              fontSize = 14.sp,
-              color = subTextColor
-            )
+          ) {
+            Row(
+              modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+              verticalAlignment = Alignment.CenterVertically
+            ) {
+              Icon(Icons.Default.Place, contentDescription = null, tint = RoleAdminGold, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Text(
+                text = lastCoordinates,
+                style = CoordinateTextStyle,
+                color = RoleAdminGold,
+                fontSize = 13.sp
+              )
+              Spacer(modifier = Modifier.width(8.dp))
+              Icon(Icons.Default.ContentCopy, contentDescription = null, tint = subTextColor, modifier = Modifier.size(14.dp))
+            }
           }
         }
       }
@@ -259,7 +258,8 @@ fun UserActionPill(
   tint: Color,
   surfaceColor: Color,
   textColor: Color,
-  onClick: () -> Unit
+  onClick: () -> Unit,
+  modifier: Modifier = Modifier
 ) {
   val pillShape = RoundedCornerShape(16.dp)
   Surface(
@@ -267,10 +267,9 @@ fun UserActionPill(
     color = surfaceColor,
     shadowElevation = 2.dp,
     onClick = onClick,
-    modifier = Modifier
-      .width(66.dp)
+    modifier = modifier
       .height(64.dp)
-      .clip(pillShape)
+      .clip(pillShape) // Clipped ripple conforming to shape
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -279,7 +278,7 @@ fun UserActionPill(
     ) {
       Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
       Spacer(modifier = Modifier.height(4.dp))
-      Text(text = label, fontSize = 10.sp, fontWeight = FontWeight.Medium, color = textColor, maxLines = 1)
+      Text(text = label, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = textColor, maxLines = 1)
     }
   }
 }
