@@ -24,7 +24,9 @@ data class ChatMessage(
   val replyToContent: String? = null,
   val readBy: List<String> = emptyList(),
   val deliveredTo: List<String> = emptyList(),
-  val isEdited: Boolean = false
+  val isEdited: Boolean = false,
+  val isLocationRequest: Boolean = false,
+  val locationTargetGamertag: String? = null
 ) {
   val isAdmin: Boolean
     get() = senderRole == "ADMIN" || senderName.equals("Siang5680", ignoreCase = true)
