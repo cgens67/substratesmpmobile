@@ -89,6 +89,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _members = MutableStateFlow<List<AdminMember>>(emptyList())
   val members: StateFlow<List<AdminMember>> = _members.asStateFlow()
 
+  private val _deletedGamertags = MutableStateFlow<Set<String>>(emptySet())
+  val deletedGamertags: StateFlow<Set<String>> = _deletedGamertags.asStateFlow()
+
   private val _typingUsers = MutableStateFlow<List<String>>(emptyList())
   val typingUsers: StateFlow<List<String>> = _typingUsers.asStateFlow()
   private var typingListener: ListenerRegistration? = null
@@ -134,6 +137,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncLiveStatuses()
       syncLiveStickers()
       syncMembers()
+      syncDeletedAccounts()
       listenToTyping(_activeChannel.value.id)
       listenToIncomingCalls()
 
@@ -153,6 +157,15 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             }
           }
         }
+      }
+    }
+  }
+
+  private fun syncDeletedAccounts() {
+    firestore.collection("deleted_accounts").addSnapshotListener { snapshot, _ ->
+      if (snapshot != null) {
+        val set = snapshot.documents.mapNotNull { it.id.lowercase().trim() }.toSet()
+        _deletedGamertags.value = set
       }
     }
   }
@@ -427,7 +440,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val isDm = doc.getBoolean("isDm") ?: false
               val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
 
-              // CRITICAL PRIVACY FIX: Unlogged users must NEVER see or receive any private messages!
+              // Strict privacy check: unlogged users can NEVER see DMs
               if (isDm) {
                 if (myTag.isBlank() || parts == null || !parts.contains(myTag)) {
                   return@mapNotNull null
@@ -568,7 +581,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
                 activityTag = doc.getString("activityTag") ?: "Mining",
                 backgroundTheme = doc.getString("backgroundTheme") ?: "EMERALD",
                 coordinates = doc.getString("coordinates"),
-                reactionCounts = reactions
+                reactionCounts = reactions,
+                musicTrackName = doc.getString("musicTrackName"),
+                musicArtistName = doc.getString("musicArtistName"),
+                musicPreviewUrl = doc.getString("musicPreviewUrl"),
+                musicArtworkUrl = doc.getString("musicArtworkUrl")
               )
             }
             _statuses.value = list
@@ -605,7 +622,9 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         .addSnapshotListener { snapshot, _ ->
           if (snapshot != null) {
             val rawList = snapshot.documents.mapNotNull { doc ->
+              if (doc.getBoolean("isDeleted") == true) return@mapNotNull null
               val gamertag = doc.getString("gamertag") ?: return@mapNotNull null
+              if (gamertag == "Deleted Account") return@mapNotNull null
               val isAdmin = doc.getBoolean("isAdmin") ?: gamertag.equals("Siang5680", ignoreCase = true)
               val role = doc.getString("role") ?: if (isAdmin) "ADMIN" else "MEMBER"
               val bio = doc.getString("bio") ?: ""
@@ -646,7 +665,16 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     firestore.collection("stickers").document(stickerId).delete()
   }
 
-  fun postStatus(content: String, theme: String, activity: String, coords: String?) {
+  fun postStatus(
+    content: String,
+    theme: String,
+    activity: String,
+    coords: String?,
+    musicName: String? = null,
+    musicArtist: String? = null,
+    musicPreview: String? = null,
+    musicArtwork: String? = null
+  ) {
     if (content.isBlank()) return
     val user = userState.value
     if (user.gamertag.isBlank()) {
@@ -665,7 +693,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         "backgroundTheme" to theme,
         "activityTag" to activity,
         "coordinates" to coords,
-        "reactionCounts" to emptyMap<String, Int>()
+        "reactionCounts" to emptyMap<String, Int>(),
+        "musicTrackName" to musicName,
+        "musicArtistName" to musicArtist,
+        "musicPreviewUrl" to musicPreview,
+        "musicArtworkUrl" to musicArtwork
       )
     )
   }
@@ -785,13 +817,27 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun removeMember(userId: String) {
     val member = _members.value.find { it.id == userId }
-    firestore.collection("users").document(userId).delete()
-    if (member != null) {
-      firestore.collection("gamertags").document(member.gamertag.lowercase().trim()).delete()
-      firestore.collection("users").whereEqualTo("gamertag", member.gamertag).get()
-        .addOnSuccessListener { query ->
-          for (doc in query.documents) doc.reference.delete()
-        }
+    val tagClean = member?.gamertag?.lowercase()?.trim() ?: ""
+
+    // 1. Mark in deleted_accounts so all devices instantly show "Deleted Account" in chat
+    if (tagClean.isNotBlank()) {
+      firestore.collection("deleted_accounts").document(tagClean).set(
+        mapOf(
+          "gamertag" to (member?.gamertag ?: ""),
+          "deletedAt" to System.currentTimeMillis()
+        )
+      )
+    }
+
+    // 2. Mark user document as isDeleted = true to instantly trigger logout on target device
+    firestore.collection("users").document(userId).set(
+      mapOf("isDeleted" to true, "role" to "DELETED", "gamertag" to "Deleted Account"),
+      SetOptions.merge()
+    ).addOnSuccessListener {
+      firestore.collection("users").document(userId).delete()
+      if (tagClean.isNotBlank()) {
+        firestore.collection("gamertags").document(tagClean).delete()
+      }
     }
   }
 
