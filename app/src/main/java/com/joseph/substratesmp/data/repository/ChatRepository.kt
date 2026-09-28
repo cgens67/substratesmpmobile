@@ -126,7 +126,6 @@ class ChatRepository(private val context: Context) {
               val hasDelivered = deliveredToList.any { it.equals(cleanMyTag, ignoreCase = true) }
               val hasAlreadyRead = readByList.any { it.equals(cleanMyTag, ignoreCase = true) }
 
-              // Update delivery and read markers
               if (!isLocal && cleanMyTag.isNotBlank()) {
                 if (!hasDelivered) {
                   doc.reference.update("deliveredTo", FieldValue.arrayUnion(cleanMyTag))
@@ -136,12 +135,15 @@ class ChatRepository(private val context: Context) {
                 }
               }
 
+              val contentStr = doc.getString("content") ?: ""
+              val isLocReq = doc.getBoolean("isLocationRequest") ?: (contentStr.startsWith("📍 Location Request") || contentStr.startsWith("📍 LOCATION_REQUEST"))
+
               ChatMessage(
                 id = doc.id,
                 channelId = doc.getString("channelId") ?: channelId,
                 senderName = sender,
                 senderRole = if (sender.equals("Siang5680", ignoreCase = true)) "ADMIN" else doc.getString("senderRole") ?: "MEMBER",
-                content = doc.getString("content") ?: "",
+                content = contentStr,
                 timestamp = doc.getLong("timestamp") ?: System.currentTimeMillis(),
                 isLocalUser = isLocal,
                 coordinates = doc.getString("coordinates"),
@@ -156,7 +158,9 @@ class ChatRepository(private val context: Context) {
                 replyToContent = doc.getString("replyToContent"),
                 readBy = readByList,
                 deliveredTo = deliveredToList,
-                isEdited = doc.getBoolean("isEdited") ?: false
+                isEdited = doc.getBoolean("isEdited") ?: false,
+                isLocationRequest = isLocReq,
+                locationTargetGamertag = doc.getString("locationTargetGamertag") ?: doc.getString("replyToSender")
               )
             }
             _messagesFlow.value = liveMessages
@@ -184,9 +188,11 @@ class ChatRepository(private val context: Context) {
     isSticker: Boolean = false,
     replyToId: String? = null,
     replyToSender: String? = null,
-    replyToContent: String? = null
+    replyToContent: String? = null,
+    isLocationRequest: Boolean = false,
+    locationTargetGamertag: String? = null
   ) {
-    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null) return
+    if (content.isBlank() && coordinates == null && imageUrl == null && audioUrl == null && fileUrl == null && !isLocationRequest) return
     if (senderName.isBlank()) return
 
     val effectiveRole = if (senderName.equals("Siang5680", ignoreCase = true)) "ADMIN" else senderRole
@@ -231,7 +237,9 @@ class ChatRepository(private val context: Context) {
       "replyToContent" to replyToContent,
       "readBy" to emptyList<String>(),
       "deliveredTo" to emptyList<String>(),
-      "isEdited" to false
+      "isEdited" to false,
+      "isLocationRequest" to isLocationRequest,
+      "locationTargetGamertag" to locationTargetGamertag
     )
 
     docRef.set(docData).addOnSuccessListener {
