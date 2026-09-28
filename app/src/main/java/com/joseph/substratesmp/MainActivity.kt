@@ -10,8 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -41,33 +41,31 @@ class MainActivity : ComponentActivity() {
         }
       }
 
-      LaunchedEffect(targetLocale) {
+      val context = LocalContext.current
+      val configuration = remember(targetLocale) {
         Locale.setDefault(targetLocale)
-      }
-
-      val baseContext = LocalContext.current
-      val localizedContext = remember(baseContext, targetLocale) {
-        val config = Configuration(baseContext.resources.configuration).apply {
+        val config = Configuration(context.resources.configuration).apply {
           setLocale(targetLocale)
         }
-        baseContext.createConfigurationContext(config)
+        @Suppress("DEPRECATION")
+        context.resources.updateConfiguration(config, context.resources.displayMetrics)
+        @Suppress("DEPRECATION")
+        context.applicationContext.resources.updateConfiguration(config, context.applicationContext.resources.displayMetrics)
+        config
       }
 
-      val localizedConfiguration = remember(localizedContext) {
-        localizedContext.resources.configuration
-      }
-
-      // Provides the active language configuration to stringResource across all Composables
+      // Safe locale provider that does NOT overwrite LocalContext (which broke ActivityResultLauncher)
       CompositionLocalProvider(
-        LocalContext provides localizedContext,
-        LocalConfiguration provides localizedConfiguration
+        LocalConfiguration provides configuration
       ) {
-        SubstrateSMPTheme(darkTheme = settings.isNightMode) {
-          Surface(
-            modifier = Modifier.fillMaxSize(),
-            color = MaterialTheme.colorScheme.background
-          ) {
-            SubstrateApp(viewModel = viewModel)
+        key(settings.language) {
+          SubstrateSMPTheme(darkTheme = settings.isNightMode) {
+            Surface(
+              modifier = Modifier.fillMaxSize(),
+              color = MaterialTheme.colorScheme.background
+            ) {
+              SubstrateApp(viewModel = viewModel)
+            }
           }
         }
       }
