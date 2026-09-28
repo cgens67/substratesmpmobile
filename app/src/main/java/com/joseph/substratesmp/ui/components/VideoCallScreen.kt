@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Cameraswitch
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material.icons.filled.VolumeDown
@@ -53,6 +54,7 @@ fun VideoCallScreen(
   voiceRoom: ActiveVoiceRoom,
   voiceManager: AgoraVoiceManager,
   onDisconnect: () -> Unit,
+  onAddPerson: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val remoteParticipant = voiceRoom.participants.firstOrNull { !it.isLocal }
@@ -131,44 +133,52 @@ fun VideoCallScreen(
         .padding(bottom = 20.dp, start = 16.dp, end = 16.dp)
     ) {
       Row(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalAlignment = Alignment.CenterVertically
       ) {
         IconButton(
           onClick = { voiceManager.switchCamera() },
-          modifier = Modifier.size(46.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
+          modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
         ) {
-          Icon(Icons.Default.Cameraswitch, contentDescription = "Flip Camera", tint = Color.White)
+          Icon(Icons.Default.Cameraswitch, contentDescription = "Flip Camera", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
         IconButton(
           onClick = { voiceManager.toggleCamera() },
-          modifier = Modifier.size(46.dp).clip(CircleShape).background(if (voiceRoom.isCameraOn) Color.White.copy(alpha = 0.2f) else StatusCallEndRed)
+          modifier = Modifier.size(44.dp).clip(CircleShape).background(if (voiceRoom.isCameraOn) Color.White.copy(alpha = 0.2f) else StatusCallEndRed)
         ) {
-          Icon(if (voiceRoom.isCameraOn) Icons.Default.Videocam else Icons.Default.VideocamOff, contentDescription = "Camera", tint = Color.White)
+          Icon(if (voiceRoom.isCameraOn) Icons.Default.Videocam else Icons.Default.VideocamOff, contentDescription = "Camera", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
         IconButton(
           onClick = { voiceManager.toggleMute() },
-          modifier = Modifier.size(46.dp).clip(CircleShape).background(if (voiceRoom.isMuted) StatusCallEndRed else Color.White.copy(alpha = 0.2f))
+          modifier = Modifier.size(44.dp).clip(CircleShape).background(if (voiceRoom.isMuted) StatusCallEndRed else Color.White.copy(alpha = 0.2f))
         ) {
-          Icon(if (voiceRoom.isMuted) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = "Mic", tint = Color.White)
+          Icon(if (voiceRoom.isMuted) Icons.Default.MicOff else Icons.Default.Mic, contentDescription = "Mic", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
         IconButton(
           onClick = { voiceManager.toggleSpeaker() },
-          modifier = Modifier.size(46.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
+          modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
         ) {
-          Icon(if (voiceRoom.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown, contentDescription = "Speaker", tint = Color.White)
+          Icon(if (voiceRoom.isSpeakerOn) Icons.Default.VolumeUp else Icons.Default.VolumeDown, contentDescription = "Speaker", tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+
+        // Add / Invite People Button to Private Call
+        IconButton(
+          onClick = onAddPerson,
+          modifier = Modifier.size(44.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f))
+        ) {
+          Icon(Icons.Default.PersonAdd, contentDescription = "Invite to Call", tint = Color.White, modifier = Modifier.size(20.dp))
         }
 
         FilledIconButton(
           onClick = onDisconnect,
-          modifier = Modifier.size(50.dp),
+          modifier = Modifier.size(46.dp),
           colors = IconButtonDefaults.filledIconButtonColors(containerColor = StatusCallEndRed)
         ) {
-          Icon(Icons.Default.CallEnd, contentDescription = "Hang Up", tint = Color.White)
+          Icon(Icons.Default.CallEnd, contentDescription = "Hang Up", tint = Color.White, modifier = Modifier.size(20.dp))
         }
       }
     }
