@@ -12,6 +12,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -42,12 +43,16 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -55,6 +60,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -231,9 +237,124 @@ fun MessageBodyText(
 }
 
 @Composable
+fun LocationRequestCard(
+  message: ChatMessage,
+  currentGamertag: String,
+  isDarkMode: Boolean,
+  onUserClick: (String) -> Unit,
+  onSendCurrentLocation: () -> Unit
+) {
+  val clipboardManager = LocalClipboardManager.current
+  val cardBg = if (isDarkMode) Color(0xFF1E262C) else Color(0xFFF1F8F5)
+  val borderColor = if (isDarkMode) Color(0xFF00A884).copy(alpha = 0.4f) else WhatsAppGreenDark.copy(alpha = 0.3f)
+  val textColor = if (isDarkMode) Color.White else Color(0xFF111B21)
+  val subTextColor = if (isDarkMode) Color(0xFFA0AAB0) else Color(0xFF667781)
+
+  val targetGamertag = message.locationTargetGamertag ?: message.replyToSender ?: ""
+  val isTargetMe = targetGamertag.isNotBlank() && targetGamertag.equals(currentGamertag, ignoreCase = true)
+
+  Card(
+    shape = RoundedCornerShape(16.dp),
+    colors = CardDefaults.cardColors(containerColor = cardBg),
+    border = BorderStroke(1.dp, borderColor),
+    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+  ) {
+    Column(modifier = Modifier.padding(14.dp)) {
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+          modifier = Modifier.size(38.dp).clip(CircleShape).background(Color(0xFF00A884).copy(alpha = 0.18f)),
+          contentAlignment = Alignment.Center
+        ) {
+          Icon(Icons.Default.Explore, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(22.dp))
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column {
+          Text(
+            text = stringResource(R.string.location_request_title),
+            fontWeight = FontWeight.Bold,
+            fontSize = 15.sp,
+            color = WhatsAppGreenDark
+          )
+          Text(
+            text = if (targetGamertag.isNotBlank()) stringResource(R.string.location_request_from, targetGamertag) else stringResource(R.string.action_request_location),
+            fontSize = 12.sp,
+            color = subTextColor,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+          )
+        }
+      }
+
+      Spacer(modifier = Modifier.height(10.dp))
+
+      if (!message.coordinates.isNullOrBlank()) {
+        Surface(
+          shape = RoundedCornerShape(10.dp),
+          color = if (isDarkMode) Color(0xFF263238) else Color.White,
+          border = BorderStroke(0.5.dp, Color.Gray.copy(alpha = 0.3f)),
+          modifier = Modifier.fillMaxWidth()
+        ) {
+          Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+          ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+              Icon(Icons.Default.Place, contentDescription = null, tint = WhatsAppGreenDark, modifier = Modifier.size(16.dp))
+              Spacer(modifier = Modifier.width(6.dp))
+              Column {
+                Text(
+                  text = stringResource(R.string.location_last_known, message.coordinates),
+                  style = CoordinateTextStyle,
+                  color = textColor,
+                  fontSize = 13.sp,
+                  fontWeight = FontWeight.SemiBold
+                )
+              }
+            }
+            IconButton(
+              onClick = { clipboardManager.setText(AnnotatedString(message.coordinates)) },
+              modifier = Modifier.size(28.dp)
+            ) {
+              Icon(Icons.Default.ContentCopy, contentDescription = null, tint = subTextColor, modifier = Modifier.size(16.dp))
+            }
+          }
+        }
+      } else {
+        Text(
+          text = stringResource(R.string.location_no_coords),
+          fontSize = 12.5.sp,
+          color = subTextColor
+        )
+      }
+
+      if (isTargetMe || (!message.isLocalUser && targetGamertag.isBlank())) {
+        Spacer(modifier = Modifier.height(10.dp))
+        Button(
+          onClick = onSendCurrentLocation,
+          colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
+          shape = RoundedCornerShape(10.dp),
+          modifier = Modifier.fillMaxWidth().height(40.dp)
+        ) {
+          Icon(Icons.Default.MyLocation, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+          Spacer(modifier = Modifier.width(6.dp))
+          Text(
+            text = stringResource(R.string.action_send_my_location),
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 13.sp
+          )
+        }
+      }
+    }
+  }
+}
+
+@Composable
 fun ChatMessageItem(
   message: ChatMessage,
   translatedText: String? = null,
+  currentGamertag: String = "",
   isDarkMode: Boolean,
   isRead: Boolean = false,
   isDelivered: Boolean = false,
@@ -244,6 +365,7 @@ fun ChatMessageItem(
   onEdit: (ChatMessage) -> Unit = {},
   onTranslate: (messageId: String, targetLanguage: String) -> Unit = { _, _ -> },
   onImageClick: (String) -> Unit = {},
+  onSendCurrentLocation: () -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
@@ -391,6 +513,8 @@ fun ChatMessageItem(
       (!message.imageUrl.isNullOrBlank() && trimmed.equals(message.imageUrl, ignoreCase = true))
   }
 
+  val isLocationRequest = message.isLocationRequest || message.content.startsWith("📍 Location Request") || message.content.startsWith("📍 LOCATION_REQUEST")
+
   val offsetX = remember { Animatable(0f) }
 
   val bubbleShape = if (isLocal) {
@@ -445,7 +569,24 @@ fun ChatMessageItem(
         horizontalArrangement = if (isLocal) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Top
       ) {
-        if (message.isSticker && (imageBytes != null || !message.imageUrl.isNullOrBlank())) {
+        if (isLocationRequest) {
+          Box(
+            modifier = Modifier
+              .widthIn(min = 220.dp, max = 340.dp)
+              .combinedClickable(
+                onClick = {},
+                onLongClick = { showOptionsDialog = true }
+              )
+          ) {
+            LocationRequestCard(
+              message = message,
+              currentGamertag = currentGamertag,
+              isDarkMode = isDarkMode,
+              onUserClick = onUserClick,
+              onSendCurrentLocation = onSendCurrentLocation
+            )
+          }
+        } else if (message.isSticker && (imageBytes != null || !message.imageUrl.isNullOrBlank())) {
           Column(
             horizontalAlignment = if (isLocal) Alignment.End else Alignment.Start,
             modifier = Modifier
@@ -896,17 +1037,17 @@ fun ChatMessageItem(
             TextButton(onClick = { onReply(message); showOptionsDialog = false }) {
               Text(stringResource(R.string.action_reply), fontSize = 16.sp, color = dialogTextColor)
             }
-            if (message.isLocalUser && message.content.isNotBlank() && !isSolelyUrl) {
+            if (message.isLocalUser && message.content.isNotBlank() && !isSolelyUrl && !isLocationRequest) {
               TextButton(onClick = { onEdit(message); showOptionsDialog = false }) {
                 Text(stringResource(R.string.action_edit), fontSize = 16.sp, color = dialogTextColor)
               }
             }
-            if (message.content.isNotBlank() && !isSolelyUrl) {
+            if (message.content.isNotBlank() && !isSolelyUrl && !isLocationRequest) {
               TextButton(onClick = { showTranslateMenu = true }) {
                 Text(stringResource(R.string.action_translate_message), fontSize = 16.sp, color = dialogTextColor)
               }
             }
-            if ((message.content.isNotBlank() && !isSolelyUrl) || !message.coordinates.isNullOrBlank()) {
+            if ((message.content.isNotBlank() && !isSolelyUrl && !isLocationRequest) || !message.coordinates.isNullOrBlank()) {
               TextButton(onClick = {
                 val copyText = if (message.content.isNotBlank()) message.content else message.coordinates ?: ""
                 clipboardManager.setText(AnnotatedString(copyText))
