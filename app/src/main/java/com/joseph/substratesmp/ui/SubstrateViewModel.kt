@@ -29,6 +29,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 
+data class IncomingCallData(
+  val callId: String,
+  val caller: String,
+  val isVideo: Boolean,
+  val timestamp: Long
+)
+
 data class AppSettings(
   val isNightMode: Boolean = false,
   val smoothAnimations: Boolean = true,
@@ -108,6 +115,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   private val _showSelectContactDialog = MutableStateFlow(false)
   val showSelectContactDialog: StateFlow<Boolean> = _showSelectContactDialog.asStateFlow()
 
+  private val _incomingCall = MutableStateFlow<IncomingCallData?>(null)
+  val incomingCall: StateFlow<IncomingCallData?> = _incomingCall.asStateFlow()
+  private var incomingCallListener: ListenerRegistration? = null
+
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
   init {
@@ -124,6 +135,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncLiveStickers()
       syncMembers()
       listenToTyping(_activeChannel.value.id)
+      listenToIncomingCalls()
 
       launch {
         messages.collect { msgList ->
@@ -197,7 +209,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun requestUserLocation(targetGamertag: String, channelId: String = _activeChannel.value.id) {
     val myTag = userState.value.gamertag.trim()
-    if (myTag.isBlank() || targetGamertag.isBlank()) return
+    if (myTag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+    if (targetGamertag.isBlank()) return
 
     sendMessage(
       content = "📍 Location Request",
@@ -208,15 +224,91 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     )
   }
 
-  fun startPrivateCall(callChannelId: String, callChannelName: String, isVideo: Boolean) {
-    val myTag = userState.value.gamertag
-    if (myTag.isBlank()) return
+  fun startPrivateCall(recipientGamertag: String, callChannelId: String, callChannelName: String, isVideo: Boolean) {
+    val myTag = userState.value.gamertag.trim()
+    if (myTag.isBlank() || recipientGamertag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+    val dmId = "dm_" + listOf(myTag.lowercase(), recipientGamertag.lowercase()).sorted().joinToString("_")
+
+    firestore.collection("active_calls").document(callChannelId).set(
+      hashMapOf(
+        "callId" to callChannelId,
+        "caller" to myTag,
+        "recipient" to recipientGamertag,
+        "isVideo" to isVideo,
+        "status" to "ringing",
+        "timestamp" to System.currentTimeMillis()
+      )
+    )
+
+    sendMessage(
+      content = "📞 Started a ${if (isVideo) "video" else "voice"} call",
+      coordinates = null,
+      channelId = dmId
+    )
+
     voiceManager.joinVoiceChannel(callChannelId, callChannelName, myTag, isVideo = isVideo)
+  }
+
+  fun answerIncomingCall() {
+    val call = _incomingCall.value ?: return
+    val myTag = userState.value.gamertag
+    firestore.collection("active_calls").document(call.callId).update("status", "accepted")
+    voiceManager.joinVoiceChannel(call.callId, "Call with ${call.caller}", myTag, isVideo = call.isVideo)
+    _incomingCall.value = null
+  }
+
+  fun declineIncomingCall() {
+    val call = _incomingCall.value ?: return
+    firestore.collection("active_calls").document(call.callId).update("status", "declined")
+    _incomingCall.value = null
+  }
+
+  private fun listenToIncomingCalls() {
+    val myTag = userState.value.gamertag.trim()
+    if (myTag.isBlank()) return
+    incomingCallListener?.remove()
+    incomingCallListener = firestore.collection("active_calls")
+      .whereEqualTo("recipient", myTag)
+      .whereEqualTo("status", "ringing")
+      .addSnapshotListener { snapshot, _ ->
+        if (snapshot != null && !snapshot.isEmpty) {
+          val now = System.currentTimeMillis()
+          val validDoc = snapshot.documents.firstOrNull { doc ->
+            val ts = doc.getLong("timestamp") ?: 0L
+            (now - ts) < 45000L
+          }
+          if (validDoc != null) {
+            val callId = validDoc.getString("callId") ?: validDoc.id
+            val caller = validDoc.getString("caller") ?: "Player"
+            val isVideo = validDoc.getBoolean("isVideo") ?: false
+            val ts = validDoc.getLong("timestamp") ?: now
+            _incomingCall.value = IncomingCallData(callId, caller, isVideo, ts)
+            NotificationHelper.showMessageNotification(
+              getApplication(),
+              callId.hashCode(),
+              "📞 Incoming Call",
+              "$caller is calling you..."
+            )
+            SoundHelper.playMessageSound(getApplication())
+          } else {
+            _incomingCall.value = null
+          }
+        } else {
+          _incomingCall.value = null
+        }
+      }
   }
 
   fun inviteToCall(targetGamertag: String, callChannelId: String, callChannelName: String, isVideo: Boolean) {
     val myTag = userState.value.gamertag.trim()
-    if (myTag.isBlank() || targetGamertag.isBlank()) return
+    if (myTag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+    if (targetGamertag.isBlank()) return
 
     val dmId = "dm_" + listOf(myTag.lowercase(), targetGamertag.lowercase()).sorted().joinToString("_")
     sendMessage(
@@ -286,11 +378,15 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
-  fun startPrivateChat(recipientGamertag: String) {
-    val myTag = userState.value.gamertag
-    if (myTag.isBlank() || recipientGamertag.isBlank() || myTag.equals(recipientGamertag, ignoreCase = true)) return
+  fun startPrivateChat(recipientGamertag: String): Boolean {
+    val myTag = userState.value.gamertag.trim()
+    if (myTag.isBlank()) {
+      _showGamertagDialog.value = true
+      return false
+    }
+    if (recipientGamertag.isBlank() || myTag.equals(recipientGamertag, ignoreCase = true)) return false
 
-    val dmId = "dm_" + listOf(myTag.lowercase().trim(), recipientGamertag.lowercase().trim()).sorted().joinToString("_")
+    val dmId = "dm_" + listOf(myTag.lowercase(), recipientGamertag.lowercase().trim()).sorted().joinToString("_")
     val dmChannel = Channel(
       id = dmId,
       name = recipientGamertag,
@@ -310,12 +406,13 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         "description" to "Private chat with $recipientGamertag",
         "allowedRolesToSend" to listOf("ALL"),
         "isDm" to true,
-        "participants" to listOf(myTag.lowercase().trim(), recipientGamertag.lowercase().trim())
+        "participants" to listOf(myTag.lowercase(), recipientGamertag.lowercase().trim())
       ),
       SetOptions.merge()
     )
 
     selectChannel(dmChannel)
+    return true
   }
 
   private fun syncLiveChannels() {
@@ -330,8 +427,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val isDm = doc.getBoolean("isDm") ?: false
               val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
 
-              if (isDm && parts != null && myTag.isNotBlank() && !parts.contains(myTag)) {
-                return@mapNotNull null
+              // CRITICAL PRIVACY FIX: Unlogged users must NEVER see or receive any private messages!
+              if (isDm) {
+                if (myTag.isBlank() || parts == null || !parts.contains(myTag)) {
+                  return@mapNotNull null
+                }
               }
 
               val rawName = doc.getString("name") ?: id
@@ -549,6 +649,10 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   fun postStatus(content: String, theme: String, activity: String, coords: String?) {
     if (content.isBlank()) return
     val user = userState.value
+    if (user.gamertag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
     if (!coords.isNullOrBlank()) {
       updateCoordinates(coords)
     }
@@ -692,6 +796,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   }
 
   fun selectChannel(channel: Channel) {
+    if (channel.isDm && userState.value.gamertag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+
     if (channel.type == ChannelType.TEXT) {
       _activeChannel.value = channel
       chatRepository.selectChannel(channel.id)
@@ -770,7 +879,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       imageUrl != null -> "📷 Photo"
       audioUrl != null -> if (audioDurationSeconds > 0) "🎤 Voice message" else "🎵 ${fileName ?: "Audio file"}"
       fileUrl != null -> "📄 ${fileName ?: "Document"}"
-      coordinates != null && content.isBlank() -> "📍 $coordinates"
+      coordinates != null && content.isBlank() -> "📍 $coords"
       else -> content.trim()
     }
     firestore.collection("channels").document(channelId).set(
@@ -790,6 +899,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val tag = result.getOrNull() ?: gamertag
         chatRepository.updateLocalGamertag(tag)
         _showGamertagDialog.value = false
+        syncLiveChannels()
+        listenToIncomingCalls()
       }
       onResult(result)
     }
@@ -802,9 +913,22 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val tag = result.getOrNull() ?: gamertag
         chatRepository.updateLocalGamertag(tag)
         _showGamertagDialog.value = false
+        syncLiveChannels()
+        listenToIncomingCalls()
       }
       onResult(result)
     }
+  }
+
+  fun logout() {
+    authRepository.logout()
+    chatRepository.updateLocalGamertag("")
+    incomingCallListener?.remove()
+    incomingCallListener = null
+    _incomingCall.value = null
+    _channels.value = DefaultChannels
+    _activeChannel.value = DefaultChannels[1]
+    chatRepository.selectChannel(DefaultChannels[1].id)
   }
 
   fun setGamertagDialogVisible(v: Boolean) { _showGamertagDialog.value = v }
@@ -816,6 +940,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   override fun onCleared() {
     super.onCleared()
     typingListener?.remove()
+    incomingCallListener?.remove()
     channelMsgListeners.values.forEach { it.remove() }
     channelMsgListeners.clear()
     voiceManager.destroy()
