@@ -2,7 +2,6 @@ package com.joseph.substratesmp.ui
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.graphics.BitmapFactory
 import android.os.Build
 import android.util.Base64
 import androidx.activity.compose.BackHandler
@@ -26,7 +25,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -37,7 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.decode.GifDecoder
+import coil.decode.ImageDecoderDecoder
 import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.model.*
 import com.joseph.substratesmp.ui.components.*
@@ -121,6 +122,167 @@ fun formatDatePill(timestamp: Long, todayText: String, yesterdayText: String): S
 }
 
 @Composable
+fun StatusStoriesTray(
+  statuses: List<StatusUpdate>,
+  currentGamertag: String,
+  isDarkMode: Boolean,
+  onOpenStatus: (StatusUpdate) -> Unit,
+  onAddStatus: () -> Unit,
+  modifier: Modifier = Modifier
+) {
+  val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
+  val subTextColor = if (isDarkMode) Color(0xFFA0A0A5) else Color(0xFF667781)
+  val trayBg = if (isDarkMode) Color(0xFF262626) else Color.White
+
+  val myStatus = statuses.find { it.authorGamertag.equals(currentGamertag, ignoreCase = true) }
+  val otherStatuses = statuses.filter { !it.authorGamertag.equals(currentGamertag, ignoreCase = true) }
+
+  Surface(
+    color = trayBg,
+    modifier = modifier.fillMaxWidth()
+  ) {
+    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp)) {
+      Row(
+        modifier = Modifier
+          .fillMaxWidth()
+          .padding(horizontal = 16.dp, vertical = 2.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        Text(
+          text = "REALM STATUS",
+          fontWeight = FontWeight.Bold,
+          fontSize = 11.5.sp,
+          color = subTextColor,
+          letterSpacing = 0.5.sp
+        )
+        Text(
+          text = "Post Update",
+          fontSize = 12.sp,
+          fontWeight = FontWeight.Bold,
+          color = WhatsAppGreenDark,
+          modifier = Modifier.clickable { onAddStatus() }
+        )
+      }
+
+      Spacer(modifier = Modifier.height(8.dp))
+
+      LazyRow(
+        modifier = Modifier.fillMaxWidth(),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.CenterVertically
+      ) {
+        // "My Status" bubble
+        item {
+          Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clickable {
+              if (myStatus != null) onOpenStatus(myStatus) else onAddStatus()
+            }
+          ) {
+            Box(
+              modifier = Modifier.size(56.dp),
+              contentAlignment = Alignment.Center
+            ) {
+              Box(
+                modifier = Modifier
+                  .size(54.dp)
+                  .clip(CircleShape)
+                  .background(if (isDarkMode) Color(0xFF383838) else Color(0xFFE9EDEF))
+                  .then(
+                    if (myStatus != null) {
+                      Modifier.border(2.5.dp, WhatsAppGreenDark, CircleShape)
+                    } else Modifier
+                  ),
+                contentAlignment = Alignment.Center
+              ) {
+                Text(
+                  text = if (currentGamertag.isNotBlank()) currentGamertag.take(1).uppercase() else "+",
+                  color = if (myStatus != null) WhatsAppGreenDark else textColor,
+                  fontWeight = FontWeight.Bold,
+                  fontSize = 20.sp
+                )
+              }
+              Box(
+                modifier = Modifier
+                  .align(Alignment.BottomEnd)
+                  .size(18.dp)
+                  .clip(CircleShape)
+                  .background(WhatsAppGreenDark)
+                  .border(1.5.dp, if (isDarkMode) Color(0xFF262626) else Color.White, CircleShape),
+                contentAlignment = Alignment.Center
+              ) {
+                Icon(
+                  imageVector = Icons.Default.Add,
+                  contentDescription = "Add Status",
+                  tint = Color.White,
+                  modifier = Modifier.size(12.dp)
+                )
+              }
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+              text = if (myStatus != null) "My Status" else "Add Status",
+              fontSize = 11.5.sp,
+              color = textColor,
+              fontWeight = FontWeight.Medium,
+              maxLines = 1
+            )
+          }
+        }
+
+        // Active Player Statuses
+        items(otherStatuses, key = { it.id }) { status ->
+          val ringColor = when (status.backgroundTheme) {
+            "CRIMSON" -> Color(0xFFFF4500)
+            "END_VOID" -> Color(0xFF9C27B0)
+            "DIAMOND" -> Color(0xFF00E5FF)
+            "GOLDEN" -> Color(0xFFFFD700)
+            "OBSIDIAN" -> Color(0xFF607D8B)
+            else -> WhatsAppGreenDark
+          }
+
+          Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.clickable { onOpenStatus(status) }
+          ) {
+            Box(
+              modifier = Modifier
+                .size(54.dp)
+                .clip(CircleShape)
+                .border(2.5.dp, ringColor, CircleShape)
+                .padding(3.dp)
+                .clip(CircleShape)
+                .background(ringColor.copy(alpha = 0.2f)),
+              contentAlignment = Alignment.Center
+            ) {
+              Text(
+                text = status.authorGamertag.take(1).uppercase(),
+                color = if (isDarkMode) Color.White else ringColor,
+                fontWeight = FontWeight.Bold,
+                fontSize = 19.sp
+              )
+            }
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+              text = status.authorGamertag,
+              fontSize = 11.5.sp,
+              color = textColor,
+              fontWeight = FontWeight.Medium,
+              maxLines = 1,
+              overflow = TextOverflow.Ellipsis,
+              modifier = Modifier.widthIn(max = 64.dp)
+            )
+          }
+        }
+      }
+    }
+  }
+}
+
+@Composable
 fun FloatingBottomNavBar(
   currentScreen: String,
   onNavigate: (String) -> Unit,
@@ -129,13 +291,14 @@ fun FloatingBottomNavBar(
   modifier: Modifier = Modifier
 ) {
   val surfaceColor = if (isDarkMode) Color(0xFF2E2E2E) else Color.White
+  val borderColor = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFDDE0E5)
   val pillShape = RoundedCornerShape(32.dp)
   
   Surface(
     shape = pillShape,
     color = surfaceColor,
-    border = if (isDarkMode) BorderStroke(1.dp, Color(0xFF3D3D3D)) else null,
-    shadowElevation = 8.dp,
+    border = BorderStroke(1.5.dp, borderColor),
+    shadowElevation = if (isDarkMode) 8.dp else 14.dp,
     modifier = modifier.height(64.dp).clip(pillShape)
   ) {
     Row(
@@ -202,6 +365,18 @@ fun SubstrateApp(
   val scope = rememberCoroutineScope()
   val keyboardController = LocalSoftwareKeyboardController.current
 
+  val gifImageLoader = remember(context) {
+    ImageLoader.Builder(context)
+      .components {
+        if (Build.VERSION.SDK_INT >= 28) {
+          add(ImageDecoderDecoder.Factory())
+        } else {
+          add(GifDecoder.Factory())
+        }
+      }
+      .build()
+  }
+
   val channels by viewModel.channels.collectAsStateWithLifecycle()
   val activeChannel by viewModel.activeChannel.collectAsStateWithLifecycle()
   val userState by viewModel.userState.collectAsStateWithLifecycle()
@@ -233,6 +408,7 @@ fun SubstrateApp(
   
   var statusToDisplay by remember { mutableStateOf<StatusUpdate?>(null) }
   var isStatusViewerVisible by remember { mutableStateOf(false) }
+  var showStatusCreatorDialog by remember { mutableStateOf(false) }
   
   var viewedUser by remember { mutableStateOf<String?>(null) }
   var shouldForceScrollToBottom by remember { mutableStateOf(false) }
@@ -243,7 +419,6 @@ fun SubstrateApp(
   }
 
   val isDarkMode = appSettings.isNightMode
-  // REDESIGNED MAIN MENU DARK PALETTE (Anchored around #262626)
   val menuDarkBg = Color(0xFF262626)
   val menuDarkSurface = Color(0xFF303030)
   val menuDarkSearch = Color(0xFF1E1E1E)
@@ -251,8 +426,14 @@ fun SubstrateApp(
   val menuDarkText = Color(0xFFEDEDED)
   val menuDarkSubtext = Color(0xFFA0A0A5)
 
-  val bgColor = if (isDarkMode) menuDarkBg else Color.White
-  val surfaceColor = if (isDarkMode) menuDarkSurface else Color.White
+  // Clear, crisp light mode background that never blends with the white floating nav bar
+  val menuLightBg = Color(0xFFF4F5F8)
+  val menuLightSurface = Color.White
+  val menuLightSearch = Color.White
+  val menuLightBorder = Color(0xFFE2E4E8)
+
+  val bgColor = if (isDarkMode) menuDarkBg else menuLightBg
+  val surfaceColor = if (isDarkMode) menuDarkSurface else menuLightSurface
   val textColor = if (isDarkMode) menuDarkText else WhatsAppTextPrimary
   val subTextColor = if (isDarkMode) menuDarkSubtext else WhatsAppTextSecondary
 
@@ -931,6 +1112,9 @@ fun SubstrateApp(
                   )
 
                   Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showStatusCreatorDialog = true }) {
+                      Icon(Icons.Default.AddCircleOutline, contentDescription = "Post Status", tint = textColor)
+                    }
                     if (userState.isAdmin) {
                       IconButton(onClick = { viewModel.setAdminConsoleVisible(true) }) {
                         Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold)
@@ -944,8 +1128,8 @@ fun SubstrateApp(
 
                 Surface(
                   shape = RoundedCornerShape(24.dp),
-                  color = if (isDarkMode) menuDarkSearch else surfaceColor,
-                  border = if (isDarkMode) BorderStroke(1.dp, menuDarkBorder) else null,
+                  color = if (isDarkMode) menuDarkSearch else menuLightSearch,
+                  border = BorderStroke(1.dp, if (isDarkMode) menuDarkBorder else menuLightBorder),
                   modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp).height(44.dp)
                 ) {
                   Row(modifier = Modifier.fillMaxSize().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -987,7 +1171,7 @@ fun SubstrateApp(
                       } else {
                         if (isDarkMode) menuDarkSurface else surfaceColor
                       },
-                      border = if (isSelected) null else BorderStroke(1.dp, if (isDarkMode) menuDarkBorder else Color(0xFFE9EDEF)),
+                      border = if (isSelected) null else BorderStroke(1.dp, if (isDarkMode) menuDarkBorder else menuLightBorder),
                       onClick = { activeFilterChip = chip },
                       modifier = Modifier.clip(chipShape)
                     ) {
@@ -1009,6 +1193,20 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
+              // RESTORED STATUS STORIES TRAY
+              StatusStoriesTray(
+                statuses = statuses,
+                currentGamertag = userState.gamertag,
+                isDarkMode = isDarkMode,
+                onOpenStatus = { openStatus(it) },
+                onAddStatus = { showStatusCreatorDialog = true }
+              )
+
+              HorizontalDivider(
+                color = if (isDarkMode) Color(0xFF333333) else menuLightBorder,
+                thickness = 0.5.dp
+              )
+
               val allLabel = stringResource(R.string.chip_all)
               val unreadLabel = stringResource(R.string.chip_unread)
               val favsLabel = stringResource(R.string.chip_favourites)
@@ -1070,6 +1268,7 @@ fun SubstrateApp(
                     Row(
                       modifier = Modifier
                         .fillMaxWidth()
+                        .background(if (isDarkMode) menuDarkBg else Color.White)
                         .combinedClickable(
                           onClick = {
                             viewModel.selectChannel(channel)
@@ -1165,7 +1364,7 @@ fun SubstrateApp(
                       }
                     }
                     HorizontalDivider(
-                      color = if (isDarkMode) Color(0xFF333333) else WhatsAppDivider, 
+                      color = if (isDarkMode) Color(0xFF333333) else menuLightBorder, 
                       thickness = 0.5.dp, 
                       modifier = Modifier.padding(start = 82.dp)
                     )
@@ -1191,6 +1390,26 @@ fun SubstrateApp(
       }
     }
 
+    // FULL SCREEN IMAGE & ANIMATED GIF / STICKER VIEWER
+    val fullScreenImageModel = remember(viewedImageUrl) {
+      val url = viewedImageUrl ?: return@remember null
+      if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("content://") || url.startsWith("file://")) {
+        url
+      } else if (url.contains("base64,")) {
+        try {
+          Base64.decode(url.substringAfter("base64,"), Base64.NO_WRAP)
+        } catch (_: Exception) {
+          url
+        }
+      } else {
+        try {
+          Base64.decode(url, Base64.NO_WRAP)
+        } catch (_: Exception) {
+          url
+        }
+      }
+    }
+
     AnimatedVisibility(
       visible = viewedImageUrl != null,
       enter = fadeIn(),
@@ -1209,27 +1428,14 @@ fun SubstrateApp(
           Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = Color.White)
         }
 
-        viewedImageUrl?.let { url ->
-          if (url.startsWith("http")) {
-            AsyncImage(
-              model = url,
-              contentDescription = null,
-              modifier = Modifier.fillMaxSize(),
-              contentScale = ContentScale.Fit
-            )
-          } else {
-            val raw = url.substringAfter("base64,")
-            val bytes = Base64.decode(raw, Base64.NO_WRAP)
-            val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-            if (bitmap != null) {
-              Image(
-                bitmap = bitmap,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-              )
-            }
-          }
+        fullScreenImageModel?.let { model ->
+          AsyncImage(
+            model = model,
+            imageLoader = gifImageLoader,
+            contentDescription = null,
+            modifier = Modifier.fillMaxSize(),
+            contentScale = ContentScale.Fit
+          )
         }
       }
     }
@@ -1254,6 +1460,16 @@ fun SubstrateApp(
         }
       )
     }
+  }
+
+  if (showStatusCreatorDialog) {
+    StatusCreatorDialog(
+      onDismiss = { showStatusCreatorDialog = false },
+      onPostStatus = { text, theme, activity, coords ->
+        viewModel.postStatus(text, theme, activity, coords)
+        showStatusCreatorDialog = false
+      }
+    )
   }
 
   if (longPressedChannel != null) {
@@ -1294,6 +1510,7 @@ fun SubstrateApp(
         if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted) else null,
         if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav) else null,
         if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, recipient) else stringResource(R.string.menu_block_user, recipient), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked) else null,
+        SheetOption("post_status", "Post Status Update", "Share realm activity, build updates or base coordinates", isSelected = false),
         SheetOption("server", stringResource(R.string.menu_server_ip), stringResource(R.string.default_server_ip), isSelected = false),
         if (userState.isAdmin) SheetOption("admin", stringResource(R.string.menu_admin_console), stringResource(R.string.menu_admin_console_sub), isSelected = false) else null
       ).filterNotNull(),
@@ -1304,6 +1521,7 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
+          "post_status" -> showStatusCreatorDialog = true
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
         }
