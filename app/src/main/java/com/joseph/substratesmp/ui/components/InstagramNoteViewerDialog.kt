@@ -65,7 +65,7 @@ fun InstagramNoteViewerDialog(
     label = "rotation"
   )
 
-  // Stream 30s audio
+  // Play audio starting from the exact section selected by the author
   LaunchedEffect(note.musicPreviewUrl) {
     if (!note.musicPreviewUrl.isNullOrBlank()) {
       try {
@@ -74,6 +74,9 @@ fun InstagramNoteViewerDialog(
           isLooping = true
           prepareAsync()
           setOnPreparedListener {
+            if (note.musicStartTimeMs > 0) {
+              it.seekTo(note.musicStartTimeMs)
+            }
             it.start()
             isPlaying = true
           }
@@ -256,7 +259,7 @@ fun InstagramNoteViewerDialog(
                     maxLines = 1
                   )
                   Text(
-                    text = "${note.musicArtistName ?: "Artist"} • 30s Clip",
+                    text = "${note.musicArtistName ?: "Artist"} • Playing from ${note.musicStartTimeMs / 1000}s",
                     fontSize = 12.sp,
                     color = subTextColor,
                     maxLines = 1
@@ -269,6 +272,9 @@ fun InstagramNoteViewerDialog(
                       mediaPlayer?.pause()
                       isPlaying = false
                     } else {
+                      if (note.musicStartTimeMs > 0 && currentPosMs < note.musicStartTimeMs) {
+                        mediaPlayer?.seekTo(note.musicStartTimeMs)
+                      }
                       mediaPlayer?.start()
                       isPlaying = true
                     }
