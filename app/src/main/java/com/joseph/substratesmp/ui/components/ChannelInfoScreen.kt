@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
@@ -34,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.model.Channel
 import com.joseph.substratesmp.data.model.ChatMessage
 import com.joseph.substratesmp.ui.theme.RoleAdminGold
@@ -70,14 +72,16 @@ fun ChannelActionCard(
   textColor: Color,
   onClick: () -> Unit
 ) {
+  val cardShape = RoundedCornerShape(16.dp)
   Surface(
-    shape = RoundedCornerShape(16.dp),
+    shape = cardShape,
     color = surfaceColor,
     shadowElevation = 2.dp,
+    onClick = onClick,
     modifier = Modifier
       .width(130.dp)
       .height(68.dp)
-      .clickable(onClick = onClick)
+      .clip(cardShape) // Eliminates rectangular ripple
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -125,7 +129,14 @@ fun ChannelInfoScreen(
   val uriHandler = LocalUriHandler.current
 
   var selectedTab by remember { mutableIntStateOf(0) }
-  val tabs = listOf("Members", "Media", "Files", "Links", "Music", "GIFs")
+  val tabs = listOf(
+    stringResource(R.string.channel_members_tab),
+    stringResource(R.string.channel_media_tab),
+    stringResource(R.string.channel_files_tab),
+    stringResource(R.string.channel_links_tab),
+    stringResource(R.string.channel_music_tab),
+    stringResource(R.string.channel_gifs_tab)
+  )
 
   var showEditDialog by remember { mutableStateOf(false) }
   var showMoreMenu by remember { mutableStateOf(false) }
@@ -153,7 +164,6 @@ fun ChannelInfoScreen(
       .background(bgColor)
       .statusBarsPadding()
   ) {
-    // Top Bar
     Row(
       modifier = Modifier
         .fillMaxWidth()
@@ -162,17 +172,15 @@ fun ChannelInfoScreen(
       verticalAlignment = Alignment.CenterVertically
     ) {
       IconButton(onClick = onNavigateBack) {
-        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = textColor)
+        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.action_back), tint = textColor)
       }
       Row {
-        // Working Edit (pencil) button
         IconButton(onClick = { showEditDialog = true }) {
-          Icon(Icons.Default.Edit, contentDescription = "Edit", tint = textColor)
+          Icon(Icons.Default.Edit, contentDescription = stringResource(R.string.action_edit), tint = textColor)
         }
-        // Working 3-dots button
         Box {
           IconButton(onClick = { showMoreMenu = true }) {
-            Icon(Icons.Default.MoreVert, contentDescription = "More", tint = textColor)
+            Icon(Icons.Default.MoreVert, contentDescription = null, tint = textColor)
           }
           DropdownMenu(
             expanded = showMoreMenu,
@@ -180,7 +188,7 @@ fun ChannelInfoScreen(
             modifier = Modifier.background(surfaceColor)
           ) {
             DropdownMenuItem(
-              text = { Text(if (isMuted) "Unmute notifications" else "Mute notifications", color = textColor) },
+              text = { Text(if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), color = textColor) },
               leadingIcon = { Icon(if (isMuted) Icons.Default.VolumeUp else Icons.Default.VolumeOff, contentDescription = null, tint = textColor) },
               onClick = {
                 onToggleMute()
@@ -188,30 +196,29 @@ fun ChannelInfoScreen(
               }
             )
             DropdownMenuItem(
-              text = { Text("Copy Server IP", color = textColor) },
+              text = { Text(stringResource(R.string.menu_server_ip), color = textColor) },
               leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, tint = textColor) },
               onClick = {
                 clipboardManager.setText(AnnotatedString("mc.substratesmp.net:19132"))
-                Toast.makeText(context, "Server IP copied to clipboard", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.copied_server_ip), Toast.LENGTH_SHORT).show()
                 showMoreMenu = false
               }
             )
             DropdownMenuItem(
-              text = { Text("Copy Channel Name", color = textColor) },
+              text = { Text(stringResource(R.string.copied_channel_name), color = textColor) },
               leadingIcon = { Icon(Icons.Default.Tag, contentDescription = null, tint = textColor) },
               onClick = {
                 clipboardManager.setText(AnnotatedString("#${channel.name}"))
-                Toast.makeText(context, "Channel name copied", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.copied_channel_name), Toast.LENGTH_SHORT).show()
                 showMoreMenu = false
               }
             )
             if (isAdmin) {
               DropdownMenuItem(
-                text = { Text(if (channel.isRestrictedToAdmin) "Unlock for all members" else "Lock for Admins only", color = textColor) },
+                text = { Text(if (channel.isRestrictedToAdmin) stringResource(R.string.menu_unlock_all) else stringResource(R.string.menu_lock_admin), color = textColor) },
                 leadingIcon = { Icon(if (channel.isRestrictedToAdmin) Icons.Default.LockOpen else Icons.Default.Lock, contentDescription = null, tint = RoleAdminGold) },
                 onClick = {
                   onTogglePermission(channel)
-                  Toast.makeText(context, "Channel permissions updated", Toast.LENGTH_SHORT).show()
                   showMoreMenu = false
                 }
               )
@@ -258,14 +265,13 @@ fun ChannelInfoScreen(
           Spacer(modifier = Modifier.height(4.dp))
 
           Text(
-            text = "${members.size} members",
+            text = stringResource(R.string.channel_members_count, members.size),
             fontSize = 14.sp,
             color = subTextColor
           )
 
           Spacer(modifier = Modifier.height(20.dp))
 
-          // Removed Leave button; Message and Mute are neatly centered
           Row(
             modifier = Modifier
               .fillMaxWidth()
@@ -274,14 +280,14 @@ fun ChannelInfoScreen(
           ) {
             ChannelActionCard(
               icon = Icons.Default.ChatBubbleOutline,
-              label = "Message",
+              label = stringResource(R.string.action_message),
               surfaceColor = surfaceColor,
               textColor = textColor,
               onClick = onNavigateBack
             )
             ChannelActionCard(
               icon = if (isMuted) Icons.Default.NotificationsOff else Icons.Default.NotificationsNone,
-              label = if (isMuted) "Unmute" else "Mute",
+              label = if (isMuted) stringResource(R.string.user_action_unmute) else stringResource(R.string.user_action_mute),
               surfaceColor = surfaceColor,
               textColor = textColor,
               onClick = onToggleMute
@@ -290,12 +296,14 @@ fun ChannelInfoScreen(
 
           Spacer(modifier = Modifier.height(16.dp))
 
+          val addShape = RoundedCornerShape(18.dp)
           Surface(
-            shape = RoundedCornerShape(18.dp),
+            shape = addShape,
             color = surfaceColor,
+            onClick = onAddMembers,
             modifier = Modifier
               .fillMaxWidth()
-              .clickable { onAddMembers() }
+              .clip(addShape)
           ) {
             Row(
               modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
@@ -303,13 +311,13 @@ fun ChannelInfoScreen(
             ) {
               Icon(
                 imageVector = Icons.Default.PersonAdd,
-                contentDescription = "Add Members",
+                contentDescription = null,
                 tint = textColor,
                 modifier = Modifier.size(24.dp)
               )
               Spacer(modifier = Modifier.width(14.dp))
               Text(
-                text = "Add Members",
+                text = stringResource(R.string.channel_add_members),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Medium,
                 color = textColor
@@ -357,7 +365,7 @@ fun ChannelInfoScreen(
       }
 
       when (selectedTab) {
-        0 -> { // Members Tab
+        0 -> { // Members
           items(members, key = { it.id }) { member ->
             val status = getMemberStatusString(member.gamertag, member.isAdmin, currentGamertag)
             val avatarBg = getMemberAvatarColor(member.gamertag)
@@ -408,9 +416,9 @@ fun ChannelInfoScreen(
           }
         }
 
-        1 -> { // Media Tab
+        1 -> { // Media
           if (mediaMessages.isEmpty()) {
-            item { EmptyMediaPlaceholder("No media shared yet", subTextColor) }
+            item { EmptyMediaPlaceholder(stringResource(R.string.no_media_yet), subTextColor) }
           } else {
             item {
               LazyVerticalGrid(
@@ -437,9 +445,9 @@ fun ChannelInfoScreen(
           }
         }
 
-        2 -> { // Files Tab
+        2 -> { // Files
           if (fileMessages.isEmpty()) {
-            item { EmptyMediaPlaceholder("No files shared yet", subTextColor) }
+            item { EmptyMediaPlaceholder(stringResource(R.string.no_files_yet), subTextColor) }
           } else {
             items(fileMessages) { msg ->
               Row(
@@ -464,7 +472,7 @@ fun ChannelInfoScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                   Text(
-                    text = msg.fileName ?: "Document",
+                    text = msg.fileName ?: stringResource(R.string.label_document),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                     color = textColor,
@@ -472,7 +480,7 @@ fun ChannelInfoScreen(
                     overflow = TextOverflow.Ellipsis
                   )
                   Text(
-                    text = "${msg.formattedTime} • by ${msg.senderName}",
+                    text = "${msg.formattedTime} • ${msg.senderName}",
                     fontSize = 12.sp,
                     color = subTextColor
                   )
@@ -482,9 +490,9 @@ fun ChannelInfoScreen(
           }
         }
 
-        3 -> { // Links Tab
+        3 -> { // Links
           if (linkMessages.isEmpty()) {
-            item { EmptyMediaPlaceholder("No links shared yet", subTextColor) }
+            item { EmptyMediaPlaceholder(stringResource(R.string.no_links_yet), subTextColor) }
           } else {
             items(linkMessages) { msg ->
               val urlRegex = "(https?://\\S+)".toRegex()
@@ -520,7 +528,7 @@ fun ChannelInfoScreen(
                     overflow = TextOverflow.Ellipsis
                   )
                   Text(
-                    text = "${msg.formattedTime} • by ${msg.senderName}",
+                    text = "${msg.formattedTime} • ${msg.senderName}",
                     fontSize = 12.sp,
                     color = subTextColor
                   )
@@ -530,9 +538,9 @@ fun ChannelInfoScreen(
           }
         }
 
-        4 -> { // Music / Audio Tab
+        4 -> { // Music / Audio
           if (musicMessages.isEmpty()) {
-            item { EmptyMediaPlaceholder("No audio shared yet", subTextColor) }
+            item { EmptyMediaPlaceholder(stringResource(R.string.no_audio_yet), subTextColor) }
           } else {
             items(musicMessages) { msg ->
               Row(
@@ -553,7 +561,7 @@ fun ChannelInfoScreen(
                 Spacer(modifier = Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
                   Text(
-                    text = msg.fileName ?: "Voice recording (${msg.audioDurationSeconds}s)",
+                    text = msg.fileName ?: stringResource(R.string.label_voice_message_hd),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 15.sp,
                     color = textColor,
@@ -561,7 +569,7 @@ fun ChannelInfoScreen(
                     overflow = TextOverflow.Ellipsis
                   )
                   Text(
-                    text = "${msg.formattedTime} • by ${msg.senderName}",
+                    text = "${msg.formattedTime} • ${msg.senderName}",
                     fontSize = 12.sp,
                     color = subTextColor
                   )
@@ -571,9 +579,9 @@ fun ChannelInfoScreen(
           }
         }
 
-        5 -> { // GIFs / Stickers Tab
+        5 -> { // GIFs / Stickers
           if (gifMessages.isEmpty()) {
-            item { EmptyMediaPlaceholder("No stickers or GIFs shared yet", subTextColor) }
+            item { EmptyMediaPlaceholder(stringResource(R.string.no_gifs_yet), subTextColor) }
           } else {
             item {
               LazyVerticalGrid(
@@ -603,7 +611,6 @@ fun ChannelInfoScreen(
     }
   }
 
-  // Working Edit Channel Dialog
   if (showEditDialog) {
     var editName by remember { mutableStateOf(channel.name) }
     var editDesc by remember { mutableStateOf(channel.description) }
@@ -613,13 +620,13 @@ fun ChannelInfoScreen(
       containerColor = surfaceColor,
       titleContentColor = textColor,
       textContentColor = textColor,
-      title = { Text("Edit Channel Info", fontWeight = FontWeight.Bold) },
+      title = { Text(stringResource(R.string.edit_channel_info_title), fontWeight = FontWeight.Bold) },
       text = {
         Column {
           OutlinedTextField(
             value = editName,
             onValueChange = { editName = it },
-            label = { Text("Channel Name") },
+            label = { Text(stringResource(R.string.channel_name_label)) },
             singleLine = true,
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
@@ -631,7 +638,7 @@ fun ChannelInfoScreen(
           OutlinedTextField(
             value = editDesc,
             onValueChange = { editDesc = it },
-            label = { Text("Description") },
+            label = { Text(stringResource(R.string.channel_desc_label)) },
             modifier = Modifier.fillMaxWidth(),
             colors = OutlinedTextFieldDefaults.colors(
               focusedTextColor = textColor,
@@ -650,12 +657,12 @@ fun ChannelInfoScreen(
           },
           colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark)
         ) {
-          Text("Save", color = Color.White)
+          Text(stringResource(R.string.action_save), color = Color.White)
         }
       },
       dismissButton = {
         TextButton(onClick = { showEditDialog = false }) {
-          Text("Cancel", color = subTextColor)
+          Text(stringResource(R.string.action_cancel), color = subTextColor)
         }
       }
     )
