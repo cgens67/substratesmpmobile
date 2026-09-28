@@ -213,7 +213,6 @@ fun SubstrateApp(
   }
 
   val isDarkMode = appSettings.isNightMode
-  // REDESIGNED MAIN MENU DARK PALETTE
   val menuDarkBg = Color(0xFF0F1012)
   val menuDarkSurface = Color(0xFF191A1E)
   val menuDarkSearch = Color(0xFF1E2024)
@@ -258,6 +257,7 @@ fun SubstrateApp(
     }
   }
 
+  // Instant jump to bottom when first opening chat screen
   LaunchedEffect(currentScreen, activeChannel.id) {
     if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
       delay(40L)
@@ -265,6 +265,7 @@ fun SubstrateApp(
     }
   }
 
+  // Smooth scroll when new incoming/sent messages arrive
   var previousMsgCount by remember { mutableIntStateOf(0) }
   LaunchedEffect(messages.size) {
     if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
@@ -447,6 +448,8 @@ fun SubstrateApp(
             isAdmin = targetMember?.isAdmin ?: false,
             bio = targetMember?.bio ?: "",
             birthday = targetMember?.birthday ?: "",
+            lastCoordinates = targetMember?.lastCoordinates ?: "",
+            lastCoordinatesTimestamp = targetMember?.lastCoordinatesTimestamp ?: 0L,
             isMuted = isMuted,
             isFavourite = isFav,
             isBlocked = isBlocked,
@@ -454,6 +457,10 @@ fun SubstrateApp(
             onNavigateBack = { currentScreen = "chat_screen" },
             onMessageUser = {
                viewModel.startPrivateChat(targetGamertag)
+               currentScreen = "chat_screen"
+            },
+            onRequestLocation = {
+               viewModel.requestUserLocation(targetGamertag)
                currentScreen = "chat_screen"
             },
             onToggleMute = { viewModel.toggleMuteChannel(dmId) },
@@ -781,6 +788,14 @@ fun SubstrateApp(
                         )
                         chatInputText = ""
                         replyingToMessage = null
+                      }
+                    },
+                    onRequestLocation = {
+                      if (activeChannel.isDm) {
+                        val recipient = activeChannel.dmRecipientGamertag ?: activeChannel.name
+                        viewModel.requestUserLocation(recipient)
+                      } else {
+                        viewModel.sendMessage(content = "📍 Location Request", coordinates = null)
                       }
                     },
                     replyingTo = replyingToMessage,
