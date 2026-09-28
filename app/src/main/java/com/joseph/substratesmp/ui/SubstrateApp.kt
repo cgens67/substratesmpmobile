@@ -122,167 +122,6 @@ fun formatDatePill(timestamp: Long, todayText: String, yesterdayText: String): S
 }
 
 @Composable
-fun StatusStoriesTray(
-  statuses: List<StatusUpdate>,
-  currentGamertag: String,
-  isDarkMode: Boolean,
-  onOpenStatus: (StatusUpdate) -> Unit,
-  onAddStatus: () -> Unit,
-  modifier: Modifier = Modifier
-) {
-  val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
-  val subTextColor = if (isDarkMode) Color(0xFFA0A0A5) else Color(0xFF667781)
-  val trayBg = if (isDarkMode) Color(0xFF262626) else Color.White
-
-  val myStatus = statuses.find { it.authorGamertag.equals(currentGamertag, ignoreCase = true) }
-  val otherStatuses = statuses.filter { !it.authorGamertag.equals(currentGamertag, ignoreCase = true) }
-
-  Surface(
-    color = trayBg,
-    modifier = modifier.fillMaxWidth()
-  ) {
-    Column(modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 10.dp)) {
-      Row(
-        modifier = Modifier
-          .fillMaxWidth()
-          .padding(horizontal = 16.dp, vertical = 2.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        Text(
-          text = "REALM STATUS",
-          fontWeight = FontWeight.Bold,
-          fontSize = 11.5.sp,
-          color = subTextColor,
-          letterSpacing = 0.5.sp
-        )
-        Text(
-          text = "Post Update",
-          fontSize = 12.sp,
-          fontWeight = FontWeight.Bold,
-          color = WhatsAppGreenDark,
-          modifier = Modifier.clickable { onAddStatus() }
-        )
-      }
-
-      Spacer(modifier = Modifier.height(8.dp))
-
-      LazyRow(
-        modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
-        verticalAlignment = Alignment.CenterVertically
-      ) {
-        // "My Status" bubble
-        item {
-          Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable {
-              if (myStatus != null) onOpenStatus(myStatus) else onAddStatus()
-            }
-          ) {
-            Box(
-              modifier = Modifier.size(56.dp),
-              contentAlignment = Alignment.Center
-            ) {
-              Box(
-                modifier = Modifier
-                  .size(54.dp)
-                  .clip(CircleShape)
-                  .background(if (isDarkMode) Color(0xFF383838) else Color(0xFFE9EDEF))
-                  .then(
-                    if (myStatus != null) {
-                      Modifier.border(2.5.dp, WhatsAppGreenDark, CircleShape)
-                    } else Modifier
-                  ),
-                contentAlignment = Alignment.Center
-              ) {
-                Text(
-                  text = if (currentGamertag.isNotBlank()) currentGamertag.take(1).uppercase() else "+",
-                  color = if (myStatus != null) WhatsAppGreenDark else textColor,
-                  fontWeight = FontWeight.Bold,
-                  fontSize = 20.sp
-                )
-              }
-              Box(
-                modifier = Modifier
-                  .align(Alignment.BottomEnd)
-                  .size(18.dp)
-                  .clip(CircleShape)
-                  .background(WhatsAppGreenDark)
-                  .border(1.5.dp, if (isDarkMode) Color(0xFF262626) else Color.White, CircleShape),
-                contentAlignment = Alignment.Center
-              ) {
-                Icon(
-                  imageVector = Icons.Default.Add,
-                  contentDescription = "Add Status",
-                  tint = Color.White,
-                  modifier = Modifier.size(12.dp)
-                )
-              }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-              text = if (myStatus != null) "My Status" else "Add Status",
-              fontSize = 11.5.sp,
-              color = textColor,
-              fontWeight = FontWeight.Medium,
-              maxLines = 1
-            )
-          }
-        }
-
-        // Active Player Statuses
-        items(otherStatuses, key = { it.id }) { status ->
-          val ringColor = when (status.backgroundTheme) {
-            "CRIMSON" -> Color(0xFFFF4500)
-            "END_VOID" -> Color(0xFF9C27B0)
-            "DIAMOND" -> Color(0xFF00E5FF)
-            "GOLDEN" -> Color(0xFFFFD700)
-            "OBSIDIAN" -> Color(0xFF607D8B)
-            else -> WhatsAppGreenDark
-          }
-
-          Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.clickable { onOpenStatus(status) }
-          ) {
-            Box(
-              modifier = Modifier
-                .size(54.dp)
-                .clip(CircleShape)
-                .border(2.5.dp, ringColor, CircleShape)
-                .padding(3.dp)
-                .clip(CircleShape)
-                .background(ringColor.copy(alpha = 0.2f)),
-              contentAlignment = Alignment.Center
-            ) {
-              Text(
-                text = status.authorGamertag.take(1).uppercase(),
-                color = if (isDarkMode) Color.White else ringColor,
-                fontWeight = FontWeight.Bold,
-                fontSize = 19.sp
-              )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-              text = status.authorGamertag,
-              fontSize = 11.5.sp,
-              color = textColor,
-              fontWeight = FontWeight.Medium,
-              maxLines = 1,
-              overflow = TextOverflow.Ellipsis,
-              modifier = Modifier.widthIn(max = 64.dp)
-            )
-          }
-        }
-      }
-    }
-  }
-}
-
-@Composable
 fun FloatingBottomNavBar(
   currentScreen: String,
   onNavigate: (String) -> Unit,
@@ -302,16 +141,14 @@ fun FloatingBottomNavBar(
     modifier = modifier.height(64.dp).clip(pillShape)
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 12.dp),
+      modifier = Modifier.padding(horizontal = 8.dp),
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically
     ) {
       NavBarPillItem(icon = Icons.Default.ChatBubble, label = stringResource(R.string.nav_chats), isSelected = currentScreen == "home", isDarkMode = isDarkMode) { onNavigate("home") }
-      Spacer(modifier = Modifier.width(8.dp))
+      NavBarPillItem(icon = Icons.Default.HistoryToggleOff, label = "Status", isSelected = currentScreen == "status_screen", isDarkMode = isDarkMode) { onNavigate("status_screen") }
       NavBarPillItem(icon = Icons.Default.Person, label = stringResource(R.string.nav_contacts), isSelected = currentScreen == "contacts", isDarkMode = isDarkMode) { onNavigate("contacts") }
-      Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(icon = Icons.Default.Settings, label = stringResource(R.string.nav_settings), isSelected = currentScreen == "settings_screen", isDarkMode = isDarkMode) { onNavigate("settings_screen") }
-      Spacer(modifier = Modifier.width(8.dp))
       NavBarPillItem(
         icon = null,
         label = stringResource(R.string.nav_profile),
@@ -343,13 +180,13 @@ fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label
       .animateContentSize(animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow))
   ) {
     Row(
-      modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+      modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
       verticalAlignment = Alignment.CenterVertically
     ) {
-      if (customIcon != null) customIcon() else Icon(imageVector = icon!!, contentDescription = label, tint = contentColor, modifier = Modifier.size(22.dp))
+      if (customIcon != null) customIcon() else Icon(imageVector = icon!!, contentDescription = label, tint = contentColor, modifier = Modifier.size(20.dp))
       if (isSelected) {
         Spacer(modifier = Modifier.width(6.dp))
-        Text(label, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+        Text(label, color = contentColor, fontWeight = FontWeight.Bold, fontSize = 12.5.sp)
       }
     }
   }
@@ -391,10 +228,10 @@ fun SubstrateApp(
   val translatedMessages by viewModel.translatedMessages.collectAsStateWithLifecycle()
 
   val activeVoiceRoom by viewModel.activeVoiceRoom.collectAsStateWithLifecycle()
-  val agoraSettings by viewModel.agoraSettings.collectAsStateWithLifecycle()
+  val incomingCall by viewModel.incomingCall.collectAsStateWithLifecycle()
   val appSettings by viewModel.appSettings.collectAsStateWithLifecycle()
 
-  val showAgoraDialog by viewModel.showAgoraDialog.collectAsStateWithLifecycle()
+  val showGamertagDialog by viewModel.showGamertagDialog.collectAsStateWithLifecycle()
   val showServerInfoSheet by viewModel.showServerInfoSheet.collectAsStateWithLifecycle()
   val showAdminConsole by viewModel.showAdminConsole.collectAsStateWithLifecycle()
 
@@ -426,7 +263,6 @@ fun SubstrateApp(
   val menuDarkText = Color(0xFFEDEDED)
   val menuDarkSubtext = Color(0xFFA0A0A5)
 
-  // Clear, crisp light mode background that never blends with the white floating nav bar
   val menuLightBg = Color(0xFFF4F5F8)
   val menuLightSurface = Color.White
   val menuLightSearch = Color.White
@@ -472,32 +308,34 @@ fun SubstrateApp(
     }
   }
 
-  LaunchedEffect(currentScreen, activeChannel.id) {
-    if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
-      delay(40L)
-      val total = listState.layoutInfo.totalItemsCount
-      if (total > 0) {
-        listState.scrollToItem(total - 1)
-      } else {
-        listState.scrollToItem(messages.size)
-      }
+  // GUARANTEED INSTANT SCROLL TO BOTTOM ON CHANNEL OPEN & LOAD
+  var lastLoadedChannelId by remember { mutableStateOf("") }
+  var hasScrolledToBottomForChannel by remember { mutableStateOf(false) }
+
+  LaunchedEffect(activeChannel.id) {
+    if (activeChannel.id != lastLoadedChannelId) {
+      lastLoadedChannelId = activeChannel.id
+      hasScrolledToBottomForChannel = false
     }
   }
 
-  var previousMsgCount by remember { mutableIntStateOf(0) }
-  LaunchedEffect(messages.size) {
-    if (messages.size > previousMsgCount && currentScreen == "chat_screen") {
-      if (isScrolledToBottom || shouldForceScrollToBottom) {
-        delay(60L)
-        if (appSettings.smoothAnimations) {
+  LaunchedEffect(messages.size, currentScreen, activeChannel.id) {
+    if (currentScreen == "chat_screen" && messages.isNotEmpty()) {
+      if (!hasScrolledToBottomForChannel) {
+        delay(25L)
+        listState.scrollToItem((messages.size * 2).coerceAtLeast(0))
+        hasScrolledToBottomForChannel = true
+      } else if (shouldForceScrollToBottom || isScrolledToBottom) {
+        delay(35L)
+        val target = (listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0)
+        if (appSettings.smoothAnimations && shouldForceScrollToBottom) {
           listState.smoothScrollToBottom()
         } else {
-          listState.scrollToItem((listState.layoutInfo.totalItemsCount - 1).coerceAtLeast(0))
+          listState.scrollToItem(target)
         }
         shouldForceScrollToBottom = false
       }
     }
-    previousMsgCount = messages.size
   }
 
   LaunchedEffect(chatInputText) {
@@ -546,7 +384,7 @@ fun SubstrateApp(
       currentScreen = "settings_screen"
     } else if (currentScreen == "user_profile_screen") {
       currentScreen = "chat_screen"
-    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts") {
+    } else if (currentScreen == "profile_screen" || currentScreen == "settings_screen" || currentScreen == "contacts" || currentScreen == "status_screen") {
       currentScreen = "home"
     } else {
       currentScreen = "home"
@@ -584,7 +422,7 @@ fun SubstrateApp(
       transitionSpec = {
         if (!appSettings.smoothAnimations) {
            fadeIn(tween(0)).togetherWith(fadeOut(tween(0)))
-        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen") {
+        } else if (targetState == "profile_screen" || targetState == "settings_screen" || targetState == "privacy_policy_screen" || targetState == "user_profile_screen" || targetState == "channel_info_screen" || targetState == "status_screen") {
           (slideInVertically(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
             .togetherWith(slideOutVertically(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
         } else if (targetState == "chat_screen" || targetState == "video_call_screen") {
@@ -598,6 +436,22 @@ fun SubstrateApp(
       label = "screen_transition"
     ) { screen ->
       when (screen) {
+        "status_screen" -> {
+          StatusScreen(
+            statuses = statuses,
+            currentGamertag = userState.gamertag,
+            isDarkMode = isDarkMode,
+            onOpenStatus = { openStatus(it) },
+            onPostStatusClick = {
+              if (userState.gamertag.isBlank()) {
+                viewModel.setGamertagDialogVisible(true)
+              } else {
+                showStatusCreatorDialog = true
+              }
+            }
+          )
+        }
+
         "channel_info_screen" -> {
           ChannelInfoScreen(
             channel = activeChannel,
@@ -613,7 +467,10 @@ fun SubstrateApp(
               viewedUser = member.gamertag
               currentScreen = "user_profile_screen"
             },
-            onAddMembers = { currentScreen = "contacts" },
+            onAddMembers = {
+              if (userState.gamertag.isBlank()) viewModel.setGamertagDialogVisible(true)
+              else currentScreen = "contacts"
+            },
             onImageClick = { url -> viewedImageUrl = url },
             onUpdateChannel = { id, name, desc -> viewModel.updateChannelInfo(id, name, desc) },
             onTogglePermission = { ch -> viewModel.toggleChannelPermission(ch) }
@@ -628,7 +485,11 @@ fun SubstrateApp(
             onNavigateHome = { currentScreen = "home" },
             onUpdateProfile = { bio, bday -> viewModel.updateProfile(bio, bday) },
             onLogin = { tag, pass, res -> viewModel.loginAccount(tag, pass, res) },
-            onRegister = { tag, pass, res -> viewModel.registerAccount(tag, pass, res) }
+            onRegister = { tag, pass, res -> viewModel.registerAccount(tag, pass, res) },
+            onLogout = {
+              viewModel.logout()
+              currentScreen = "home"
+            }
           )
         }
         
@@ -675,12 +536,20 @@ fun SubstrateApp(
             isDarkMode = isDarkMode,
             onNavigateBack = { currentScreen = "chat_screen" },
             onMessageUser = {
-               viewModel.startPrivateChat(targetGamertag)
-               currentScreen = "chat_screen"
+              if (userState.gamertag.isBlank()) {
+                viewModel.setGamertagDialogVisible(true)
+              } else {
+                viewModel.startPrivateChat(targetGamertag)
+                currentScreen = "chat_screen"
+              }
             },
             onRequestLocation = {
-               viewModel.requestUserLocation(targetGamertag)
-               currentScreen = "chat_screen"
+              if (userState.gamertag.isBlank()) {
+                viewModel.setGamertagDialogVisible(true)
+              } else {
+                viewModel.requestUserLocation(targetGamertag)
+                currentScreen = "chat_screen"
+              }
             },
             onToggleMute = { viewModel.toggleMuteChannel(dmId) },
             onToggleFavourite = { viewModel.toggleFavourite(dmId) },
@@ -689,16 +558,23 @@ fun SubstrateApp(
         }
         
         "contacts" -> {
-          SelectContactDialog(
-            members = members,
-            currentGamertag = userState.gamertag,
-            isDarkMode = isDarkMode,
-            onDismiss = { currentScreen = "home" },
-            onSelectMember = { target ->
-              viewModel.startPrivateChat(target.gamertag)
-              currentScreen = "chat_screen"
+          if (userState.gamertag.isBlank()) {
+            LaunchedEffect(Unit) {
+              viewModel.setGamertagDialogVisible(true)
+              currentScreen = "home"
             }
-          )
+          } else {
+            SelectContactDialog(
+              members = members,
+              currentGamertag = userState.gamertag,
+              isDarkMode = isDarkMode,
+              onDismiss = { currentScreen = "home" },
+              onSelectMember = { target ->
+                viewModel.startPrivateChat(target.gamertag)
+                currentScreen = "chat_screen"
+              }
+            )
+          }
         }
 
         "video_call_screen" -> {
@@ -796,7 +672,7 @@ fun SubstrateApp(
                       runWithPermissions {
                         if (activeChannel.isDm) {
                           val callId = "call_" + activeChannel.id
-                          viewModel.startPrivateCall(callId, "${activeChannel.name} (Private Video)", isVideo = true)
+                          viewModel.startPrivateCall(activeChannel.name, callId, "${activeChannel.name} (Video)", isVideo = true)
                           currentScreen = "video_call_screen"
                         } else {
                           val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
@@ -814,7 +690,7 @@ fun SubstrateApp(
                       runWithPermissions {
                         if (activeChannel.isDm) {
                           val callId = "call_" + activeChannel.id
-                          viewModel.startPrivateCall(callId, "${activeChannel.name} (Private Call)", isVideo = false)
+                          viewModel.startPrivateCall(activeChannel.name, callId, "${activeChannel.name} (Voice)", isVideo = false)
                         } else {
                           val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
                           viewModel.selectChannel(vc)
@@ -838,7 +714,6 @@ fun SubstrateApp(
               Column(modifier = Modifier.fillMaxSize().imePadding().navigationBarsPadding()) {
                 Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                   LazyColumn(state = listState, modifier = Modifier.fillMaxSize().padding(vertical = 4.dp)) {
-                    // DYNAMIC DATE PILLS PER CALENDAR DAY
                     itemsIndexed(messages, key = { _, message -> message.id }) { index, message ->
                       val showDateHeader = index == 0 || !isSameDay(messages[index - 1].timestamp, message.timestamp)
                       if (showDateHeader) {
@@ -1112,9 +987,6 @@ fun SubstrateApp(
                   )
 
                   Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { showStatusCreatorDialog = true }) {
-                      Icon(Icons.Default.AddCircleOutline, contentDescription = "Post Status", tint = textColor)
-                    }
                     if (userState.isAdmin) {
                       IconButton(onClick = { viewModel.setAdminConsoleVisible(true) }) {
                         Icon(Icons.Default.Shield, contentDescription = null, tint = RoleAdminGold)
@@ -1193,20 +1065,6 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
-              // RESTORED STATUS STORIES TRAY
-              StatusStoriesTray(
-                statuses = statuses,
-                currentGamertag = userState.gamertag,
-                isDarkMode = isDarkMode,
-                onOpenStatus = { openStatus(it) },
-                onAddStatus = { showStatusCreatorDialog = true }
-              )
-
-              HorizontalDivider(
-                color = if (isDarkMode) Color(0xFF333333) else menuLightBorder,
-                thickness = 0.5.dp
-              )
-
               val allLabel = stringResource(R.string.chip_all)
               val unreadLabel = stringResource(R.string.chip_unread)
               val favsLabel = stringResource(R.string.chip_favourites)
@@ -1378,11 +1236,17 @@ fun SubstrateApp(
       }
     }
 
-    if (currentScreen in listOf("home", "profile_screen", "settings_screen", "contacts")) {
+    if (currentScreen in listOf("home", "status_screen", "profile_screen", "settings_screen", "contacts")) {
       Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         FloatingBottomNavBar(
           currentScreen = currentScreen,
-          onNavigate = { currentScreen = it },
+          onNavigate = {
+            if (it == "contacts" && userState.gamertag.isBlank()) {
+              viewModel.setGamertagDialogVisible(true)
+            } else {
+              currentScreen = it
+            }
+          },
           userInitial = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?",
           isDarkMode = isDarkMode,
           modifier = Modifier.navigationBarsPadding().padding(bottom = 16.dp)
@@ -1441,6 +1305,47 @@ fun SubstrateApp(
     }
   }
 
+  // REAL-TIME INCOMING CALL POPUP BANNER
+  incomingCall?.let { call ->
+    AlertDialog(
+      onDismissRequest = {},
+      containerColor = if (isDarkMode) Color(0xFF1E2024) else Color.White,
+      title = {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Icon(Icons.Default.PhoneInTalk, contentDescription = null, tint = WhatsAppGreenDark)
+          Spacer(modifier = Modifier.width(8.dp))
+          Text("Incoming ${if (call.isVideo) "Video" else "Voice"} Call")
+        }
+      },
+      text = {
+        Text("${call.caller} is calling you right now. Tap Accept to connect.", fontSize = 14.5.sp)
+      },
+      confirmButton = {
+        Button(
+          colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
+          onClick = {
+            viewModel.answerIncomingCall()
+            if (call.isVideo) currentScreen = "video_call_screen"
+          }
+        ) {
+          Icon(Icons.Default.Call, contentDescription = null, modifier = Modifier.size(16.dp))
+          Spacer(modifier = Modifier.width(6.dp))
+          Text("Accept")
+        }
+      },
+      dismissButton = {
+        Button(
+          colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFEA0038)),
+          onClick = { viewModel.declineIncomingCall() }
+        ) {
+          Icon(Icons.Default.CallEnd, contentDescription = null, modifier = Modifier.size(16.dp))
+          Spacer(modifier = Modifier.width(6.dp))
+          Text("Decline")
+        }
+      }
+    )
+  }
+
   androidx.compose.animation.AnimatedVisibility(
     visible = isStatusViewerVisible && statusToDisplay != null,
     enter = scaleIn(initialScale = 0.82f, animationSpec = spring(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow)) + fadeIn(tween(250)),
@@ -1469,6 +1374,15 @@ fun SubstrateApp(
         viewModel.postStatus(text, theme, activity, coords)
         showStatusCreatorDialog = false
       }
+    )
+  }
+
+  if (showGamertagDialog) {
+    GamertagDialog(
+      currentGamertag = userState.gamertag,
+      onDismiss = { viewModel.setGamertagDialogVisible(false) },
+      onLogin = { tag, pass, res -> viewModel.loginAccount(tag, pass, res) },
+      onRegister = { tag, pass, res -> viewModel.registerAccount(tag, pass, res) }
     )
   }
 
@@ -1510,7 +1424,6 @@ fun SubstrateApp(
         if (currentScreen == "chat_screen") SheetOption("mute", if (isMuted) stringResource(R.string.menu_unmute_notifications) else stringResource(R.string.menu_mute_notifications), if (isMuted) stringResource(R.string.menu_unmute_sub) else stringResource(R.string.menu_mute_sub), isSelected = isMuted) else null,
         if (currentScreen == "chat_screen") SheetOption("fav", if (isFav) stringResource(R.string.menu_remove_favourites) else stringResource(R.string.menu_add_favourites), if (isFav) stringResource(R.string.menu_remove_fav_sub) else stringResource(R.string.menu_add_fav_sub), isSelected = isFav) else null,
         if (currentScreen == "chat_screen" && isDm && recipient != null) SheetOption("block", if (isBlocked) stringResource(R.string.menu_unblock_user, recipient) else stringResource(R.string.menu_block_user, recipient), if (isBlocked) stringResource(R.string.menu_unblock_sub) else stringResource(R.string.menu_block_sub), isSelected = isBlocked) else null,
-        SheetOption("post_status", "Post Status Update", "Share realm activity, build updates or base coordinates", isSelected = false),
         SheetOption("server", stringResource(R.string.menu_server_ip), stringResource(R.string.default_server_ip), isSelected = false),
         if (userState.isAdmin) SheetOption("admin", stringResource(R.string.menu_admin_console), stringResource(R.string.menu_admin_console_sub), isSelected = false) else null
       ).filterNotNull(),
@@ -1521,7 +1434,6 @@ fun SubstrateApp(
           "mute" -> viewModel.toggleMuteChannel(activeChannel.id)
           "fav" -> viewModel.toggleFavourite(activeChannel.id)
           "block" -> recipient?.let { viewModel.toggleBlockUser(it) }
-          "post_status" -> showStatusCreatorDialog = true
           "server" -> viewModel.setServerInfoSheetVisible(true)
           "admin" -> viewModel.setAdminConsoleVisible(true)
         }
