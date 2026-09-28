@@ -207,6 +207,7 @@ fun SubstrateApp(
   
   var viewedUser by remember { mutableStateOf<String?>(null) }
   var shouldForceScrollToBottom by remember { mutableStateOf(false) }
+  var showInviteToCallDialog by remember { mutableStateOf(false) }
 
   LaunchedEffect(currentScreen) {
     viewModel.setCurrentScreen(currentScreen)
@@ -448,6 +449,7 @@ fun SubstrateApp(
             birthday = targetMember?.birthday ?: "",
             lastCoordinates = targetMember?.lastCoordinates ?: "",
             lastCoordinatesTimestamp = targetMember?.lastCoordinatesTimestamp ?: 0L,
+            isViewerAdmin = userState.isAdmin,
             isMuted = isMuted,
             isFavourite = isFav,
             isBlocked = isBlocked,
@@ -488,6 +490,9 @@ fun SubstrateApp(
               onDisconnect = {
                 viewModel.voiceManager.disconnect()
                 currentScreen = "home"
+              },
+              onAddPerson = {
+                showInviteToCallDialog = true
               }
             )
           } ?: run { currentScreen = "home" }
@@ -569,10 +574,16 @@ fun SubstrateApp(
                 actions = {
                   IconButton(
                     onClick = {
-                      val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
                       runWithPermissions {
-                        viewModel.startVideoCall(vc)
-                        currentScreen = "video_call_screen"
+                        if (activeChannel.isDm) {
+                          val callId = "call_" + activeChannel.id
+                          viewModel.startPrivateCall(callId, "${activeChannel.name} (Private Video)", isVideo = true)
+                          currentScreen = "video_call_screen"
+                        } else {
+                          val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
+                          viewModel.startVideoCall(vc)
+                          currentScreen = "video_call_screen"
+                        }
                       }
                     }
                   ) {
@@ -581,8 +592,15 @@ fun SubstrateApp(
 
                   IconButton(
                     onClick = {
-                      val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
-                      runWithPermissions { viewModel.selectChannel(vc) }
+                      runWithPermissions {
+                        if (activeChannel.isDm) {
+                          val callId = "call_" + activeChannel.id
+                          viewModel.startPrivateCall(callId, "${activeChannel.name} (Private Call)", isVideo = false)
+                        } else {
+                          val vc = channels.find { it.type == ChannelType.VOICE } ?: channels.last()
+                          viewModel.selectChannel(vc)
+                        }
+                      }
                     }
                   ) {
                     Icon(Icons.Default.Call, contentDescription = null, tint = textColor)
@@ -658,7 +676,6 @@ fun SubstrateApp(
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
                         onSendCurrentLocation = {
-                          // Prompt coordinate input with prefill
                           chatInputText = ""
                           shouldForceScrollToBottom = true
                           if (userState.lastCoordinates.isNotBlank()) {
@@ -917,15 +934,17 @@ fun SubstrateApp(
                 LazyRow(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                   items(filterChips) { chip ->
                     val isSelected = activeFilterChip == chip
+                    val chipShape = RoundedCornerShape(18.dp)
                     Surface(
-                      shape = RoundedCornerShape(18.dp),
+                      shape = chipShape,
                       color = if (isSelected) {
                         if (isDarkMode) Color(0xFF00A884) else WhatsAppNavSelectedPill
                       } else {
                         if (isDarkMode) menuDarkSurface else surfaceColor
                       },
                       border = if (isSelected) null else BorderStroke(1.dp, if (isDarkMode) menuDarkBorder else Color(0xFFE9EDEF)),
-                      modifier = Modifier.clickable { activeFilterChip = chip }
+                      onClick = { activeFilterChip = chip },
+                      modifier = Modifier.clip(chipShape)
                     ) {
                       Text(
                         chip, 
@@ -1260,6 +1279,21 @@ fun SubstrateApp(
       onUpdateMemberRole = { id, role -> viewModel.updateMemberRole(id, role) },
       onUpdateMemberGamertag = { id, name -> viewModel.updateMemberGamertag(id, name) },
       onRemoveMember = { id -> viewModel.removeMember(id) }
+    )
+  }
+
+  if (showInviteToCallDialog) {
+    SelectContactDialog(
+      members = members,
+      currentGamertag = userState.gamertag,
+      isDarkMode = isDarkMode,
+      onDismiss = { showInviteToCallDialog = false },
+      onSelectMember = { member ->
+        activeVoiceRoom?.let { room ->
+          viewModel.inviteToCall(member.gamertag, room.channelId, room.channelName, room.isCameraOn)
+        }
+        showInviteToCallDialog = false
+      }
     )
   }
 
