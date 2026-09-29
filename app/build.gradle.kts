@@ -90,6 +90,9 @@ dependencies {
 
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
+  // Added Firebase Cloud Messaging for Background Push Notifications
+  implementation("com.google.firebase:firebase-messaging")
+  
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
