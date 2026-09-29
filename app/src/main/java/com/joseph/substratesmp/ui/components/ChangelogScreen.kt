@@ -51,6 +51,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -432,7 +433,6 @@ fun ChangelogScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            // Only 2 tabs: Releases and Beta Releases (Commits tab is completely hidden)
             TabRow(
                 selectedTabIndex = selectedTab,
                 containerColor = bgColor,
@@ -496,7 +496,6 @@ fun ReleasesContent(
 
     val currentIsLoading = isFetchingOldReleases || (changelogLoadingStates[currentVersionTag] == true)
 
-    // Neutral dark mode styling (no glowing neon)
     val cardBg = if (isDarkMode) Color(0xFF303030) else Color.White
     val cardBorder = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFE2E4E8)
     val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
@@ -768,7 +767,6 @@ fun ReleasesContent(
             }
 
             if (searchFilteredReleases.isNotEmpty()) {
-                // Version pills selector
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
