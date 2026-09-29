@@ -1,9 +1,10 @@
+--- START OF FILE substratesmpmobile-main/app/src/main/java/com/joseph/substratesmp/ui/components/StatusMusicSelectorSheet.kt ---
+
 package com.joseph.substratesmp.ui.components
 
 import android.content.Context
 import android.media.MediaPlayer
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -112,12 +113,22 @@ object StarredMusicManager {
   }
 }
 
-val VerifiedRealTracks = listOf(
+// Pre-seeded Michael Jackson tracks for "Suggested"
+val MichaelJacksonTracks = listOf(
+  MusicTrack("mj_billie_jean", "Billie Jean", "Michael Jackson", "4:54", "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/37/d9/38/37d938b8-b131-e1f9-906f-77119f3900cb/24UMGIM10352.rgb.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/a4/bc/39/a4bc3922-3860-6c37-14fa-7bf66ecdc083/mzaf_10334887309995873977.plus.aac.p.m4a"),
+  MusicTrack("mj_beat_it", "Beat It", "Michael Jackson", "4:18", "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/21/df/b9/21dfb9be-9e73-b295-9988-cb58b760a95b/886445980062.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/9f/c6/33/9fc633c7-128a-7c90-0931-15cb38d672e6/mzaf_1409395277869680373.plus.aac.p.m4a"),
+  MusicTrack("mj_thriller", "Thriller", "Michael Jackson", "5:57", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/e5/22/8e/e5228ee0-2e06-c875-01e4-fc1f5cb8a1b6/886443574164.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/05/29/ce/0529ce8c-2ad4-3676-e886-0428d08c5c0c/mzaf_17208493060647898863.plus.aac.p.m4a"),
+  MusicTrack("mj_smooth_criminal", "Smooth Criminal", "Michael Jackson", "4:17", "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/71/84/f9/7184f9ea-b80c-5126-7f41-0730d3674681/886443574171.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/1b/ad/83/1bad831d-b875-1e35-ce4e-12ce17b2b005/mzaf_11802931494954497645.plus.aac.p.m4a"),
+  MusicTrack("mj_man_in_mirror", "Man in the Mirror", "Michael Jackson", "5:19", "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/71/84/f9/7184f9ea-b80c-5126-7f41-0730d3674681/886443574171.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview112/v4/19/b6/2a/19b62a74-d4ba-7a26-34ca-879930f3fec1/mzaf_3197626943890833202.plus.aac.p.m4a")
+)
+
+// Pre-seeded C418 tracks for "Minecraft"
+val C418MinecraftTracks = listOf(
   MusicTrack("c418_sweden", "Sweden (Minecraft)", "C418", "3:35", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/eb/aa/62/ebaa627f-9be1-f62f-124b-fb022c4f4544/859705663712_cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/1b/ad/83/1bad831d-b875-1e35-ce4e-12ce17b2b005/mzaf_11802931494954497645.plus.aac.p.m4a"),
   MusicTrack("c418_subwoofer", "Subwoofer Lullaby", "C418", "3:28", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/eb/aa/62/ebaa627f-9be1-f62f-124b-fb022c4f4544/859705663712_cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/ff/8d/62/ff8d6263-d305-6548-e8a3-2c1a1796c9ca/mzaf_6454790098418047913.plus.aac.p.m4a"),
   MusicTrack("c418_wet_hands", "Wet Hands", "C418", "1:30", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/eb/aa/62/ebaa627f-9be1-f62f-124b-fb022c4f4544/859705663712_cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview125/v4/a5/ea/bd/a5eabd84-c5b7-7eb5-17a4-bb0ee24430e7/mzaf_17208493060647898863.plus.aac.p.m4a"),
-  MusicTrack("jvke_golden_hour", "golden hour", "JVKE", "3:29", "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/5c/4b/f9/5c4bf925-bdf9-03a1-2fc5-5db4f3e0c0df/196925184203_Cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview112/v4/19/b6/2a/19b62a74-d4ba-7a26-34ca-879930f3fec1/mzaf_3197626943890833202.plus.aac.p.m4a"),
-  MusicTrack("post_sunflower", "Sunflower", "Post Malone & Swae Lee", "2:38", "https://is1-ssl.mzstatic.com/image/thumb/Music125/v4/36/83/82/368382ba-b3be-bfb6-ff95-5ad200d720b5/18UMGIM70072.rgb.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/80/cb/0e/80cb0ea0-31fe-9c02-7476-eb8d32d0cb53/mzaf_7867086812852269550.plus.aac.p.m4a")
+  MusicTrack("c418_mice_venus", "Mice on Venus", "C418", "4:41", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/eb/aa/62/ebaa627f-9be1-f62f-124b-fb022c4f4544/859705663712_cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview116/v4/a4/bc/39/a4bc3922-3860-6c37-14fa-7bf66ecdc083/mzaf_10334887309995873977.plus.aac.p.m4a"),
+  MusicTrack("c418_minecraft", "Minecraft", "C418", "4:14", "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/eb/aa/62/ebaa627f-9be1-f62f-124b-fb022c4f4544/859705663712_cover.jpg/200x200bb.jpg", "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview122/v4/ee/12/bd/ee12bd32-353d-24bf-875f-2ffb6c2a4773/mzaf_15783350419339023610.plus.aac.p.m4a")
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,24 +144,23 @@ fun StatusMusicSelectorSheet(
   var searchQuery by remember { mutableStateOf("") }
   var selectedCategory by remember { mutableStateOf("Suggested") }
   var isSearching by remember { mutableStateOf(false) }
-  var searchResults by remember { mutableStateOf(VerifiedRealTracks) }
+  var searchResults by remember { mutableStateOf(MichaelJacksonTracks) }
 
   var starredTracks by remember { mutableStateOf(StarredMusicManager.getStarredTracks(context)) }
 
   var playingTrackId by remember { mutableStateOf<String?>(null) }
   var mediaPlayer by remember { mutableStateOf<MediaPlayer?>(null) }
-
   var trimmingTrack by remember { mutableStateOf<MusicTrack?>(null) }
 
   // Theme Colors
-  val sheetBg = if (isDarkMode) Color(0xFF16181D) else Color(0xFFF7F8FA)
-  val searchBg = if (isDarkMode) Color(0xFF232730) else Color.White
-  val searchBorder = if (isDarkMode) Color(0xFF323845) else Color(0xFFE2E4E8)
+  val sheetBg = if (isDarkMode) Color(0xFF1E2024) else Color(0xFFF7F8FA)
+  val searchBg = if (isDarkMode) Color(0xFF282C34) else Color.White
+  val searchBorder = if (isDarkMode) Color(0xFF383E4B) else Color(0xFFE2E4E8)
   val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
   val subTextColor = if (isDarkMode) Color(0xFFA0AAB5) else Color(0xFF707784)
   val dragHandleColor = if (isDarkMode) Color(0xFF3D4554) else Color(0xFFD1D5DB)
-  val chipBg = if (isDarkMode) Color(0xFF232730) else Color.White
-  val chipBorder = if (isDarkMode) Color(0xFF323845) else Color(0xFFE2E4E8)
+  val chipBg = if (isDarkMode) Color(0xFF282C34) else Color.White
+  val chipBorder = if (isDarkMode) Color(0xFF383E4B) else Color(0xFFE2E4E8)
   val blueAccent = Color(0xFF007AFF)
 
   DisposableEffect(Unit) {
@@ -232,9 +242,9 @@ fun StatusMusicSelectorSheet(
     }
   }
 
-  // Load real trending songs on startup
+  // Load real Michael Jackson hits on startup for Suggested
   LaunchedEffect(Unit) {
-    fetchItunes("top hits")
+    fetchItunes("Michael Jackson")
   }
 
   ModalBottomSheet(
@@ -276,7 +286,8 @@ fun StatusMusicSelectorSheet(
               searchQuery = it
               if (it.isBlank()) {
                 if (selectedCategory == "Starred") searchResults = starredTracks
-                else fetchItunes("top hits")
+                else if (selectedCategory == "Minecraft") searchResults = C418MinecraftTracks
+                else fetchItunes("Michael Jackson")
               } else {
                 fetchItunes(it)
               }
@@ -290,7 +301,14 @@ fun StatusMusicSelectorSheet(
             }
           )
           if (searchQuery.isNotEmpty()) {
-            IconButton(onClick = { searchQuery = ""; fetchItunes("top hits") }, modifier = Modifier.size(24.dp)) {
+            IconButton(
+              onClick = {
+                searchQuery = ""
+                if (selectedCategory == "Minecraft") searchResults = C418MinecraftTracks
+                else fetchItunes("Michael Jackson")
+              },
+              modifier = Modifier.size(24.dp)
+            ) {
               Icon(Icons.Default.Close, contentDescription = "Clear", tint = subTextColor, modifier = Modifier.size(16.dp))
             }
           }
@@ -299,29 +317,37 @@ fun StatusMusicSelectorSheet(
 
       Spacer(modifier = Modifier.height(14.dp))
 
-      // Category filter chips
-      val chips = listOf("Suggested", "Mood", "Genre", "Starred")
+      // Category filter chips with circular ripples clipped to shape
+      val chips = listOf("Suggested", "Minecraft", "Genre", "Starred")
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
       ) {
         items(chips) { chip ->
           val isSelected = selectedCategory == chip
+          val chipShape = RoundedCornerShape(20.dp)
+
           Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = chipShape,
             color = if (isSelected) (if (isDarkMode) Color(0xFF004D40) else Color(0xFFD8FDD2)) else chipBg,
             border = BorderStroke(1.dp, if (isSelected) Color(0xFF00A884) else chipBorder),
-            modifier = Modifier.clickable {
+            onClick = {
               selectedCategory = chip
               searchQuery = ""
-              if (chip == "Suggested") fetchItunes("popular songs")
-              else if (chip == "Mood") fetchItunes("chill lofi minecraft")
-              else if (chip == "Genre") fetchItunes("gaming electronic ambient")
-              else if (chip == "Starred") {
+              if (chip == "Suggested") {
+                searchResults = MichaelJacksonTracks
+                fetchItunes("Michael Jackson")
+              } else if (chip == "Minecraft") {
+                searchResults = C418MinecraftTracks
+                fetchItunes("C418")
+              } else if (chip == "Genre") {
+                fetchItunes("gaming electronic ambient")
+              } else if (chip == "Starred") {
                 starredTracks = StarredMusicManager.getStarredTracks(context)
                 searchResults = starredTracks
               }
-            }
+            },
+            modifier = Modifier.clip(chipShape) // Fixes rectangular press ripple!
           ) {
             Text(
               text = if (chip == "Starred") "★ Starred (${starredTracks.size})" else chip,
@@ -363,11 +389,12 @@ fun StatusMusicSelectorSheet(
         LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
           items(searchResults, key = { it.id }) { track ->
             val isStarred = starredTracks.any { it.id == track.id }
+            val itemShape = RoundedCornerShape(12.dp)
 
             Row(
               modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
+                .clip(itemShape)
                 .clickable { playPreview(track) }
                 .padding(vertical = 8.dp, horizontal = 4.dp),
               verticalAlignment = Alignment.CenterVertically
@@ -382,7 +409,8 @@ fun StatusMusicSelectorSheet(
                 Surface(
                   shape = CircleShape,
                   color = Color.Black.copy(alpha = 0.55f),
-                  modifier = Modifier.size(28.dp).clickable { playPreview(track) }
+                  onClick = { playPreview(track) },
+                  modifier = Modifier.size(28.dp).clip(CircleShape)
                 ) {
                   Box(contentAlignment = Alignment.Center) {
                     Icon(
@@ -414,7 +442,6 @@ fun StatusMusicSelectorSheet(
                 )
               }
 
-              // Star Icon (Persistently saved)
               IconButton(onClick = {
                 StarredMusicManager.toggleStar(context, track)
                 starredTracks = StarredMusicManager.getStarredTracks(context)
@@ -427,14 +454,14 @@ fun StatusMusicSelectorSheet(
                 )
               }
 
-              // Arrow Button opens section selector
               Surface(
                 shape = CircleShape,
                 color = if (isDarkMode) Color(0xFF282C34) else Color(0xFFE5E7EB),
-                modifier = Modifier.size(36.dp).clickable {
+                onClick = {
                   mediaPlayer?.stop()
                   trimmingTrack = track
-                }
+                },
+                modifier = Modifier.size(36.dp).clip(CircleShape)
               ) {
                 Box(contentAlignment = Alignment.Center) {
                   Icon(
@@ -452,7 +479,7 @@ fun StatusMusicSelectorSheet(
     }
   }
 
-  // Section Selector Dialog (Choose starting second of 30s preview)
+  // Section Selector Dialog (Choose section)
   trimmingTrack?.let { track ->
     var startOffsetSec by remember { mutableFloatStateOf(0f) }
     var isTestingSection by remember { mutableStateOf(false) }
@@ -533,7 +560,6 @@ fun StatusMusicSelectorSheet(
 
           Spacer(modifier = Modifier.height(14.dp))
 
-          // Test section audio preview
           OutlinedButton(
             onClick = {
               isTestingSection = !isTestingSection
@@ -544,7 +570,7 @@ fun StatusMusicSelectorSheet(
               }
             },
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
           ) {
             Icon(
               imageVector = if (isTestingSection) Icons.Default.Stop else Icons.Default.PlayArrow,
@@ -567,7 +593,7 @@ fun StatusMusicSelectorSheet(
             },
             colors = ButtonDefaults.buttonColors(containerColor = blueAccent),
             shape = RoundedCornerShape(12.dp),
-            modifier = Modifier.fillMaxWidth().height(46.dp)
+            modifier = Modifier.fillMaxWidth().height(46.dp).clip(RoundedCornerShape(12.dp))
           ) {
             Text("Confirm & Attach Clip", fontWeight = FontWeight.Bold, color = Color.White)
           }
