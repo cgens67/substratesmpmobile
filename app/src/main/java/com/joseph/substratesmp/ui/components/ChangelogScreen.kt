@@ -29,18 +29,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -85,7 +80,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -123,8 +117,6 @@ import java.time.Duration
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
-
-val LocalPlayerAwareWindowInsets = staticCompositionLocalOf { WindowInsets.navigationBars }
 
 @Composable
 private fun stringResourceSafe(resName: String, fallback: String, vararg formatArgs: Any): String {
@@ -245,18 +237,15 @@ fun matchesVersion(tagName: String, query: String): Boolean {
     return false
 }
 
-// Fixed: Default arguments use plain string literals so no @Composable calls occur in parameter defaults
+// Fixed: default parameters are plain string literals, eliminating the @Composable invocation error
 @Composable
 fun EmptySearchResultsView(
     modifier: Modifier = Modifier,
-    title: String = "",
-    subtitle: String = ""
+    title: String = "No results found",
+    subtitle: String = "Try another search term"
 ) {
-    val displayTitle = if (title.isNotBlank()) title else stringResourceSafe("no_results_found", "No results found")
-    val displaySubtitle = if (subtitle.isNotBlank()) subtitle else stringResourceSafe("try_another_term", "Try another search term")
-
-    var visible by remember(displayTitle, displaySubtitle) { mutableStateOf(false) }
-    LaunchedEffect(displayTitle, displaySubtitle) {
+    var visible by remember(title, subtitle) { mutableStateOf(false) }
+    LaunchedEffect(title, subtitle) {
         visible = true
     }
 
@@ -315,7 +304,7 @@ fun EmptySearchResultsView(
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = displayTitle,
+            text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -325,7 +314,7 @@ fun EmptySearchResultsView(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = displaySubtitle,
+            text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -779,11 +768,7 @@ fun ReleasesContent(
     val updateDescription = currentChangelog?.description
     val updateWarning = currentChangelog?.warning
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             if (currentIsLoading) {
                 LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -1218,11 +1203,7 @@ fun CommitsContent(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
