@@ -246,6 +246,10 @@ fun SubstrateApp(
   var showMenuDropdownSheet by remember { mutableStateOf(false) }
   var longPressedChannel by remember { mutableStateOf<Channel?>(null) }
 
+  // Manual Coordinates Dialog fallback state
+  var manualLocationTargetMessage by remember { mutableStateOf<ChatMessage?>(null) }
+  var manualCoordsInput by remember { mutableStateOf("") }
+
   // Instagram Note State
   var activeNoteToView by remember { mutableStateOf<StatusUpdate?>(null) }
   var showNoteComposer by remember { mutableStateOf(false) }
@@ -760,15 +764,15 @@ fun SubstrateApp(
                         },
                         onTranslate = { msgId, lang -> viewModel.translateMessage(msgId, message.content, lang) },
                         onImageClick = { url -> viewedImageUrl = url },
-                        onSendCurrentLocation = {
-                          chatInputText = ""
+                        onSendCurrentLocation = { reqMsg ->
                           shouldForceScrollToBottom = true
-                          if (userState.lastCoordinates.isNotBlank()) {
-                            viewModel.sendMessage(
-                              content = "",
-                              coordinates = userState.lastCoordinates
-                            )
-                          }
+                          viewModel.sendLocationResponse(
+                            requestMessage = reqMsg,
+                            onManualInputRequired = {
+                              manualLocationTargetMessage = reqMsg
+                              manualCoordsInput = ""
+                            }
+                          )
                         },
                         modifier = Modifier.animateItem(
                           fadeInSpec = tween(200),
@@ -1050,7 +1054,6 @@ fun SubstrateApp(
             }
           ) { innerPadding ->
             Column(modifier = Modifier.fillMaxSize().padding(innerPadding).background(bgColor)) {
-              // Instagram Notes Tray on top of the chats list
               InstagramNotesTray(
                 notes = statuses,
                 currentGamertag = userState.gamertag,
@@ -1259,7 +1262,6 @@ fun SubstrateApp(
       }
     }
 
-    // Full screen image and animated GIF or sticker viewer
     val fullScreenImageModel = remember(viewedImageUrl) {
       val url = viewedImageUrl ?: return@remember null
       if (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("content://") || url.startsWith("file://")) {
@@ -1310,7 +1312,6 @@ fun SubstrateApp(
     }
   }
 
-  // Real-time incoming call dialog
   incomingCall?.let { call ->
     AlertDialog(
       onDismissRequest = {},
@@ -1351,7 +1352,56 @@ fun SubstrateApp(
     )
   }
 
-  // Instagram Note Viewer Popover
+  // Fallback Manual Coordinate Input Dialog
+  manualLocationTargetMessage?.let { targetMsg ->
+    AlertDialog(
+      onDismissRequest = { manualLocationTargetMessage = null },
+      containerColor = surfaceColor,
+      titleContentColor = textColor,
+      textContentColor = textColor,
+      title = { Text("Share Coordinates", fontWeight = FontWeight.Bold) },
+      text = {
+        Column {
+          Text(
+            text = "No live coordinates were detected from the Minecraft server for ${userState.gamertag}. Please enter your coordinates manually:",
+            fontSize = 13.5.sp,
+            color = subTextColor
+          )
+          Spacer(modifier = Modifier.height(12.dp))
+          OutlinedTextField(
+            value = manualCoordsInput,
+            onValueChange = { manualCoordsInput = it },
+            placeholder = { Text("e.g. X: 120, Y: 64, Z: -350 (Overworld)") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            colors = OutlinedTextFieldDefaults.colors(
+              focusedTextColor = textColor,
+              unfocusedTextColor = textColor
+            )
+          )
+        }
+      },
+      confirmButton = {
+        Button(
+          colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
+          onClick = {
+            if (manualCoordsInput.isNotBlank()) {
+              viewModel.submitManualCoordinates(targetMsg, manualCoordsInput)
+              manualLocationTargetMessage = null
+            }
+          }
+        ) {
+          Text("Send Location", color = Color.White)
+        }
+      },
+      dismissButton = {
+        TextButton(onClick = { manualLocationTargetMessage = null }) {
+          Text("Cancel", color = subTextColor)
+        }
+      }
+    )
+  }
+
   activeNoteToView?.let { note ->
     InstagramNoteViewerDialog(
       note = note,
@@ -1371,7 +1421,6 @@ fun SubstrateApp(
     )
   }
 
-  // Instagram Note Composer Dialog
   if (showNoteComposer) {
     InstagramNoteComposerDialog(
       currentGamertag = userState.gamertag,
