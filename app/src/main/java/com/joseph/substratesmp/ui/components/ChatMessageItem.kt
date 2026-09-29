@@ -185,13 +185,13 @@ fun LocationRequestCard(
   currentGamertag: String,
   isDarkMode: Boolean,
   onUserClick: (String) -> Unit,
-  onSendCurrentLocation: () -> Unit
+  onSendCurrentLocation: (ChatMessage) -> Unit
 ) {
   val clipboardManager = LocalClipboardManager.current
   val cardBg = if (isDarkMode) Color(0xFF1E262C) else Color(0xFFF1F8F5)
   val borderColor = if (isDarkMode) Color(0xFF00A884).copy(alpha = 0.4f) else WhatsAppGreenDark.copy(alpha = 0.3f)
   val textColor = if (isDarkMode) Color.White else Color(0xFF111B21)
-  val subTextColor = if (isDarkMode) Color(0xFFA0AAB0) else Color(0xFF667781)
+  val subTextColor = if (isDarkMode) Color(0xFFA0AAB5) else Color(0xFF667781)
 
   val targetGamertag = message.locationTargetGamertag ?: message.replyToSender ?: ""
   val isTargetMe = targetGamertag.isNotBlank() && targetGamertag.equals(currentGamertag, ignoreCase = true)
@@ -287,7 +287,7 @@ fun LocationRequestCard(
           horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
           Button(
-            onClick = onSendCurrentLocation,
+            onClick = { onSendCurrentLocation(message) },
             colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
             shape = RoundedCornerShape(10.dp),
             modifier = Modifier
@@ -337,7 +337,7 @@ fun ChatMessageItem(
   onEdit: (ChatMessage) -> Unit = {},
   onTranslate: (messageId: String, targetLanguage: String) -> Unit = { _, _ -> },
   onImageClick: (String) -> Unit = {},
-  onSendCurrentLocation: () -> Unit = {},
+  onSendCurrentLocation: (ChatMessage) -> Unit = {},
   modifier: Modifier = Modifier
 ) {
   val context = LocalContext.current
