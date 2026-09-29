@@ -1,5 +1,6 @@
 package com.joseph.substratesmp
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -19,6 +20,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.joseph.substratesmp.ui.SubstrateApp
 import com.joseph.substratesmp.ui.SubstrateViewModel
+import com.joseph.substratesmp.ui.components.CallRingtoneHelper
+import com.joseph.substratesmp.ui.components.NotificationHelper
 import com.joseph.substratesmp.ui.theme.SubstrateSMPTheme
 import java.util.Locale
 
@@ -29,6 +32,8 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     viewModel.voiceManager.initAgoraEngine()
+    handleCallIntent(intent)
+
     setContent {
       val settings by viewModel.appSettings.collectAsStateWithLifecycle()
 
@@ -70,5 +75,26 @@ class MainActivity : ComponentActivity() {
         }
       }
     }
+  }
+
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    handleCallIntent(intent)
+  }
+
+  private fun handleCallIntent(intent: Intent?) {
+    if (intent == null) return
+    if (intent.action == "ACTION_ANSWER_CALL") {
+      val callId = intent.getStringExtra("callId") ?: return
+      CallRingtoneHelper.stopRinging(this)
+      NotificationHelper.dismissCallNotification(this, callId.hashCode())
+      viewModel.answerIncomingCall()
+    }
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    CallRingtoneHelper.stopRinging(this)
   }
 }
