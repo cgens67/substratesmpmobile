@@ -8,11 +8,18 @@ import coil.ImageLoaderFactory
 import coil.decode.GifDecoder
 import coil.decode.ImageDecoderDecoder
 import com.google.firebase.FirebaseApp
+import com.onesignal.OneSignal
+import com.onesignal.debug.LogLevel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class SubstrateApplication : Application(), ImageLoaderFactory {
   companion object {
     var instance: SubstrateApplication? = null
       private set
+
+    const val ONESIGNAL_APP_ID = "c304cfb2-a08d-45b0-b1c4-a90b96be3e05"
   }
 
   override fun newImageLoader(): ImageLoader {
@@ -31,6 +38,21 @@ class SubstrateApplication : Application(), ImageLoaderFactory {
     super.onCreate()
     instance = this
 
+    // 1. Initialize OneSignal (Handles background wake-up and push notifications)
+    try {
+      OneSignal.Debug.logLevel = LogLevel.WARN
+      OneSignal.initWithContext(this, ONESIGNAL_APP_ID)
+
+      // Request push notification permissions automatically
+      CoroutineScope(Dispatchers.IO).launch {
+        OneSignal.Notifications.requestPermission(false)
+      }
+      Log.i("SubstrateApplication", "OneSignal initialized with App ID: $ONESIGNAL_APP_ID")
+    } catch (e: Exception) {
+      Log.e("SubstrateApplication", "OneSignal initialization error: ${e.message}")
+    }
+
+    // 2. Initialize Firebase
     try {
       if (FirebaseApp.getApps(this).isEmpty()) {
         FirebaseApp.initializeApp(this)
