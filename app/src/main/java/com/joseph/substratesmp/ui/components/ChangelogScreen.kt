@@ -1,6 +1,6 @@
 @file:OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 
-package com.joseph.substratesmp.ui.screens.settings
+package com.joseph.substratesmp.ui.components
 
 import android.content.Context
 import android.content.Intent
@@ -77,7 +77,7 @@ import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
+import androidx.compose.material3.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -91,8 +91,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
@@ -130,7 +130,7 @@ import java.util.concurrent.TimeUnit
 // --- Window Inset Fallback ---
 val LocalPlayerAwareWindowInsets = staticCompositionLocalOf { WindowInsets.navigationBars }
 
-// --- Resource Fallback Helpers (Prevents Unresolved Reference Compiler Errors) ---
+// --- Resource Fallback Helpers ---
 
 @Composable
 private fun stringResourceSafe(resName: String, fallback: String, vararg formatArgs: Any): String {
@@ -260,11 +260,14 @@ fun matchesVersion(tagName: String, query: String): Boolean {
 @Composable
 fun EmptySearchResultsView(
     modifier: Modifier = Modifier,
-    title: String = stringResourceSafe("no_results_found", "No results found"),
-    subtitle: String = stringResourceSafe("try_another_term", "Try another search term")
+    title: String? = null,
+    subtitle: String? = null
 ) {
-    var visible by remember(title, subtitle) { mutableStateOf(false) }
-    LaunchedEffect(title, subtitle) {
+    val displayTitle = title ?: stringResourceSafe("no_results_found", "No results found")
+    val displaySubtitle = subtitle ?: stringResourceSafe("try_another_term", "Try another search term")
+
+    var visible by remember(displayTitle, displaySubtitle) { mutableStateOf(false) }
+    LaunchedEffect(displayTitle, displaySubtitle) {
         visible = true
     }
 
@@ -323,7 +326,7 @@ fun EmptySearchResultsView(
         Spacer(modifier = Modifier.height(14.dp))
 
         Text(
-            text = title,
+            text = displayTitle,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
@@ -333,7 +336,7 @@ fun EmptySearchResultsView(
         Spacer(modifier = Modifier.height(4.dp))
 
         Text(
-            text = subtitle,
+            text = displaySubtitle,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
@@ -546,7 +549,7 @@ fun ReleasesContent(
     val highlightTextColor = MaterialTheme.colorScheme.onPrimaryContainer
 
     val httpClient = remember(context) {
-        val cacheSize = 10L * 1024 * 1024 // 10 MiB Cache size
+        val cacheSize = 10L * 1024 * 1024
         val cache = Cache(File(context.cacheDir, "github_api_cache"), cacheSize)
         
         OkHttpClient.Builder()
@@ -729,7 +732,6 @@ fun ReleasesContent(
     }
 
     val filteredReleases = availableReleases.filter { it.isPrerelease == isBetaTab }
-
     val allChangelogsValues = allChangelogsData.toMap()
     
     val searchFilteredReleases = remember(filteredReleases, searchQuery, allChangelogsValues) {
@@ -1146,7 +1148,7 @@ fun CommitsContent(
     }
 
     val httpClient = remember(context) {
-        val cacheSize = 10L * 1024 * 1024 // 10 MiB Cache size
+        val cacheSize = 10L * 1024 * 1024
         val cache = Cache(File(context.cacheDir, "github_api_cache"), cacheSize)
         
         OkHttpClient.Builder()
@@ -1532,7 +1534,7 @@ private fun saveReleasesToCache(context: Context, json: String) {
 private fun loadReleasesFromCache(context: Context): String? {
     val prefs = context.getSharedPreferences("changelog_prefs", Context.MODE_PRIVATE)
     val time = prefs.getLong("releases_cache_time", 0)
-    if (System.currentTimeMillis() - time > 3600_000) return null // 1 hour expiration
+    if (System.currentTimeMillis() - time > 3600_000) return null
     return try {
         val file = File(context.filesDir, "releases_cache.json")
         if (!file.exists()) return null
@@ -1550,7 +1552,7 @@ private fun saveCommitsToCache(context: Context, json: String) {
 private fun loadCommitsFromCache(context: Context): String? {
     val prefs = context.getSharedPreferences("changelog_prefs", Context.MODE_PRIVATE)
     val time = prefs.getLong("commits_cache_time", 0)
-    if (System.currentTimeMillis() - time > 3600_000) return null // 1 hour expiration
+    if (System.currentTimeMillis() - time > 3600_000) return null
     return try {
         val file = File(context.filesDir, "commits_cache.json")
         if (!file.exists()) return null
