@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.repository.AuthUserState
 import com.joseph.substratesmp.ui.AppSettings
-import com.joseph.substratesmp.ui.screens.settings.ChangelogScreen
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 
 data class SettingItemData(
