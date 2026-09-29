@@ -245,14 +245,15 @@ fun matchesVersion(tagName: String, query: String): Boolean {
     return false
 }
 
+// Fixed: Default arguments use plain string literals so no @Composable calls occur in parameter defaults
 @Composable
 fun EmptySearchResultsView(
     modifier: Modifier = Modifier,
-    title: String? = null,
-    subtitle: String? = null
+    title: String = "",
+    subtitle: String = ""
 ) {
-    val displayTitle = title ?: stringResourceSafe("no_results_found", "No results found")
-    val displaySubtitle = subtitle ?: stringResourceSafe("try_another_term", "Try another search term")
+    val displayTitle = if (title.isNotBlank()) title else stringResourceSafe("no_results_found", "No results found")
+    val displaySubtitle = if (subtitle.isNotBlank()) subtitle else stringResourceSafe("try_another_term", "Try another search term")
 
     var visible by remember(displayTitle, displaySubtitle) { mutableStateOf(false) }
     LaunchedEffect(displayTitle, displaySubtitle) {
@@ -876,10 +877,7 @@ fun ReleasesContent(
                         .padding(vertical = 48.dp, horizontal = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptySearchResultsView(
-                        title = stringResourceSafe("no_results_found", "No results found"),
-                        subtitle = stringResourceSafe("try_another_term", "Try another search term")
-                    )
+                    EmptySearchResultsView()
                 }
             }
 
@@ -1307,10 +1305,7 @@ fun CommitsContent(
                             .padding(vertical = 48.dp, horizontal = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        EmptySearchResultsView(
-                            title = stringResourceSafe("no_results_found", "No results found"),
-                            subtitle = stringResourceSafe("try_another_term", "Try another search term")
-                        )
+                        EmptySearchResultsView()
                     }
                 }
             }
