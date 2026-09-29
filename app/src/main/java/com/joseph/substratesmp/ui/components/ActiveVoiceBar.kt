@@ -69,7 +69,7 @@ fun ActiveVoiceBar(
         .fillMaxWidth()
         .padding(horizontal = 14.dp, vertical = 10.dp)
     ) {
-      // Header Bar (With Minimize/Collapse Toggle Button)
+      // Header Bar
       Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -80,7 +80,7 @@ fun ActiveVoiceBar(
             modifier = Modifier
               .size(10.dp)
               .clip(CircleShape)
-              .background(Color(0xFF25D366).copy(alpha = pulseAlpha))
+              .background(Color(0xFF0A84FF).copy(alpha = pulseAlpha))
           )
           Spacer(modifier = Modifier.width(8.dp))
           Column {
@@ -93,14 +93,13 @@ fun ActiveVoiceBar(
             Text(
               text = if (voiceRoom.isConnecting) "Connecting..." else "${voiceRoom.participants.size} participant(s) in call",
               style = MaterialTheme.typography.labelSmall,
-              color = Color(0xFF25D366),
+              color = Color(0xFF0A84FF),
               fontSize = 11.sp
             )
           }
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-          // Minimize / Expand Toggle Button
           IconButton(
             onClick = { isMinimized = !isMinimized },
             modifier = Modifier.size(34.dp)
@@ -227,7 +226,7 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
 
   val ringBorderColor by animateColorAsState(
     targetValue = when {
-      isSpeaking -> Color(0xFF25D366)
+      isSpeaking -> Color(0xFF0A84FF)
       isAdmin -> RoleAdminGold
       else -> Color.Transparent
     },
@@ -297,7 +296,7 @@ fun SpeakerAvatarPill(participant: VoiceParticipant) {
                 .width(2.dp)
                 .height(barHeight)
                 .clip(CircleShape)
-                .background(if (participant.isMuted) StatusCallEndRed else if (isSpeaking) Color(0xFF25D366) else Color.Gray.copy(alpha = 0.4f))
+                .background(if (participant.isMuted) StatusCallEndRed else if (isSpeaking) Color(0xFF0A84FF) else Color.Gray.copy(alpha = 0.4f))
             )
           }
         }
