@@ -169,8 +169,8 @@ fun FloatingBottomNavBar(
 
 @Composable
 fun NavBarPillItem(icon: androidx.compose.ui.graphics.vector.ImageVector?, label: String, isSelected: Boolean, isDarkMode: Boolean, customIcon: @Composable (() -> Unit)? = null, onClick: () -> Unit) {
-  val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF00A884) else Color(0xFFE1F5FE)) else Color.Transparent
-  val contentColor = if (isSelected) (if (isDarkMode) Color.White else Color(0xFF0288D1)) else (if (isDarkMode) Color(0xFFA0A0A5) else Color.Gray)
+  val bgColor = if (isSelected) (if (isDarkMode) Color(0xFF007AFF) else Color(0xFFE1F5FE)) else Color.Transparent
+  val contentColor = if (isSelected) (if (isDarkMode) Color.White else Color(0xFF007AFF)) else (if (isDarkMode) Color(0xFFA0A0A5) else Color.Gray)
   val itemShape = RoundedCornerShape(20.dp)
 
   Surface(
@@ -971,7 +971,7 @@ fun SubstrateApp(
                     text = stringResource(R.string.app_name),
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isDarkMode) Color(0xFF00A884) else WhatsAppHeaderGreen,
+                    color = if (isDarkMode) Color(0xFF0A84FF) else WhatsAppHeaderGreen,
                     fontSize = 24.sp
                   )
 
@@ -1028,7 +1028,7 @@ fun SubstrateApp(
                     Surface(
                       shape = chipShape,
                       color = if (isSelected) {
-                        if (isDarkMode) Color(0xFF00A884) else WhatsAppNavSelectedPill
+                        if (isDarkMode) Color(0xFF007AFF) else WhatsAppNavSelectedPill
                       } else {
                         if (isDarkMode) menuDarkSurface else surfaceColor
                       },
@@ -1162,7 +1162,7 @@ fun SubstrateApp(
                           channel.name.take(1).uppercase(),
                           color = if (channel.id == "announcements") Color(0xFFEA0038)
                           else if (channel.isDm) RoleAdminGold
-                          else if (isDarkMode) Color(0xFF00A884)
+                          else if (isDarkMode) Color(0xFF0A84FF)
                           else WhatsAppGreenDark,
                           fontWeight = FontWeight.Bold,
                           fontSize = 20.sp
