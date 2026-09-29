@@ -1,10 +1,10 @@
 package com.joseph.substratesmp.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Policy
@@ -45,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -58,14 +60,17 @@ import androidx.compose.ui.unit.sp
 import com.joseph.substratesmp.R
 import com.joseph.substratesmp.data.repository.AuthUserState
 import com.joseph.substratesmp.ui.AppSettings
+import com.joseph.substratesmp.ui.screens.settings.ChangelogScreen
 import com.joseph.substratesmp.ui.theme.WhatsAppGreenDark
 
 data class SettingItemData(
   val id: String,
   val icon: ImageVector,
   val iconBgColor: Color,
-  val titleRes: Int,
-  val subtitleRes: Int,
+  val titleRes: Int = 0,
+  val subtitleRes: Int = 0,
+  val titleText: String? = null,
+  val subtitleText: String? = null,
   val dynamicSubtitle: String? = null
 )
 
@@ -79,6 +84,52 @@ fun SettingsScreen(
   onNavigateProfile: () -> Unit,
   onNavigatePrivacy: () -> Unit
 ) {
+  var showChangelog by rememberSaveable { mutableStateOf(false) }
+
+  AnimatedContent(
+    targetState = showChangelog,
+    transitionSpec = {
+      if (targetState) {
+        (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeIn())
+          .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeOut())
+      } else {
+        (slideInHorizontally(animationSpec = spring(stiffness = 400f)) { -it / 3 } + fadeIn())
+          .togetherWith(slideOutHorizontally(animationSpec = spring(stiffness = 400f)) { it } + fadeOut())
+      }
+    },
+    label = "settingsToChangelogTransition"
+  ) { displayingChangelog ->
+    if (displayingChangelog) {
+      BackHandler { showChangelog = false }
+      ChangelogScreen(
+        onDismiss = { showChangelog = false }
+      )
+    } else {
+      MainSettingsContent(
+        userState = userState,
+        appSettings = appSettings,
+        isDarkMode = isDarkMode,
+        onUpdateSetting = onUpdateSetting,
+        onNavigateBack = onNavigateBack,
+        onNavigateProfile = onNavigateProfile,
+        onNavigatePrivacy = onNavigatePrivacy,
+        onOpenChangelog = { showChangelog = true }
+      )
+    }
+  }
+}
+
+@Composable
+private fun MainSettingsContent(
+  userState: AuthUserState,
+  appSettings: AppSettings,
+  isDarkMode: Boolean,
+  onUpdateSetting: (String, Any) -> Unit,
+  onNavigateBack: () -> Unit,
+  onNavigateProfile: () -> Unit,
+  onNavigatePrivacy: () -> Unit,
+  onOpenChangelog: () -> Unit
+) {
   val animState = remember { MutableTransitionState(false) }.apply { targetState = true }
 
   var isSearching by remember { mutableStateOf(false) }
@@ -91,10 +142,42 @@ fun SettingsScreen(
   val subTextColor = if (isDarkMode) Color.LightGray else Color.Gray
 
   val settingsList = listOf(
-    SettingItemData("account", Icons.Default.Person, Color(0xFF1DA1F2), R.string.settings_account, R.string.settings_account_sub),
-    SettingItemData("appearance", Icons.Default.ChatBubble, Color(0xFFF7A23B), R.string.settings_appearance, R.string.settings_appearance_sub),
-    SettingItemData("privacy", Icons.Default.Policy, Color(0xFF27D05B), R.string.settings_privacy_policy, R.string.settings_privacy_policy_sub),
-    SettingItemData("language", Icons.Default.Language, Color(0xFFB15DFF), R.string.settings_language, R.string.settings_language, dynamicSubtitle = appSettings.language)
+    SettingItemData(
+      id = "account",
+      icon = Icons.Default.Person,
+      iconBgColor = Color(0xFF1DA1F2),
+      titleRes = R.string.settings_account,
+      subtitleRes = R.string.settings_account_sub
+    ),
+    SettingItemData(
+      id = "appearance",
+      icon = Icons.Default.ChatBubble,
+      iconBgColor = Color(0xFFF7A23B),
+      titleRes = R.string.settings_appearance,
+      subtitleRes = R.string.settings_appearance_sub
+    ),
+    SettingItemData(
+      id = "privacy",
+      icon = Icons.Default.Policy,
+      iconBgColor = Color(0xFF27D05B),
+      titleRes = R.string.settings_privacy_policy,
+      subtitleRes = R.string.settings_privacy_policy_sub
+    ),
+    SettingItemData(
+      id = "changelog",
+      icon = Icons.Default.History,
+      iconBgColor = Color(0xFF007AFF),
+      titleText = "Changelog",
+      subtitleText = "Releases, beta updates & commit history"
+    ),
+    SettingItemData(
+      id = "language",
+      icon = Icons.Default.Language,
+      iconBgColor = Color(0xFFB15DFF),
+      titleRes = R.string.settings_language,
+      subtitleRes = R.string.settings_language,
+      dynamicSubtitle = appSettings.language
+    )
   )
 
   Column(
@@ -137,11 +220,25 @@ fun SettingsScreen(
           modifier = Modifier.size(90.dp).clip(CircleShape).background(Color(0xFF1C2228)),
           contentAlignment = Alignment.Center
         ) {
-          Text(userState.gamertag.take(1).uppercase(), color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+          Text(
+            text = if (userState.gamertag.isNotBlank()) userState.gamertag.take(1).uppercase() else "?",
+            color = Color.White,
+            fontSize = 28.sp,
+            fontWeight = FontWeight.Bold
+          )
         }
         Spacer(modifier = Modifier.height(12.dp))
-        Text(userState.gamertag, fontSize = 22.sp, fontWeight = FontWeight.Medium, color = textColor)
-        Text("@${userState.gamertag}", fontSize = 13.sp, color = subTextColor)
+        Text(
+          text = if (userState.gamertag.isNotBlank()) userState.gamertag else stringResource(R.string.profile_guest),
+          fontSize = 22.sp,
+          fontWeight = FontWeight.Medium,
+          color = textColor
+        )
+        Text(
+          text = if (userState.gamertag.isNotBlank()) "@${userState.gamertag}" else "",
+          fontSize = 13.sp,
+          color = subTextColor
+        )
       }
       Spacer(modifier = Modifier.height(20.dp))
     }
@@ -155,16 +252,23 @@ fun SettingsScreen(
           Surface(shape = RoundedCornerShape(24.dp), color = surfaceColor, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
               settingsList.forEach { setting ->
-                val title = stringResource(setting.titleRes)
-                val subtitle = setting.dynamicSubtitle ?: stringResource(setting.subtitleRes)
+                val title = if (setting.titleRes != 0) stringResource(setting.titleRes) else (setting.titleText ?: "")
+                val subtitle = setting.dynamicSubtitle 
+                    ?: if (setting.subtitleRes != 0) stringResource(setting.subtitleRes) else (setting.subtitleText ?: "")
+
                 if (searchQuery.isBlank() || title.contains(searchQuery, true) || subtitle.contains(searchQuery, true)) {
                   SettingsListItem(
-                    icon = setting.icon, iconBgColor = setting.iconBgColor, title = title, subtitle = subtitle,
-                    textColor = textColor, subTextColor = subTextColor,
+                    icon = setting.icon,
+                    iconBgColor = setting.iconBgColor,
+                    title = title,
+                    subtitle = subtitle,
+                    textColor = textColor,
+                    subTextColor = subTextColor,
                     onClick = {
                       when (setting.id) {
                         "account" -> onNavigateProfile()
                         "privacy" -> onNavigatePrivacy()
+                        "changelog" -> onOpenChangelog()
                         else -> activeDialog = setting.id
                       }
                     }
@@ -182,7 +286,10 @@ fun SettingsScreen(
   when (activeDialog) {
     "appearance" -> {
       AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
+        onDismissRequest = { activeDialog = null },
+        containerColor = surfaceColor,
+        titleContentColor = textColor,
+        textContentColor = textColor,
         title = { Text(stringResource(R.string.settings_appearance_dialog_title), fontWeight = FontWeight.Bold) },
         text = {
           Column {
@@ -201,7 +308,10 @@ fun SettingsScreen(
     }
     "language" -> {
       AlertDialog(
-        onDismissRequest = { activeDialog = null }, containerColor = surfaceColor, titleContentColor = textColor, textContentColor = textColor,
+        onDismissRequest = { activeDialog = null },
+        containerColor = surfaceColor,
+        titleContentColor = textColor,
+        textContentColor = textColor,
         title = { Text(stringResource(R.string.settings_language_dialog_title), fontWeight = FontWeight.Bold) },
         text = {
           Column {
