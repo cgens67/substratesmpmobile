@@ -166,10 +166,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
   }
 
-  /**
-   * Real-time listener for the Bedrock server bridge (SubstrateSync script).
-   * Reads from 'server_coords/live' where the Minecraft server sends player coordinates.
-   */
   private fun listenToServerLiveCoordinates() {
     serverCoordsListener?.remove()
     serverCoordsListener = firestore.collection("server_coords").document("live")
@@ -179,20 +175,16 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val playersMap = snapshot.get("players") as? Map<*, *> ?: return@addSnapshotListener
         val myTag = userState.value.gamertag.lowercase().trim()
 
-        // 1. Update our own live coordinates in local state & user doc
         if (myTag.isNotBlank()) {
           val myData = playersMap[myTag] as? Map<*, *>
           if (myData != null) {
             val myCoords = myData["coords"]?.toString() ?: ""
             if (myCoords.isNotBlank() && myCoords != userState.value.lastCoordinates) {
-              viewModelScope.launch {
-                authRepository.updateCoordinates(myCoords)
-              }
+              viewModelScope.launch { authRepository.updateCoordinates(myCoords) }
             }
           }
         }
 
-        // 2. Update coordinates for all members in the member list
         if (_members.value.isNotEmpty()) {
           _members.value = _members.value.map { member ->
             val memberKey = member.gamertag.lowercase().trim()
@@ -209,10 +201,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       }
   }
 
-  fun sendLocationResponse(
-    requestMessage: ChatMessage,
-    onManualInputRequired: () -> Unit
-  ) {
+  fun sendLocationResponse(requestMessage: ChatMessage, onManualInputRequired: () -> Unit) {
     val myTag = userState.value.gamertag.trim()
     if (myTag.isBlank()) {
       _showGamertagDialog.value = true
@@ -220,10 +209,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     viewModelScope.launch {
-      // 1. Check if we already have coordinates in userState
       var coordsToSend = userState.value.lastCoordinates.trim()
 
-      // 2. If empty, directly query the server_coords/live document
       if (coordsToSend.isBlank()) {
         try {
           val liveDoc = firestore.collection("server_coords").document("live").get().await()
@@ -233,20 +220,17 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         } catch (_: Exception) {}
       }
 
-      // 3. If still empty, prompt manual input dialog instead of doing nothing
       if (coordsToSend.isBlank()) {
         onManualInputRequired()
         return@launch
       }
 
-      // 4. Update the location request card in Firestore so the card itself displays the coordinates
       firestore.collection("channels")
         .document(requestMessage.channelId)
         .collection("messages")
         .document(requestMessage.id)
         .update("coordinates", coordsToSend)
 
-      // 5. Send a reply message with coordinates
       sendMessage(
         content = "📍 Shared location: $coordsToSend",
         coordinates = coordsToSend,
@@ -308,9 +292,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       autoTranslate = prefs.getBoolean("auto_translate", false)
     )
 
-    if (key == "auto_translate" && value == true) {
-      triggerAutoTranslate()
-    }
+    if (key == "auto_translate" && value == true) triggerAutoTranslate()
   }
 
   private fun triggerAutoTranslate() {
@@ -328,15 +310,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   }
 
   fun updateProfile(bio: String, birthday: String) {
-    viewModelScope.launch {
-      authRepository.updateProfileInfo(bio, birthday)
-    }
+    viewModelScope.launch { authRepository.updateProfileInfo(bio, birthday) }
   }
 
   fun updateCoordinates(coords: String) {
-    viewModelScope.launch {
-      authRepository.updateCoordinates(coords)
-    }
+    viewModelScope.launch { authRepository.updateCoordinates(coords) }
   }
 
   fun requestUserLocation(targetGamertag: String, channelId: String = _activeChannel.value.id) {
@@ -404,7 +382,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             val isVideo = validDoc.getBoolean("isVideo") ?: false
             val ts = validDoc.getLong("timestamp") ?: now
 
-            if (_incomingCall.value?.callId != callId) {
+            // FIX: Only trigger the incoming call screen if the call started in the last 15 seconds.
+            // This prevents old, missed calls from popping up when the user opens the app.
+            val isRecentCall = (now - ts) < 15000L
+
+            if (_incomingCall.value?.callId != callId && isRecentCall) {
               _incomingCall.value = IncomingCallData(callId, caller, isVideo, ts)
               CallRingtoneHelper.startRinging(getApplication())
               NotificationHelper.showIncomingCallNotification(
@@ -571,28 +553,19 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val isDm = doc.getBoolean("isDm") ?: false
               val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
 
-              // Strict privacy: unauthenticated users never see direct messages
               if (isDm) {
-                if (myTag.isBlank() || parts == null || !parts.contains(myTag)) {
-                  return@mapNotNull null
-                }
+                if (myTag.isBlank() || parts == null || !parts.contains(myTag)) return@mapNotNull null
               }
 
               val rawName = doc.getString("name") ?: id
-              val name = if (isDm && parts != null) {
-                parts.find { it != myTag } ?: rawName
-              } else rawName
+              val name = if (isDm && parts != null) parts.find { it != myTag } ?: rawName else rawName
 
               val typeStr = doc.getString("type") ?: "TEXT"
               val category = doc.getString("category") ?: "CHANNELS"
               val description = doc.getString("description") ?: ""
               val allowed = (doc.get("allowedRolesToSend") as? List<*>)?.mapNotNull { it?.toString() }
                 ?: if (id == "announcements") listOf("ADMIN") else listOf("ALL")
-              val type = try {
-                ChannelType.valueOf(typeStr)
-              } catch (_: Exception) {
-                ChannelType.TEXT
-              }
+              val type = try { ChannelType.valueOf(typeStr) } catch (_: Exception) { ChannelType.TEXT }
 
               Channel(
                 id = id,
@@ -611,9 +584,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
             if (remote.isNotEmpty()) {
               _channels.value = remote.sortedByDescending { it.lastMessageTimestamp }
-              remote.find { it.id == _activeChannel.value.id }?.let {
-                _activeChannel.value = it
-              }
+              remote.find { it.id == _activeChannel.value.id }?.let { _activeChannel.value = it }
               remote.forEach { ch ->
                 if (ch.type == ChannelType.TEXT && !channelMsgListeners.containsKey(ch.id)) {
                   attachChannelLatestMsgListener(ch.id)
@@ -667,7 +638,11 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val isFromMe = myTag.isNotBlank() && sender.equals(myTag, ignoreCase = true)
         val isViewingThisChat = _currentScreenState.value == "chat_screen" && _activeChannel.value.id == channelId
 
-        if (prevTs != null && ts > prevTs && !isFromMe) {
+        // FIX: Ensure message is actually NEW (sent within the last 15 seconds). 
+        // This prevents the app from spamming notifications for old messages when you open it.
+        val isRecentlySent = (System.currentTimeMillis() - ts) < 15000L
+
+        if (prevTs != null && ts > prevTs && !isFromMe && isRecentlySent) {
           if (!isViewingThisChat && !isChannelMuted(channelId) && !isUserBlocked(sender)) {
             SoundHelper.playMessageSound(getApplication())
             val notifTitle = if (channelId.startsWith("dm_")) sender else "#$channelId • $sender"
@@ -953,7 +928,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     val member = _members.value.find { it.id == userId }
     val tagClean = member?.gamertag?.lowercase()?.trim() ?: ""
 
-    // 1. Mark in deleted_accounts so all devices instantly show "Deleted Account" in chat
     if (tagClean.isNotBlank()) {
       firestore.collection("deleted_accounts").document(tagClean).set(
         mapOf(
@@ -963,7 +937,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       )
     }
 
-    // 2. Mark user document as isDeleted = true to instantly trigger logout on target device
     firestore.collection("users").document(userId).set(
       mapOf("isDeleted" to true, "role" to "DELETED", "gamertag" to "Deleted Account"),
       SetOptions.merge()
