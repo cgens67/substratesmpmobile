@@ -92,7 +92,7 @@ fun ServerInfoSheet(
           ServerDetailRow(
             icon = Icons.Default.Dns,
             label = "Server IP / Domain",
-            value = "mc.substratesmp.net",
+            value = "103.175.50.61",
             labelColor = subTextColor,
             valueColor = textColor
           )
@@ -100,7 +100,7 @@ fun ServerInfoSheet(
           ServerDetailRow(
             icon = Icons.Default.Sensors,
             label = "Bedrock Port",
-            value = "19132",
+            value = "25568",
             labelColor = subTextColor,
             valueColor = textColor
           )
@@ -119,7 +119,7 @@ fun ServerInfoSheet(
 
       Button(
         onClick = {
-          clipboardManager.setText(AnnotatedString("mc.substratesmp.net:19132"))
+          clipboardManager.setText(AnnotatedString("103.175.50.61:25568"))
           onDismiss()
         },
         colors = ButtonDefaults.buttonColors(containerColor = WhatsAppGreenDark),
