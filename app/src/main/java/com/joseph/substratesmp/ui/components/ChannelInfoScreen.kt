@@ -58,8 +58,8 @@ fun getMemberStatusString(gamertag: String, isAdmin: Boolean, currentGamertag: S
 
 fun getMemberAvatarColor(gamertag: String): Color {
   val colors = listOf(
-    Color(0xFF2ECC71), Color(0xFFE67E22), Color(0xFF3498DB),
-    Color(0xFF9B59B6), Color(0xFFE74C3C), Color(0xFF1ABC9C), Color(0xFFF39C12)
+    Color(0xFF007AFF), Color(0xFFE67E22), Color(0xFF3498DB),
+    Color(0xFF9B59B6), Color(0xFFE74C3C), Color(0xFF0288D1), Color(0xFFF39C12)
   )
   return colors[abs(gamertag.hashCode()) % colors.size]
 }
@@ -81,7 +81,7 @@ fun ChannelActionCard(
     modifier = Modifier
       .width(130.dp)
       .height(68.dp)
-      .clip(cardShape) // Eliminates rectangular ripple
+      .clip(cardShape)
   ) {
     Column(
       horizontalAlignment = Alignment.CenterHorizontally,
@@ -242,7 +242,7 @@ fun ChannelInfoScreen(
             modifier = Modifier
               .size(105.dp)
               .clip(CircleShape)
-              .background(Color(0xFF2ECC71)),
+              .background(Color(0xFF007AFF)),
             contentAlignment = Alignment.Center
           ) {
             Text(
@@ -334,12 +334,12 @@ fun ChannelInfoScreen(
             items(tabs.size) { index ->
               val isSelected = selectedTab == index
               val pillBg = if (isSelected) {
-                if (isDarkMode) Color(0xFF005C4B) else Color(0xFFD6F0FF)
+                if (isDarkMode) Color(0xFF0052A3) else Color(0xFFD6F0FF)
               } else {
                 Color.Transparent
               }
               val pillText = if (isSelected) {
-                if (isDarkMode) Color(0xFFD8FDD2) else Color(0xFF008069)
+                if (isDarkMode) Color(0xFFD6E9FF) else Color(0xFF007AFF)
               } else {
                 subTextColor
               }
@@ -404,7 +404,7 @@ fun ChannelInfoScreen(
                 Text(
                   text = status.first,
                   fontSize = 13.sp,
-                  color = if (status.second) Color(0xFF00A884) else subTextColor
+                  color = if (status.second) Color(0xFF0A84FF) else subTextColor
                 )
               }
             }
