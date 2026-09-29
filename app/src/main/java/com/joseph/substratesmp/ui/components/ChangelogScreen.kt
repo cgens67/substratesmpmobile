@@ -46,9 +46,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
@@ -907,10 +907,10 @@ fun ReleasesContent(
                 ) {
                     updateImage?.let { imageUrl ->
                         Spacer(modifier = Modifier.height(8.dp))
-                        ElevatedCard(
+                        Card(
                             shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                             border = BorderStroke(1.dp, cardBorder),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -940,10 +940,10 @@ fun ReleasesContent(
                         }
                     } ?: updateDescription?.let { desc ->
                         Spacer(Modifier.height(8.dp))
-                        ElevatedCard(
+                        Card(
                             shape = RoundedCornerShape(20.dp),
-                            colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                            colors = CardDefaults.cardColors(containerColor = cardBg),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                             border = BorderStroke(1.dp, cardBorder),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -968,10 +968,10 @@ fun ReleasesContent(
                     if (changelogSections.isNotEmpty()) {
                         changelogSections.forEach { section ->
                             Spacer(Modifier.height(14.dp))
-                            ElevatedCard(
+                            Card(
                                 shape = RoundedCornerShape(20.dp),
-                                colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
-                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                                colors = CardDefaults.cardColors(containerColor = cardBg),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                                 border = BorderStroke(1.dp, cardBorder),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
