@@ -564,6 +564,9 @@ fun SubstrateApp(
                 viewModel.voiceManager.disconnect()
                 currentScreen = "home"
               },
+              onMinimize = {
+                currentScreen = "chat_screen"
+              },
               onAddPerson = {
                 showInviteToCallDialog = true
               }
@@ -932,6 +935,7 @@ fun SubstrateApp(
                     EmojiPickerView(
                       stickers = stickers,
                       isAdmin = userState.isAdmin,
+                      isDarkMode = isDarkMode,
                       onOpenCreateSticker = { stickerPickerLauncher.launch("image/*") },
                       onEmojiSelected = { emoji -> chatInputText += emoji },
                       onStickerSelected = { st ->
