@@ -199,7 +199,7 @@ fun ChannelInfoScreen(
               text = { Text(stringResource(R.string.menu_server_ip), color = textColor) },
               leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null, tint = textColor) },
               onClick = {
-                clipboardManager.setText(AnnotatedString("mc.substratesmp.net:19132"))
+                clipboardManager.setText(AnnotatedString("103.175.50.61:25568"))
                 Toast.makeText(context, context.getString(R.string.copied_server_ip), Toast.LENGTH_SHORT).show()
                 showMoreMenu = false
               }
