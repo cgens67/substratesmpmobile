@@ -123,6 +123,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
   val incomingCall: StateFlow<IncomingCallData?> = _incomingCall.asStateFlow()
   private var incomingCallListener: ListenerRegistration? = null
 
+  private var serverCoordsListener: ListenerRegistration? = null
+
   private val firestore: FirebaseFirestore by lazy { FirebaseFirestore.getInstance() }
 
   init {
@@ -141,6 +143,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       syncDeletedAccounts()
       listenToTyping(_activeChannel.value.id)
       listenToIncomingCalls()
+      listenToServerLiveCoordinates()
 
       launch {
         messages.collect { msgList ->
@@ -160,6 +163,49 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         }
       }
     }
+  }
+
+  /**
+   * Real-time listener for the Bedrock server bridge (SubstrateSync script).
+   * Reads from 'server_coords/live' where the Minecraft server sends player coordinates.
+   */
+  private fun listenToServerLiveCoordinates() {
+    serverCoordsListener?.remove()
+    serverCoordsListener = firestore.collection("server_coords").document("live")
+      .addSnapshotListener { snapshot, error ->
+        if (error != null || snapshot == null || !snapshot.exists()) return@addSnapshotListener
+
+        val playersMap = snapshot.get("players") as? Map<*, *> ?: return@addSnapshotListener
+        val myTag = userState.value.gamertag.lowercase().trim()
+
+        // 1. Update our own live coordinates in local state & user doc
+        if (myTag.isNotBlank()) {
+          val myData = playersMap[myTag] as? Map<*, *>
+          if (myData != null) {
+            val myCoords = myData["coords"]?.toString() ?: ""
+            if (myCoords.isNotBlank() && myCoords != userState.value.lastCoordinates) {
+              viewModelScope.launch {
+                authRepository.updateCoordinates(myCoords)
+              }
+            }
+          }
+        }
+
+        // 2. Update coordinates for all members in the member list
+        if (_members.value.isNotEmpty()) {
+          _members.value = _members.value.map { member ->
+            val memberKey = member.gamertag.lowercase().trim()
+            val memberData = playersMap[memberKey] as? Map<*, *>
+            if (memberData != null) {
+              val coords = memberData["coords"]?.toString() ?: member.lastCoordinates
+              val ts = (memberData["timestamp"] as? Number)?.toLong() ?: member.lastCoordinatesTimestamp
+              member.copy(lastCoordinates = coords, lastCoordinatesTimestamp = ts)
+            } else {
+              member
+            }
+          }
+        }
+      }
   }
 
   private fun syncDeletedAccounts() {
@@ -963,6 +1009,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         _showGamertagDialog.value = false
         syncLiveChannels()
         listenToIncomingCalls()
+        listenToServerLiveCoordinates()
       }
       onResult(result)
     }
@@ -977,6 +1024,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         _showGamertagDialog.value = false
         syncLiveChannels()
         listenToIncomingCalls()
+        listenToServerLiveCoordinates()
       }
       onResult(result)
     }
@@ -988,6 +1036,8 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     incomingCallListener?.remove()
     incomingCallListener = null
     stopIncomingCallAlerts()
+    serverCoordsListener?.remove()
+    serverCoordsListener = null
     _channels.value = DefaultChannels
     _activeChannel.value = DefaultChannels[1]
     chatRepository.selectChannel(DefaultChannels[1].id)
@@ -1003,6 +1053,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     super.onCleared()
     typingListener?.remove()
     incomingCallListener?.remove()
+    serverCoordsListener?.remove()
     stopIncomingCallAlerts()
     channelMsgListeners.values.forEach { it.remove() }
     channelMsgListeners.clear()
