@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Substrate SMP</string>
-    <string name="default_server_ip">mc.substratesmp.net:19132</string>
-    <string name="default_server_domain">mc.substratesmp.net</string>
+    <string name="default_server_ip">103.175.50.61:25568</string>
+    <string name="default_server_domain">103.175.50.61</string>
 
     <!-- General & Actions -->
     <string name="action_cancel">Cancel</string>
