@@ -9,6 +9,7 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
+import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -107,6 +108,18 @@ class AuthRepository(private val context: Context) {
     }
   }
 
+  private fun saveFcmToken(uid: String) {
+    FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
+      try {
+        firestore.collection("users").document(uid).set(
+          mapOf("fcmToken" to token), SetOptions.merge()
+        )
+      } catch (e: Exception) {
+        Log.e(TAG, "Failed to save FCM token", e)
+      }
+    }
+  }
+
   suspend fun initializeAuth() {
     var isReady = false
     var currentUid = ""
@@ -136,6 +149,7 @@ class AuthRepository(private val context: Context) {
         isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
         startLiveUserListener(currentUid)
+        saveFcmToken(currentUid) // Ensure token is updated on app start
       }
     } catch (e: Exception) {
       Log.w(TAG, "Auth init check: ${e.message}")
@@ -269,6 +283,7 @@ class AuthRepository(private val context: Context) {
       )
 
       startLiveUserListener(uid)
+      saveFcmToken(uid) // Save token on register
       Result.success(cleanTag)
     } catch (e: Exception) {
       Result.failure(e)
@@ -338,6 +353,7 @@ class AuthRepository(private val context: Context) {
       )
 
       startLiveUserListener(uid)
+      saveFcmToken(uid) // Save token on login
       Result.success(actualTag)
     } catch (e: Exception) {
       Result.failure(e)
