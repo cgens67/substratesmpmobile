@@ -17,6 +17,7 @@ import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
 import com.joseph.substratesmp.ui.components.AdminMember
+import com.joseph.substratesmp.ui.components.CallRingtoneHelper
 import com.joseph.substratesmp.ui.components.NotificationHelper
 import com.joseph.substratesmp.ui.components.SoundHelper
 import com.joseph.substratesmp.voice.AgoraVoiceManager
@@ -265,20 +266,6 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     voiceManager.joinVoiceChannel(callChannelId, callChannelName, myTag, isVideo = isVideo)
   }
 
-  fun answerIncomingCall() {
-    val call = _incomingCall.value ?: return
-    val myTag = userState.value.gamertag
-    firestore.collection("active_calls").document(call.callId).update("status", "accepted")
-    voiceManager.joinVoiceChannel(call.callId, "Call with ${call.caller}", myTag, isVideo = call.isVideo)
-    _incomingCall.value = null
-  }
-
-  fun declineIncomingCall() {
-    val call = _incomingCall.value ?: return
-    firestore.collection("active_calls").document(call.callId).update("status", "declined")
-    _incomingCall.value = null
-  }
-
   private fun listenToIncomingCalls() {
     val myTag = userState.value.gamertag.trim()
     if (myTag.isBlank()) return
@@ -298,21 +285,47 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
             val caller = validDoc.getString("caller") ?: "Player"
             val isVideo = validDoc.getBoolean("isVideo") ?: false
             val ts = validDoc.getLong("timestamp") ?: now
-            _incomingCall.value = IncomingCallData(callId, caller, isVideo, ts)
-            NotificationHelper.showMessageNotification(
-              getApplication(),
-              callId.hashCode(),
-              "📞 Incoming Call",
-              "$caller is calling you..."
-            )
-            SoundHelper.playMessageSound(getApplication())
+
+            if (_incomingCall.value?.callId != callId) {
+              _incomingCall.value = IncomingCallData(callId, caller, isVideo, ts)
+              CallRingtoneHelper.startRinging(getApplication())
+              NotificationHelper.showIncomingCallNotification(
+                context = getApplication(),
+                callId = callId,
+                caller = caller,
+                isVideo = isVideo
+              )
+            }
           } else {
-            _incomingCall.value = null
+            stopIncomingCallAlerts()
           }
         } else {
-          _incomingCall.value = null
+          stopIncomingCallAlerts()
         }
       }
+  }
+
+  private fun stopIncomingCallAlerts() {
+    _incomingCall.value?.let { call ->
+      NotificationHelper.dismissCallNotification(getApplication(), call.callId.hashCode())
+    }
+    CallRingtoneHelper.stopRinging(getApplication())
+    _incomingCall.value = null
+  }
+
+  fun answerIncomingCall() {
+    val call = _incomingCall.value ?: return
+    stopIncomingCallAlerts()
+    val myTag = userState.value.gamertag
+    firestore.collection("active_calls").document(call.callId).update("status", "accepted")
+    voiceManager.joinVoiceChannel(call.callId, "Call with ${call.caller}", myTag, isVideo = call.isVideo)
+  }
+
+  fun declineIncomingCall() {
+    val call = _incomingCall.value ?: return
+    val callId = call.callId
+    stopIncomingCallAlerts()
+    firestore.collection("active_calls").document(callId).update("status", "declined")
   }
 
   fun inviteToCall(targetGamertag: String, callChannelId: String, callChannelName: String, isVideo: Boolean) {
@@ -440,7 +453,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
               val isDm = doc.getBoolean("isDm") ?: false
               val parts = (doc.get("participants") as? List<*>)?.mapNotNull { it?.toString()?.lowercase() }
 
-              // Strict privacy check: unlogged users can NEVER see DMs
+              // Strict privacy: unauthenticated users never see direct messages
               if (isDm) {
                 if (myTag.isBlank() || parts == null || !parts.contains(myTag)) {
                   return@mapNotNull null
@@ -525,7 +538,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           img != null -> "📷 Photo"
           aud != null -> if (dur > 0) "🎤 Voice message" else "🎵 ${fn ?: "Audio file"}"
           fil != null -> "📄 ${fn ?: "Document"}"
-          coords != null && content.isBlank() -> "📍 $coords"
+          coordinates != null && content.isBlank() -> "📍 $coords"
           else -> content
         }
 
@@ -974,7 +987,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     chatRepository.updateLocalGamertag("")
     incomingCallListener?.remove()
     incomingCallListener = null
-    _incomingCall.value = null
+    stopIncomingCallAlerts()
     _channels.value = DefaultChannels
     _activeChannel.value = DefaultChannels[1]
     chatRepository.selectChannel(DefaultChannels[1].id)
@@ -990,6 +1003,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
     super.onCleared()
     typingListener?.remove()
     incomingCallListener?.remove()
+    stopIncomingCallAlerts()
     channelMsgListeners.values.forEach { it.remove() }
     channelMsgListeners.clear()
     voiceManager.destroy()
