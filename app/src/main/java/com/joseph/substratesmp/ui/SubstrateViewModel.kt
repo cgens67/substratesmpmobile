@@ -16,6 +16,7 @@ import com.joseph.substratesmp.data.model.ServerSticker
 import com.joseph.substratesmp.data.model.StatusUpdate
 import com.joseph.substratesmp.data.repository.AuthRepository
 import com.joseph.substratesmp.data.repository.ChatRepository
+import com.joseph.substratesmp.services.OneSignalHelper
 import com.joseph.substratesmp.ui.components.AdminMember
 import com.joseph.substratesmp.ui.components.CallRingtoneHelper
 import com.joseph.substratesmp.ui.components.NotificationHelper
@@ -336,6 +337,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
 
   fun startPrivateCall(recipientGamertag: String, callChannelId: String, callChannelName: String, isVideo: Boolean) {
     val myTag = userState.value.gamertag.trim()
+    val user = userState.value
     if (myTag.isBlank() || recipientGamertag.isBlank()) {
       _showGamertagDialog.value = true
       return
@@ -358,6 +360,21 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       coordinates = null,
       channelId = dmId
     )
+
+    // Ring recipient's phone via OneSignal even if their app is killed
+    viewModelScope.launch {
+      OneSignalHelper.sendToUser(
+        recipientGamertag = recipientGamertag,
+        title = "Incoming ${if (isVideo) "Video" else "Voice"} Call",
+        message = "${user.gamertag} is calling you...",
+        dataPayload = mapOf(
+          "type" to "call",
+          "callId" to callChannelId,
+          "caller" to user.gamertag,
+          "isVideo" to isVideo.toString()
+        )
+      )
+    }
 
     voiceManager.joinVoiceChannel(callChannelId, callChannelName, myTag, isVideo = isVideo)
   }
@@ -1043,6 +1060,28 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
       ),
       SetOptions.merge()
     )
+
+    // Trigger instant background push notification via OneSignal
+    viewModelScope.launch {
+      val isDm = channelId.startsWith("dm_")
+      if (isDm) {
+        val target = locationTargetGamertag 
+          ?: channelId.removePrefix("dm_").split("_").firstOrNull { !it.equals(user.gamertag, ignoreCase = true) }
+        if (!target.isNullOrBlank()) {
+          OneSignalHelper.sendToUser(
+            recipientGamertag = target,
+            title = user.gamertag,
+            message = preview
+          )
+        }
+      } else {
+        OneSignalHelper.broadcastToAll(
+          title = "#$channelId • ${user.gamertag}",
+          message = preview,
+          senderGamertag = user.gamertag
+        )
+      }
+    }
   }
 
   fun loginAccount(gamertag: String, pass: String, onResult: (Result<String>) -> Unit) {
