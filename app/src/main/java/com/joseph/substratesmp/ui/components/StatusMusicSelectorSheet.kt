@@ -3,6 +3,7 @@ package com.joseph.substratesmp.ui.components
 import android.content.Context
 import android.media.MediaPlayer
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -240,7 +241,6 @@ fun StatusMusicSelectorSheet(
     }
   }
 
-  // Load real Michael Jackson hits on startup for Suggested
   LaunchedEffect(Unit) {
     fetchItunes("Michael Jackson")
   }
@@ -265,7 +265,6 @@ fun StatusMusicSelectorSheet(
         .fillMaxHeight(0.90f)
         .padding(horizontal = 16.dp)
     ) {
-      // Search Bar
       Surface(
         shape = RoundedCornerShape(16.dp),
         color = searchBg,
@@ -315,7 +314,6 @@ fun StatusMusicSelectorSheet(
 
       Spacer(modifier = Modifier.height(14.dp))
 
-      // Category filter chips with circular ripples clipped to shape
       val chips = listOf("Suggested", "Minecraft", "Genre", "Starred")
       LazyRow(
         modifier = Modifier.fillMaxWidth(),
@@ -345,7 +343,7 @@ fun StatusMusicSelectorSheet(
                 searchResults = starredTracks
               }
             },
-            modifier = Modifier.clip(chipShape) // Fixes rectangular press ripple!
+            modifier = Modifier.clip(chipShape)
           ) {
             Text(
               text = if (chip == "Starred") "★ Starred (${starredTracks.size})" else chip,
@@ -360,7 +358,6 @@ fun StatusMusicSelectorSheet(
 
       Spacer(modifier = Modifier.height(14.dp))
 
-      // Track List
       if (searchResults.isEmpty()) {
         Box(
           modifier = Modifier.fillMaxWidth().weight(1f),
@@ -477,7 +474,6 @@ fun StatusMusicSelectorSheet(
     }
   }
 
-  // Section Selector Dialog (Choose section)
   trimmingTrack?.let { track ->
     var startOffsetSec by remember { mutableFloatStateOf(0f) }
     var isTestingSection by remember { mutableStateOf(false) }
