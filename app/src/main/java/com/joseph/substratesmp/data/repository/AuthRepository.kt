@@ -9,7 +9,7 @@ import com.google.firebase.auth.userProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
-import com.google.firebase.messaging.FirebaseMessaging
+import com.onesignal.OneSignal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -72,7 +72,6 @@ class AuthRepository(private val context: Context) {
   private fun startLiveUserListener(uid: String) {
     userDocListener?.remove()
     userDocListener = firestore.collection("users").document(uid).addSnapshotListener { snapshot, _ ->
-      // INSTANT KICK: If the user document was removed or marked isDeleted = true, kick out immediately!
       if (snapshot == null || !snapshot.exists() || snapshot.getBoolean("isDeleted") == true) {
         logout()
         return@addSnapshotListener
@@ -108,18 +107,6 @@ class AuthRepository(private val context: Context) {
     }
   }
 
-  private fun saveFcmToken(uid: String) {
-    FirebaseMessaging.getInstance().token.addOnSuccessListener { token ->
-      try {
-        firestore.collection("users").document(uid).set(
-          mapOf("fcmToken" to token), SetOptions.merge()
-        )
-      } catch (e: Exception) {
-        Log.e(TAG, "Failed to save FCM token", e)
-      }
-    }
-  }
-
   suspend fun initializeAuth() {
     var isReady = false
     var currentUid = ""
@@ -149,7 +136,9 @@ class AuthRepository(private val context: Context) {
         isAdmin = savedGamertag.equals("Siang5680", ignoreCase = true) || savedRole == "ADMIN"
         isReady = true
         startLiveUserListener(currentUid)
-        saveFcmToken(currentUid) // Ensure token is updated on app start
+
+        // Identify this phone in OneSignal with the user's Gamertag
+        try { OneSignal.login(savedGamertag.lowercase().trim()) } catch (_: Exception) {}
       }
     } catch (e: Exception) {
       Log.w(TAG, "Auth init check: ${e.message}")
@@ -283,7 +272,7 @@ class AuthRepository(private val context: Context) {
       )
 
       startLiveUserListener(uid)
-      saveFcmToken(uid) // Save token on register
+      try { OneSignal.login(cleanTag.lowercase()) } catch (_: Exception) {}
       Result.success(cleanTag)
     } catch (e: Exception) {
       Result.failure(e)
@@ -353,7 +342,7 @@ class AuthRepository(private val context: Context) {
       )
 
       startLiveUserListener(uid)
-      saveFcmToken(uid) // Save token on login
+      try { OneSignal.login(actualTag.lowercase().trim()) } catch (_: Exception) {}
       Result.success(actualTag)
     } catch (e: Exception) {
       Result.failure(e)
@@ -364,6 +353,9 @@ class AuthRepository(private val context: Context) {
     userDocListener?.remove()
     try {
       auth.signOut()
+    } catch (_: Exception) {}
+    try {
+      OneSignal.logout()
     } catch (_: Exception) {}
     prefs.edit().clear().apply()
     _userState.value = AuthUserState(needsGamertagSetup = true)
