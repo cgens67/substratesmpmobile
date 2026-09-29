@@ -9,18 +9,15 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -45,17 +42,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonGroupDefaults
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
@@ -68,7 +63,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
-import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -99,8 +93,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.joseph.substratesmp.BuildConfig
@@ -149,16 +143,6 @@ private fun rememberIconPainterSafe(resName: String, fallbackIcon: ImageVector):
     }
 }
 
-data class CommitData(
-    val sha: String,
-    val message: String,
-    val authorName: String,
-    val authorAvatarUrl: String?,
-    val authorLogin: String?,
-    val date: String,
-    val htmlUrl: String
-)
-
 data class ChangelogSection(val title: String, val items: List<String>)
 
 data class ReleaseMetadata(
@@ -184,7 +168,6 @@ fun getTimeAgo(context: Context, dateString: String?): String {
         val zdt = ZonedDateTime.parse(dateString)
         val now = ZonedDateTime.now(ZoneId.systemDefault())
         val duration = Duration.between(zdt, now)
-        
         val seconds = duration.seconds
         when {
             seconds < 0 -> getStringSafe(context, "just_now", "Just now")
@@ -200,7 +183,7 @@ fun getTimeAgo(context: Context, dateString: String?): String {
             seconds < 63072000 -> getStringSafe(context, "one_year_ago", "1 year ago")
             else -> getStringSafe(context, "years_ago", "%d years ago", seconds / 31536000)
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         dateString ?: ""
     }
 }
@@ -228,22 +211,21 @@ fun matchesVersion(tagName: String, query: String): Boolean {
     if (cleanQuery == "v" || cleanQuery == "v.") return false
 
     if (tagName.lowercase().replace(" ", "").contains(cleanQuery)) return true
-
     val normTag = normalizeVersionString(tagName)
     val normQuery = normalizeVersionString(cleanQuery)
-
-    if (normQuery.isNotEmpty() && normTag.contains(normQuery)) return true
-
-    return false
+    return normQuery.isNotEmpty() && normTag.contains(normQuery)
 }
 
-// Fixed: default parameters are plain string literals, eliminating the @Composable invocation error
 @Composable
 fun EmptySearchResultsView(
     modifier: Modifier = Modifier,
     title: String = "No results found",
-    subtitle: String = "Try another search term"
+    subtitle: String = "Try another search term",
+    isDarkMode: Boolean = false
 ) {
+    val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
+    val subTextColor = if (isDarkMode) Color(0xFFA0A0A5) else Color(0xFF667781)
+
     var visible by remember(title, subtitle) { mutableStateOf(false) }
     LaunchedEffect(title, subtitle) {
         visible = true
@@ -251,10 +233,7 @@ fun EmptySearchResultsView(
 
     val iconScale by animateFloatAsState(
         targetValue = if (visible) 1f else 0.4f,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "emptyIconScale"
     )
 
@@ -266,10 +245,7 @@ fun EmptySearchResultsView(
 
     val contentOffsetY by animateDpAsState(
         targetValue = if (visible) 0.dp else 16.dp,
-        animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,
-            stiffness = Spring.StiffnessMediumLow
-        ),
+        animationSpec = spring(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow),
         label = "emptyContentOffsetY"
     )
 
@@ -288,7 +264,7 @@ fun EmptySearchResultsView(
                 .size(56.dp)
                 .scale(iconScale)
                 .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    color = if (isDarkMode) Color(0xFF383838) else Color(0xFFE9EDEF),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
@@ -297,7 +273,7 @@ fun EmptySearchResultsView(
                 painter = rememberIconPainterSafe("search", Icons.Default.Search),
                 contentDescription = null,
                 modifier = Modifier.size(28.dp),
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = subTextColor
             )
         }
 
@@ -307,7 +283,7 @@ fun EmptySearchResultsView(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = textColor,
             textAlign = TextAlign.Center
         )
 
@@ -316,7 +292,7 @@ fun EmptySearchResultsView(
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = subTextColor,
             textAlign = TextAlign.Center
         )
     }
@@ -324,6 +300,7 @@ fun EmptySearchResultsView(
 
 @Composable
 fun ChangelogScreen(
+    isDarkMode: Boolean = false,
     onDismiss: () -> Unit = {},
     versionTag: String = BuildConfig.VERSION_NAME
 ) {
@@ -332,6 +309,13 @@ fun ChangelogScreen(
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+
+    val bgColor = if (isDarkMode) Color(0xFF262626) else Color(0xFFF4F5F8)
+    val surfaceColor = if (isDarkMode) Color(0xFF303030) else Color.White
+    val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
+    val subTextColor = if (isDarkMode) Color(0xFFA0A0A5) else Color(0xFF667781)
+    val accentGreen = if (isDarkMode) Color(0xFF00A884) else Color(0xFF008069)
+    val dividerColor = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFE2E4E8)
 
     BackHandler(enabled = isSearchActive) {
         isSearchActive = false
@@ -342,7 +326,7 @@ fun ChangelogScreen(
         modifier = Modifier
             .fillMaxSize()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
+        containerColor = bgColor,
         topBar = {
             AnimatedContent(
                 targetState = isSearchActive,
@@ -361,9 +345,7 @@ fun ChangelogScreen(
                                 onSearch = { isSearchActive = false },
                                 expanded = false,
                                 onExpandedChange = {},
-                                placeholder = {
-                                    Text(text = stringResourceSafe("search", "Search"))
-                                },
+                                placeholder = { Text(text = "Search releases or changes...", color = subTextColor) },
                                 leadingIcon = {
                                     IconButton(
                                         onClick = {
@@ -373,7 +355,8 @@ fun ChangelogScreen(
                                     ) {
                                         Icon(
                                             painter = rememberIconPainterSafe("arrow_back", Icons.AutoMirrored.Filled.ArrowBack),
-                                            contentDescription = stringResourceSafe("back", "Back")
+                                            contentDescription = "Back",
+                                            tint = textColor
                                         )
                                     }
                                 },
@@ -382,7 +365,8 @@ fun ChangelogScreen(
                                         IconButton(onClick = { searchQuery = "" }) {
                                             Icon(
                                                 painter = rememberIconPainterSafe("close", Icons.Default.Close),
-                                                contentDescription = stringResourceSafe("clear", "Clear")
+                                                contentDescription = "Clear",
+                                                tint = subTextColor
                                             )
                                         }
                                     }
@@ -391,25 +375,29 @@ fun ChangelogScreen(
                         },
                         expanded = false,
                         onExpandedChange = {},
+                        colors = SearchBarDefaults.colors(
+                            containerColor = if (isDarkMode) Color(0xFF1E1E1E) else Color.White
+                        ),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
-                            .padding(top = 8.dp, bottom = 4.dp)
+                            .padding(horizontal = 16.dp, vertical = 6.dp)
                     ) {}
                 } else {
                     LargeTopAppBar(
-                        title = { 
+                        title = {
                             Text(
-                                text = stringResourceSafe("Changelog", "Changelog"),
+                                text = "Changelog",
                                 style = MaterialTheme.typography.headlineMedium,
-                                fontWeight = FontWeight.Bold
-                            ) 
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
                         },
                         navigationIcon = {
                             IconButton(onClick = onDismiss) {
                                 Icon(
-                                    painter = rememberIconPainterSafe("arrow_back", Icons.AutoMirrored.Filled.ArrowBack), 
-                                    contentDescription = null
+                                    painter = rememberIconPainterSafe("arrow_back", Icons.AutoMirrored.Filled.ArrowBack),
+                                    contentDescription = "Back",
+                                    tint = textColor
                                 )
                             }
                         },
@@ -417,19 +405,21 @@ fun ChangelogScreen(
                             IconButton(onClick = { isSearchActive = true }) {
                                 Icon(
                                     painter = rememberIconPainterSafe("search", Icons.Default.Search),
-                                    contentDescription = stringResourceSafe("search", "Search")
+                                    contentDescription = "Search",
+                                    tint = textColor
                                 )
                             }
                             IconButton(onClick = { refreshTrigger++ }) {
                                 Icon(
                                     painter = rememberIconPainterSafe("sync", Icons.Default.Sync),
-                                    contentDescription = stringResourceSafe("action_retry", "Retry")
+                                    contentDescription = "Refresh",
+                                    tint = textColor
                                 )
                             }
                         },
                         colors = TopAppBarDefaults.largeTopAppBarColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLowest,
-                            scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            containerColor = bgColor,
+                            scrolledContainerColor = surfaceColor,
                         ),
                         scrollBehavior = scrollBehavior
                     )
@@ -442,50 +432,55 @@ fun ChangelogScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
+            // Only 2 tabs: Releases and Beta Releases (Commits tab is completely hidden)
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                containerColor = bgColor,
+                contentColor = accentGreen,
+                divider = { HorizontalDivider(color = dividerColor, thickness = 0.5.dp) }
             ) {
                 Tab(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
-                    text = { Text(stringResourceSafe("tab_releases", "Releases"), fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "Releases",
+                            fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedTab == 0) accentGreen else subTextColor
+                        )
+                    }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
-                    text = { Text(stringResourceSafe("beta_releases", "Beta Releases"), fontWeight = FontWeight.SemiBold) }
-                )
-                Tab(
-                    selected = selectedTab == 2,
-                    onClick = { selectedTab = 2 },
-                    text = { Text(stringResourceSafe("tab_commits", "Commits"), fontWeight = FontWeight.SemiBold) }
+                    text = {
+                        Text(
+                            text = "Beta Releases",
+                            fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Medium,
+                            color = if (selectedTab == 1) accentGreen else subTextColor
+                        )
+                    }
                 )
             }
 
-            if (selectedTab == 0 || selectedTab == 1) {
-                ReleasesContent(
-                    versionTag = versionTag,
-                    refreshTrigger = refreshTrigger,
-                    isBetaTab = selectedTab == 1,
-                    searchQuery = searchQuery
-                )
-            } else {
-                CommitsContent(
-                    refreshTrigger = refreshTrigger,
-                    searchQuery = searchQuery
-                )
-            }
+            ReleasesContent(
+                versionTag = versionTag,
+                refreshTrigger = refreshTrigger,
+                isBetaTab = selectedTab == 1,
+                searchQuery = searchQuery,
+                isDarkMode = isDarkMode
+            )
         }
     }
 }
 
 @Composable
 fun ReleasesContent(
-    versionTag: String, 
-    refreshTrigger: Int, 
+    versionTag: String,
+    refreshTrigger: Int,
     isBetaTab: Boolean,
-    searchQuery: String = ""
+    searchQuery: String = "",
+    isDarkMode: Boolean = false
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -498,26 +493,22 @@ fun ReleasesContent(
     val allChangelogsData = remember { mutableStateMapOf<String, CachedChangelogData>() }
     val changelogFetchErrors = remember { mutableStateMapOf<String, String>() }
     val changelogLoadingStates = remember { mutableStateMapOf<String, Boolean>() }
-    
+
     val currentIsLoading = isFetchingOldReleases || (changelogLoadingStates[currentVersionTag] == true)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "highlight_transition")
-    val highlightAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "highlight_alpha"
-    )
-    val highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = highlightAlpha)
-    val highlightTextColor = MaterialTheme.colorScheme.onPrimaryContainer
+    // Neutral dark mode styling (no glowing neon)
+    val cardBg = if (isDarkMode) Color(0xFF303030) else Color.White
+    val cardBorder = if (isDarkMode) Color(0xFF3D3D3D) else Color(0xFFE2E4E8)
+    val textColor = if (isDarkMode) Color(0xFFEDEDED) else Color(0xFF111B21)
+    val subTextColor = if (isDarkMode) Color(0xFFA0A0A5) else Color(0xFF667781)
+    val accentGreen = if (isDarkMode) Color(0xFF00A884) else Color(0xFF008069)
+    val linkColor = if (isDarkMode) Color(0xFF53BDEB) else Color(0xFF0288D1)
+    val highlightColor = if (isDarkMode) Color(0xFF005C4B).copy(alpha = 0.45f) else Color(0xFFD8FDD2)
+    val highlightTextColor = if (isDarkMode) Color(0xFFD8FDD2) else Color(0xFF005C4B)
 
     val httpClient = remember(context) {
         val cacheSize = 10L * 1024 * 1024
         val cache = Cache(File(context.cacheDir, "github_api_cache"), cacheSize)
-        
         OkHttpClient.Builder()
             .cache(cache)
             .connectTimeout(15, TimeUnit.SECONDS)
@@ -544,12 +535,12 @@ fun ReleasesContent(
                         changelogLoadingStates[tag] = false
                     }
                 } else {
-                    val urlToFetch = release?.changelogUrl 
+                    val urlToFetch = release?.changelogUrl
                         ?: "https://github.com/cgens67/substratesmpmobile/releases/download/$tag/changelog.json"
 
                     val request = Request.Builder()
                         .url(urlToFetch)
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header("User-Agent", "Mozilla/5.0")
                         .build()
 
                     val response = httpClient.newCall(request).execute()
@@ -558,7 +549,6 @@ fun ReleasesContent(
                         val changelogJson = response.body?.string() ?: "{}"
                         try {
                             val changelogData = JSONObject(changelogJson)
-
                             val desc = changelogData.optString("description", "").takeIf { it.isNotBlank() }
                             val imageUrl = changelogData.optString("image", "").takeIf { it.isNotBlank() }
                             val warning = changelogData.optString("warning", "").takeIf { it.isNotBlank() }
@@ -599,21 +589,21 @@ fun ReleasesContent(
                                 changelogLoadingStates[tag] = false
                             }
                         } catch (e: Exception) {
-                            withContext(Dispatchers.Main) { 
+                            withContext(Dispatchers.Main) {
                                 changelogFetchErrors[tag] = "JSON Parse Error: ${e.message}"
-                                changelogLoadingStates[tag] = false 
+                                changelogLoadingStates[tag] = false
                             }
                         }
                     } else {
-                        withContext(Dispatchers.Main) { 
-                            changelogFetchErrors[tag] = if (response.code == 403) getStringSafe(context, "github_api_rate_limit_exceeded", "GitHub API rate limit exceeded") else "HTTP ${response.code}: ${response.message}\nURL: $urlToFetch"
-                            changelogLoadingStates[tag] = false 
+                        withContext(Dispatchers.Main) {
+                            changelogFetchErrors[tag] = if (response.code == 403) "GitHub API rate limit exceeded" else "HTTP ${response.code}: ${response.message}"
+                            changelogLoadingStates[tag] = false
                         }
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    changelogFetchErrors[tag] = "Network Error: ${e.javaClass.simpleName} - ${e.message}"
+                    changelogFetchErrors[tag] = "Network Error: ${e.message}"
                     changelogLoadingStates[tag] = false
                 }
             }
@@ -631,7 +621,7 @@ fun ReleasesContent(
                 } else {
                     val request = Request.Builder()
                         .url("https://api.github.com/repos/cgens67/substratesmpmobile/releases?per_page=50")
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                        .header("User-Agent", "Mozilla/5.0")
                         .header("Accept", "application/vnd.github.v3+json")
                         .build()
 
@@ -644,7 +634,7 @@ fun ReleasesContent(
                     } else {
                         withContext(Dispatchers.Main) {
                             isFetchingOldReleases = false
-                            releasesFetchError = if (response.code == 403) getStringSafe(context, "github_api_rate_limit_exceeded", "GitHub API rate limit exceeded") else "HTTP ${response.code}: ${response.message}"
+                            releasesFetchError = if (response.code == 403) "GitHub API rate limit exceeded" else "HTTP ${response.code}: ${response.message}"
                         }
                         return@launch
                     }
@@ -699,14 +689,13 @@ fun ReleasesContent(
 
     val filteredReleases = availableReleases.filter { it.isPrerelease == isBetaTab }
     val allChangelogsValues = allChangelogsData.toMap()
-    
+
     val searchFilteredReleases = remember(filteredReleases, searchQuery, allChangelogsValues) {
         if (searchQuery.isBlank()) {
             filteredReleases
         } else {
             filteredReleases.filter { release ->
                 val changelogData = allChangelogsData[release.tagName]
-                
                 val changelogText = buildString {
                     changelogData?.sections?.forEach { section ->
                         append(section.title).append(" ")
@@ -762,7 +751,7 @@ fun ReleasesContent(
     val currentChangelog = allChangelogsData[currentVersionTag]
     val currentHasError = releasesFetchError != null || changelogFetchErrors[currentVersionTag] != null
     val currentDetailedError = releasesFetchError ?: changelogFetchErrors[currentVersionTag]
-    
+
     val changelogSections = currentChangelog?.sections ?: emptyList()
     val updateImage = currentChangelog?.image
     val updateDescription = currentChangelog?.description
@@ -771,10 +760,15 @@ fun ReleasesContent(
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
             if (currentIsLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = accentGreen,
+                    trackColor = accentGreen.copy(alpha = 0.2f)
+                )
             }
 
             if (searchFilteredReleases.isNotEmpty()) {
+                // Version pills selector
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -785,27 +779,30 @@ fun ReleasesContent(
                         modifier = Modifier
                             .weight(1f)
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(ButtonGroupDefaults.ConnectedSpaceBetween),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        searchFilteredReleases.forEachIndexed { index, release ->
-                            ToggleButton(
-                                checked = currentVersionTag == release.tagName,
-                                onCheckedChange = {
+                        searchFilteredReleases.forEach { release ->
+                            val isSelected = currentVersionTag == release.tagName
+                            val pillShape = RoundedCornerShape(16.dp)
+
+                            Surface(
+                                shape = pillShape,
+                                color = if (isSelected) accentGreen else (if (isDarkMode) Color(0xFF383838) else Color(0xFFE9EDEF)),
+                                border = if (isSelected) null else BorderStroke(1.dp, cardBorder),
+                                onClick = {
                                     if (currentVersionTag != release.tagName) {
                                         currentVersionTag = release.tagName
                                     }
                                 },
-                                shapes = when {
-                                    searchFilteredReleases.size == 1 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                    index == 0 -> ButtonGroupDefaults.connectedLeadingButtonShapes()
-                                    index == searchFilteredReleases.lastIndex -> ButtonGroupDefaults.connectedTrailingButtonShapes()
-                                    else -> ButtonGroupDefaults.connectedMiddleButtonShapes()
-                                }
+                                modifier = Modifier.clip(pillShape)
                             ) {
                                 Text(
                                     text = release.tagName,
-                                    style = MaterialTheme.typography.labelLarge
+                                    fontSize = 13.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) Color.White else subTextColor,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                                 )
                             }
                         }
@@ -814,17 +811,17 @@ fun ReleasesContent(
                         CircularProgressIndicator(
                             modifier = Modifier
                                 .padding(start = 8.dp)
-                                .size(24.dp),
+                                .size(20.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = accentGreen
                         )
                     }
                 }
 
                 val currentRelease = searchFilteredReleases.find { it.tagName == currentVersionTag }
-                
+
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -833,21 +830,21 @@ fun ReleasesContent(
                             text = currentVersionTag,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                            color = textColor
                         )
                         if (currentRelease != null) {
                             Text(
                                 text = getTimeAgo(context, currentRelease.rawDate),
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = subTextColor
                             )
                             if (currentRelease.isPrerelease) {
                                 val target = getBetaTarget(currentRelease.tagName)
                                 if (target != null) {
                                     Text(
-                                        text = stringResourceSafe("pre_release_for", "Pre-release for %s", target),
+                                        text = "Pre-release for $target",
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.secondary,
+                                        color = accentGreen,
                                         fontWeight = FontWeight.Medium
                                     )
                                 }
@@ -862,42 +859,45 @@ fun ReleasesContent(
                         .padding(vertical = 48.dp, horizontal = 24.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    EmptySearchResultsView()
+                    EmptySearchResultsView(isDarkMode = isDarkMode)
                 }
             }
 
             if (currentHasError && !currentIsLoading) {
-                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxWidth().heightIn(min = 340.dp), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                        Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(48.dp))
-                        Spacer(Modifier.height(16.dp))
-                        Text(stringResourceSafe("error_loading_changelog", "Error loading changelog"), color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                        
+                        Icon(Icons.Default.Error, null, tint = Color(0xFFEA0038), modifier = Modifier.size(44.dp))
+                        Spacer(Modifier.height(14.dp))
+                        Text("Error loading changelog", color = textColor, fontWeight = FontWeight.Bold)
+
                         currentDetailedError?.let { detail ->
                             Spacer(Modifier.height(8.dp))
                             Surface(
-                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(8.dp)
+                                color = if (isDarkMode) Color(0xFF3D2626) else Color(0xFFFFEBEE),
+                                shape = RoundedCornerShape(10.dp)
                             ) {
                                 Text(
-                                    text = detail, 
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    text = detail,
+                                    color = if (isDarkMode) Color(0xFFFFB4AB) else Color(0xFFC62828),
                                     style = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.padding(12.dp),
                                     textAlign = TextAlign.Center
                                 )
                             }
                         }
-                        
-                        Spacer(Modifier.height(24.dp))
-                        Button(onClick = { 
-                            fetchOldReleases(bypassCache = true)
-                            if (currentVersionTag.isNotBlank()) {
-                                val rel = availableReleases.find { it.tagName == currentVersionTag }
-                                ensureChangelogFetched(currentVersionTag, rel, bypassCache = true) 
-                            }
-                        }) {
-                            Text(stringResourceSafe("action_retry", "Retry"))
+
+                        Spacer(Modifier.height(20.dp))
+                        Button(
+                            onClick = {
+                                fetchOldReleases(bypassCache = true)
+                                if (currentVersionTag.isNotBlank()) {
+                                    val rel = availableReleases.find { it.tagName == currentVersionTag }
+                                    ensureChangelogFetched(currentVersionTag, rel, bypassCache = true)
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = accentGreen)
+                        ) {
+                            Text("Retry", color = Color.White)
                         }
                     }
                 }
@@ -905,16 +905,15 @@ fun ReleasesContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
                     updateImage?.let { imageUrl ->
                         Spacer(modifier = Modifier.height(8.dp))
                         ElevatedCard(
-                            shape = MaterialTheme.shapes.extraLarge,
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            ),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                            border = BorderStroke(1.dp, cardBorder),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             AsyncImage(
@@ -936,7 +935,7 @@ fun ReleasesContent(
                                 Text(
                                     text = annotatedDesc,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    color = textColor,
                                     modifier = Modifier.padding(16.dp)
                                 )
                             }
@@ -944,11 +943,10 @@ fun ReleasesContent(
                     } ?: updateDescription?.let { desc ->
                         Spacer(Modifier.height(8.dp))
                         ElevatedCard(
-                            shape = MaterialTheme.shapes.extraLarge,
-                            colors = CardDefaults.elevatedCardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                            ),
-                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
+                            elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                            border = BorderStroke(1.dp, cardBorder),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             val annotatedDesc = buildAnnotatedString {
@@ -963,7 +961,7 @@ fun ReleasesContent(
                             Text(
                                 text = annotatedDesc,
                                 style = MaterialTheme.typography.bodyLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = textColor,
                                 modifier = Modifier.padding(16.dp)
                             )
                         }
@@ -971,16 +969,15 @@ fun ReleasesContent(
 
                     if (changelogSections.isNotEmpty()) {
                         changelogSections.forEach { section ->
-                            Spacer(Modifier.height(16.dp))
+                            Spacer(Modifier.height(14.dp))
                             ElevatedCard(
-                                shape = MaterialTheme.shapes.extraLarge,
-                                colors = CardDefaults.elevatedCardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                                ),
-                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 2.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                colors = CardDefaults.elevatedCardColors(containerColor = cardBg),
+                                elevation = CardDefaults.elevatedCardElevation(defaultElevation = 1.dp),
+                                border = BorderStroke(1.dp, cardBorder),
                                 modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column(modifier = Modifier.padding(20.dp)) {
+                                Column(modifier = Modifier.padding(18.dp)) {
                                     if (section.title.isNotBlank()) {
                                         val annotatedTitle = buildAnnotatedString {
                                             append(section.title)
@@ -993,11 +990,11 @@ fun ReleasesContent(
                                         }
                                         Text(
                                             text = annotatedTitle,
-                                            style = MaterialTheme.typography.headlineSmall,
+                                            style = MaterialTheme.typography.titleMedium,
                                             fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onSurface
+                                            color = textColor
                                         )
-                                        Spacer(Modifier.height(12.dp))
+                                        Spacer(Modifier.height(10.dp))
                                     }
 
                                     section.items.forEach { item ->
@@ -1007,7 +1004,7 @@ fun ReleasesContent(
                                             append(itemTrimmed)
                                             urls.forEach { (range, url) ->
                                                 addStringAnnotation("URL", url, range.first, range.last + 1)
-                                                addStyle(SpanStyle(color = MaterialTheme.colorScheme.primary, textDecoration = TextDecoration.Underline), range.first, range.last + 1)
+                                                addStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline), range.first, range.last + 1)
                                             }
                                             if (searchQuery.isNotBlank()) {
                                                 val matches = Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(itemTrimmed)
@@ -1017,14 +1014,16 @@ fun ReleasesContent(
                                             }
                                         }
                                         Row(
-                                            modifier = Modifier.padding(vertical = 6.dp), 
-                                            verticalAlignment = Alignment.Top, 
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                            modifier = Modifier.padding(vertical = 5.dp),
+                                            verticalAlignment = Alignment.Top,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                                         ) {
-                                            Box(modifier = Modifier
-                                                .padding(top = 8.dp)
-                                                .size(6.dp)
-                                                .background(MaterialTheme.colorScheme.primary, CircleShape))
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(top = 8.dp)
+                                                    .size(6.dp)
+                                                    .background(accentGreen, CircleShape)
+                                            )
                                             ClickableText(
                                                 text = annotatedText,
                                                 onClick = { offset ->
@@ -1032,7 +1031,7 @@ fun ReleasesContent(
                                                         ContextCompat.startActivity(context, Intent(Intent.ACTION_VIEW, Uri.parse(it.item)), null)
                                                     }
                                                 },
-                                                style = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                style = MaterialTheme.typography.bodyMedium.copy(color = textColor, lineHeight = 20.sp)
                                             )
                                         }
                                     }
@@ -1042,10 +1041,14 @@ fun ReleasesContent(
                     }
 
                     updateWarning?.let { warning ->
-                        Spacer(Modifier.height(24.dp))
-                        Surface(color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp)) {
-                            Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Icon(Icons.Default.Error, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(20.dp))
+                        Spacer(Modifier.height(20.dp))
+                        Surface(
+                            color = if (isDarkMode) Color(0xFF3D2626) else Color(0xFFFFEBEE),
+                            shape = RoundedCornerShape(14.dp),
+                            border = BorderStroke(1.dp, if (isDarkMode) Color(0xFF5E3535) else Color(0xFFFFCDD2))
+                        ) {
+                            Row(modifier = Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Error, null, tint = Color(0xFFEA0038), modifier = Modifier.size(20.dp))
                                 val annotatedWarning = buildAnnotatedString {
                                     append(warning)
                                     if (searchQuery.isNotBlank()) {
@@ -1055,381 +1058,13 @@ fun ReleasesContent(
                                         }
                                     }
                                 }
-                                Text(annotatedWarning, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+                                Text(annotatedWarning, style = MaterialTheme.typography.bodyMedium, color = if (isDarkMode) Color(0xFFFFB4AB) else Color(0xFFC62828))
                             }
                         }
                     }
 
                     Spacer(Modifier.height(32.dp))
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun CommitsContent(
-    refreshTrigger: Int,
-    searchQuery: String = ""
-) {
-    val context = LocalContext.current
-    var commits by remember { mutableStateOf<List<CommitData>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var hasError by remember { mutableStateOf(false) }
-    var detailedError by remember { mutableStateOf<String?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
-    val httpClient = remember(context) {
-        val cacheSize = 10L * 1024 * 1024
-        val cache = Cache(File(context.cacheDir, "github_api_cache"), cacheSize)
-        
-        OkHttpClient.Builder()
-            .cache(cache)
-            .connectTimeout(15, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .followRedirects(true)
-            .followSslRedirects(true)
-            .build()
-    }
-
-    fun fetchCommits(bypassCache: Boolean = false) {
-        isLoading = true
-        hasError = false
-        detailedError = null
-        coroutineScope.launch(Dispatchers.IO) {
-            try {
-                val cachedJson = if (!bypassCache) loadCommitsFromCache(context) else null
-                val json = if (cachedJson != null) {
-                    cachedJson
-                } else {
-                    val request = Request.Builder()
-                        .url("https://api.github.com/repos/cgens67/substratesmpmobile/commits?branch=main&per_page=50")
-                        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-                        .header("Accept", "application/vnd.github.v3+json")
-                        .build()
-
-                    val response = httpClient.newCall(request).execute()
-
-                    if (response.isSuccessful) {
-                        val bodyString = response.body?.string() ?: "[]"
-                        saveCommitsToCache(context, bodyString)
-                        bodyString
-                    } else {
-                        withContext(Dispatchers.Main) {
-                            isLoading = false
-                            hasError = true
-                            detailedError = if (response.code == 403) getStringSafe(context, "github_api_rate_limit_exceeded", "GitHub API rate limit exceeded") else "HTTP ${response.code}: ${response.message}"
-                        }
-                        return@launch
-                    }
-                }
-
-                val array = JSONArray(json)
-
-                val list = mutableListOf<CommitData>()
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    val sha = obj.getString("sha")
-                    val htmlUrl = obj.getString("html_url")
-
-                    val commitObj = obj.getJSONObject("commit")
-                    val fullMessage = commitObj.getString("message")
-                    val message = fullMessage.lines().firstOrNull { it.isNotBlank() } ?: fullMessage
-
-                    val authorObj = commitObj.getJSONObject("author")
-                    val authorName = authorObj.optString("name").takeIf { it.isNotEmpty() } ?: getStringSafe(context, "unknown", "Unknown")
-                    val rawDate = authorObj.optString("date", "")
-                    val formattedDate = getTimeAgo(context, rawDate)
-
-                    val authorLogin = if (!obj.isNull("author")) {
-                        obj.getJSONObject("author").optString("login", null)
-                    } else null
-                    val authorAvatarUrl = if (!obj.isNull("author")) {
-                        obj.getJSONObject("author").optString("avatar_url", null)
-                    } else null
-
-                    list.add(CommitData(sha, message, authorName, authorAvatarUrl, authorLogin, formattedDate, htmlUrl))
-                }
-
-                withContext(Dispatchers.Main) {
-                    commits = list
-                    isLoading = false
-                    hasError = false
-                }
-            } catch (e: Exception) {
-                Log.e("CommitScreen", "Error fetching commits: ${e.message}")
-                withContext(Dispatchers.Main) {
-                    hasError = true
-                    detailedError = "Network Error: ${e.message}"
-                    isLoading = false
-                }
-            }
-        }
-    }
-
-    val filteredCommits = remember(commits, searchQuery) {
-        if (searchQuery.isBlank()) {
-            commits
-        } else {
-            commits.filter { commit ->
-                commit.message.contains(searchQuery, ignoreCase = true) ||
-                commit.authorName.contains(searchQuery, ignoreCase = true) ||
-                commit.sha.contains(searchQuery, ignoreCase = true) ||
-                (commit.authorLogin?.contains(searchQuery, ignoreCase = true) == true)
-            }
-        }
-    }
-
-    val infiniteTransition = rememberInfiniteTransition(label = "highlight_transition")
-    val highlightAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.3f,
-        targetValue = 0.8f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(800, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "highlight_alpha"
-    )
-    val highlightColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = highlightAlpha)
-    val highlightTextColor = MaterialTheme.colorScheme.onPrimaryContainer
-
-    LaunchedEffect(Unit) {
-        fetchCommits(false)
-    }
-
-    LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger > 0) {
-            fetchCommits(bypassCache = true)
-        }
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            if (isLoading) {
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
-            }
-
-            when {
-                hasError && !isLoading -> {
-                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp), contentAlignment = Alignment.Center) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                            Icon(
-                                Icons.Default.Error,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error,
-                                modifier = Modifier.size(48.dp)
-                            )
-                            Spacer(Modifier.height(16.dp))
-                            Text(
-                                text = stringResourceSafe("error_loading_commits", "Error loading commits"),
-                                color = MaterialTheme.colorScheme.error,
-                                fontWeight = FontWeight.Bold
-                            )
-                            
-                            detailedError?.let { detail ->
-                                Spacer(Modifier.height(8.dp))
-                                Surface(
-                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                                    shape = RoundedCornerShape(8.dp)
-                                ) {
-                                    Text(
-                                        text = detail, 
-                                        color = MaterialTheme.colorScheme.onErrorContainer,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(12.dp),
-                                        textAlign = TextAlign.Center
-                                    )
-                                }
-                            }
-                            
-                            Spacer(Modifier.height(24.dp))
-                            Button(onClick = { fetchCommits(bypassCache = true) }) {
-                                Text(stringResourceSafe("action_retry", "Retry"))
-                            }
-                        }
-                    }
-                }
-
-                filteredCommits.isNotEmpty() -> {
-                    filteredCommits.forEachIndexed { index, commit ->
-                        CommitItem(
-                            commit = commit,
-                            onClick = {
-                                ContextCompat.startActivity(
-                                    context,
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(commit.htmlUrl)),
-                                    null
-                                )
-                            },
-                            searchQuery = searchQuery,
-                            highlightColor = highlightColor,
-                            highlightTextColor = highlightTextColor
-                        )
-                        if (index < filteredCommits.lastIndex) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(start = 72.dp),
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                }
-
-                !isLoading -> {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 48.dp, horizontal = 24.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        EmptySearchResultsView()
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun CommitItem(
-    commit: CommitData,
-    onClick: () -> Unit,
-    searchQuery: String = "",
-    highlightColor: Color = Color.Transparent,
-    highlightTextColor: Color = Color.Unspecified
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .background(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    shape = CircleShape
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = rememberIconPainterSafe("history", Icons.Default.History), 
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(20.dp)
-            )
-        }
-
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            val annotatedMessage = buildAnnotatedString {
-                append(commit.message)
-                if (searchQuery.isNotBlank()) {
-                    val matches = Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(commit.message)
-                    matches.forEach { match ->
-                        addStyle(SpanStyle(background = highlightColor, color = highlightTextColor), match.range.first, match.range.last + 1)
-                    }
-                }
-            }
-            Text(
-                text = annotatedMessage,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val annotatedAuthor = buildAnnotatedString {
-                    append(commit.authorName)
-                    if (searchQuery.isNotBlank()) {
-                        val matches = Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(commit.authorName)
-                        matches.forEach { match ->
-                            addStyle(SpanStyle(background = highlightColor, color = highlightTextColor), match.range.first, match.range.last + 1)
-                        }
-                    }
-                }
-                Text(
-                    text = annotatedAuthor,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = "·",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = commit.date,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-
-            Surface(
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                shape = RoundedCornerShape(4.dp)
-            ) {
-                val shortSha = commit.sha.take(7)
-                val annotatedSha = buildAnnotatedString {
-                    append(shortSha)
-                    if (searchQuery.isNotBlank()) {
-                        val matches = Regex(Regex.escape(searchQuery), RegexOption.IGNORE_CASE).findAll(shortSha)
-                        matches.forEach { match ->
-                            addStyle(SpanStyle(background = highlightColor, color = highlightTextColor), match.range.first, match.range.last + 1)
-                        }
-                    }
-                }
-                Text(
-                    text = annotatedSha,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                )
-            }
-        }
-
-        Spacer(Modifier.width(4.dp))
-
-        if (commit.authorAvatarUrl != null) {
-            AsyncImage(
-                model = commit.authorAvatarUrl,
-                contentDescription = commit.authorName,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-            )
-        } else {
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(
-                        color = MaterialTheme.colorScheme.tertiaryContainer,
-                        shape = CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = commit.authorName.firstOrNull()?.uppercaseChar()?.toString() ?: "?",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onTertiaryContainer
-                )
             }
         }
     }
@@ -1450,25 +1085,7 @@ private fun loadReleasesFromCache(context: Context): String? {
         val file = File(context.filesDir, "releases_cache.json")
         if (!file.exists()) return null
         context.openFileInput("releases_cache.json").use { it.bufferedReader().readText() }
-    } catch (e: Exception) { null }
-}
-
-private fun saveCommitsToCache(context: Context, json: String) {
-    try {
-        context.openFileOutput("commits_cache.json", Context.MODE_PRIVATE).use { it.write(json.toByteArray()) }
-        context.getSharedPreferences("changelog_prefs", Context.MODE_PRIVATE).edit().putLong("commits_cache_time", System.currentTimeMillis()).apply()
-    } catch (e: Exception) { Log.e("ChangelogCache", "Error saving commits cache", e) }
-}
-
-private fun loadCommitsFromCache(context: Context): String? {
-    val prefs = context.getSharedPreferences("changelog_prefs", Context.MODE_PRIVATE)
-    val time = prefs.getLong("commits_cache_time", 0)
-    if (System.currentTimeMillis() - time > 3600_000) return null
-    return try {
-        val file = File(context.filesDir, "commits_cache.json")
-        if (!file.exists()) return null
-        context.openFileInput("commits_cache.json").use { it.bufferedReader().readText() }
-    } catch (e: Exception) { null }
+    } catch (_: Exception) { null }
 }
 
 private fun cleanupOldChangelogCache(context: Context, currentVersionTag: String) {
@@ -1506,7 +1123,6 @@ private fun loadChangelogFromCache(context: Context, versionTag: String): Cached
         val cacheFile = File(context.filesDir, "changelog_cache_$versionTag.json")
         if (!cacheFile.exists()) return null
         val cacheData = JSONObject(context.openFileInput("changelog_cache_$versionTag.json").use { it.bufferedReader().readText() })
-
         val sectionsArray = cacheData.optJSONArray("sections")
         val sections = mutableListOf<ChangelogSection>()
         if (sectionsArray != null) {
@@ -1528,7 +1144,7 @@ private fun loadChangelogFromCache(context: Context, versionTag: String): Cached
             description = cacheData.optString("description", null).takeIf { !it.isNullOrBlank() },
             warning = cacheData.optString("warning", null).takeIf { !it.isNullOrBlank() }
         )
-    } catch (e: Exception) { null }
+    } catch (_: Exception) { null }
 }
 
 fun String.extractUrls(): List<Pair<IntRange, String>> {
