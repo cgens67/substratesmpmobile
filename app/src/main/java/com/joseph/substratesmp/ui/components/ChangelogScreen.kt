@@ -9,7 +9,6 @@ import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -65,6 +64,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -75,9 +75,6 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.ToggleButton
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.pullToRefresh
-import androidx.compose.material3.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -127,10 +124,7 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.util.concurrent.TimeUnit
 
-// --- Window Inset Fallback ---
 val LocalPlayerAwareWindowInsets = staticCompositionLocalOf { WindowInsets.navigationBars }
-
-// --- Resource Fallback Helpers ---
 
 @Composable
 private fun stringResourceSafe(resName: String, fallback: String, vararg formatArgs: Any): String {
@@ -163,8 +157,6 @@ private fun rememberIconPainterSafe(resName: String, fallbackIcon: ImageVector):
     }
 }
 
-// --- Data Models ---
-
 data class CommitData(
     val sha: String,
     val message: String,
@@ -193,8 +185,6 @@ data class CachedChangelogData(
     val description: String?,
     val warning: String?
 )
-
-// --- Utils ---
 
 fun getTimeAgo(context: Context, dateString: String?): String {
     if (dateString.isNullOrBlank()) return getStringSafe(context, "unknown", "Unknown")
@@ -254,8 +244,6 @@ fun matchesVersion(tagName: String, query: String): Boolean {
 
     return false
 }
-
-// --- Empty Search Results Component ---
 
 @Composable
 fun EmptySearchResultsView(
@@ -343,8 +331,6 @@ fun EmptySearchResultsView(
         )
     }
 }
-
-// --- Main Screen ---
 
 @Composable
 fun ChangelogScreen(
@@ -504,8 +490,6 @@ fun ChangelogScreen(
     }
 }
 
-// --- Releases (News-style) Content ---
-
 @Composable
 fun ReleasesContent(
     versionTag: String, 
@@ -524,16 +508,8 @@ fun ReleasesContent(
     val allChangelogsData = remember { mutableStateMapOf<String, CachedChangelogData>() }
     val changelogFetchErrors = remember { mutableStateMapOf<String, String>() }
     val changelogLoadingStates = remember { mutableStateMapOf<String, Boolean>() }
-
-    val pullToRefreshState = rememberPullToRefreshState()
     
     val currentIsLoading = isFetchingOldReleases || (changelogLoadingStates[currentVersionTag] == true)
-    val isRefreshing = currentIsLoading
-
-    val scaleFraction = {
-        if (isRefreshing) 1f
-        else LinearOutSlowInEasing.transform(pullToRefreshState.distanceFraction).coerceIn(0f, 1f)
-    }
 
     val infiniteTransition = rememberInfiniteTransition(label = "highlight_transition")
     val highlightAlpha by infiniteTransition.animateFloat(
@@ -805,20 +781,13 @@ fun ReleasesContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pullToRefresh(
-                state = pullToRefreshState,
-                isRefreshing = isRefreshing,
-                onRefresh = { 
-                    fetchOldReleases(bypassCache = true)
-                    if (currentVersionTag.isNotBlank()) {
-                        val rel = availableReleases.find { it.tagName == currentVersionTag }
-                        ensureChangelogFetched(currentVersionTag, rel, bypassCache = true) 
-                    }
-                }
-            )
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
     ) {
         Column(modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            if (currentIsLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
             if (searchFilteredReleases.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -1112,21 +1081,8 @@ fun ReleasesContent(
                 }
             }
         }
-
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .graphicsLayer {
-                    scaleX = scaleFraction()
-                    scaleY = scaleFraction()
-                }
-        ) {
-            PullToRefreshDefaults.LoadingIndicator(state = pullToRefreshState, isRefreshing = isRefreshing)
-        }
     }
 }
-
-// --- Commits Content ---
 
 @Composable
 fun CommitsContent(
@@ -1139,13 +1095,6 @@ fun CommitsContent(
     var hasError by remember { mutableStateOf(false) }
     var detailedError by remember { mutableStateOf<String?>(null) }
     val coroutineScope = rememberCoroutineScope()
-
-    val pullToRefreshState = rememberPullToRefreshState()
-
-    val scaleFraction = {
-        if (isLoading) 1f
-        else LinearOutSlowInEasing.transform(pullToRefreshState.distanceFraction).coerceIn(0f, 1f)
-    }
 
     val httpClient = remember(context) {
         val cacheSize = 10L * 1024 * 1024
@@ -1274,60 +1223,59 @@ fun CommitsContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pullToRefresh(
-                state = pullToRefreshState,
-                isRefreshing = isLoading,
-                onRefresh = { fetchCommits(bypassCache = true) }
-            )
             .windowInsetsPadding(LocalPlayerAwareWindowInsets.current.only(WindowInsetsSides.Bottom))
     ) {
-        when {
-            hasError && !isLoading -> {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
-                        Icon(
-                            Icons.Default.Error,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(48.dp)
-                        )
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            text = stringResourceSafe("error_loading_commits", "Error loading commits"),
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
-                        
-                        detailedError?.let { detail ->
-                            Spacer(Modifier.height(8.dp))
-                            Surface(
-                                color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Text(
-                                    text = detail, 
-                                    color = MaterialTheme.colorScheme.onErrorContainer,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    modifier = Modifier.padding(12.dp),
-                                    textAlign = TextAlign.Center
-                                )
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+        ) {
+            if (isLoading) {
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+
+            when {
+                hasError && !isLoading -> {
+                    Box(modifier = Modifier.fillMaxWidth().heightIn(min = 400.dp), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+                            Icon(
+                                Icons.Default.Error,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(Modifier.height(16.dp))
+                            Text(
+                                text = stringResourceSafe("error_loading_commits", "Error loading commits"),
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                            
+                            detailedError?.let { detail ->
+                                Spacer(Modifier.height(8.dp))
+                                Surface(
+                                    color = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.5f),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = detail, 
+                                        color = MaterialTheme.colorScheme.onErrorContainer,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(12.dp),
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
-                        }
-                        
-                        Spacer(Modifier.height(24.dp))
-                        Button(onClick = { fetchCommits(bypassCache = true) }) {
-                            Text(stringResourceSafe("action_retry", "Retry"))
+                            
+                            Spacer(Modifier.height(24.dp))
+                            Button(onClick = { fetchCommits(bypassCache = true) }) {
+                                Text(stringResourceSafe("action_retry", "Retry"))
+                            }
                         }
                     }
                 }
-            }
 
-            filteredCommits.isNotEmpty() -> {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                ) {
+                filteredCommits.isNotEmpty() -> {
                     filteredCommits.forEachIndexed { index, commit ->
                         CommitItem(
                             commit = commit,
@@ -1351,32 +1299,21 @@ fun CommitsContent(
                     }
                     Spacer(Modifier.height(8.dp))
                 }
-            }
 
-            !isLoading -> {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(vertical = 48.dp, horizontal = 24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptySearchResultsView(
-                        title = stringResourceSafe("no_results_found", "No results found"),
-                        subtitle = stringResourceSafe("try_another_term", "Try another search term")
-                    )
+                !isLoading -> {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 48.dp, horizontal = 24.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        EmptySearchResultsView(
+                            title = stringResourceSafe("no_results_found", "No results found"),
+                            subtitle = stringResourceSafe("try_another_term", "Try another search term")
+                        )
+                    }
                 }
             }
-        }
-
-        Box(
-            Modifier
-                .align(Alignment.TopCenter)
-                .graphicsLayer {
-                    scaleX = scaleFraction()
-                    scaleY = scaleFraction()
-                }
-        ) {
-            PullToRefreshDefaults.LoadingIndicator(state = pullToRefreshState, isRefreshing = isLoading)
         }
     }
 }
@@ -1521,8 +1458,6 @@ fun CommitItem(
         }
     }
 }
-
-// --- Cache Utils ---
 
 private fun saveReleasesToCache(context: Context, json: String) {
     try {
