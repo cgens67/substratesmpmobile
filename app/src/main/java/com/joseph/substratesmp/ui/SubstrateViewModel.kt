@@ -26,6 +26,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -206,6 +207,77 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           }
         }
       }
+  }
+
+  fun sendLocationResponse(
+    requestMessage: ChatMessage,
+    onManualInputRequired: () -> Unit
+  ) {
+    val myTag = userState.value.gamertag.trim()
+    if (myTag.isBlank()) {
+      _showGamertagDialog.value = true
+      return
+    }
+
+    viewModelScope.launch {
+      // 1. Check if we already have coordinates in userState
+      var coordsToSend = userState.value.lastCoordinates.trim()
+
+      // 2. If empty, directly query the server_coords/live document
+      if (coordsToSend.isBlank()) {
+        try {
+          val liveDoc = firestore.collection("server_coords").document("live").get().await()
+          val playersMap = liveDoc.get("players") as? Map<*, *>
+          val myData = playersMap?.get(myTag.lowercase()) as? Map<*, *>
+          coordsToSend = myData?.get("coords")?.toString()?.trim() ?: ""
+        } catch (_: Exception) {}
+      }
+
+      // 3. If still empty, prompt manual input dialog instead of doing nothing
+      if (coordsToSend.isBlank()) {
+        onManualInputRequired()
+        return@launch
+      }
+
+      // 4. Update the location request card in Firestore so the card itself displays the coordinates
+      firestore.collection("channels")
+        .document(requestMessage.channelId)
+        .collection("messages")
+        .document(requestMessage.id)
+        .update("coordinates", coordsToSend)
+
+      // 5. Send a reply message with coordinates
+      sendMessage(
+        content = "📍 Shared location: $coordsToSend",
+        coordinates = coordsToSend,
+        replyTo = requestMessage,
+        channelId = requestMessage.channelId
+      )
+
+      authRepository.updateCoordinates(coordsToSend)
+    }
+  }
+
+  fun submitManualCoordinates(requestMessage: ChatMessage, manualCoords: String) {
+    val clean = manualCoords.trim()
+    if (clean.isBlank()) return
+
+    viewModelScope.launch {
+      firestore.collection("channels")
+        .document(requestMessage.channelId)
+        .collection("messages")
+        .document(requestMessage.id)
+        .update("coordinates", clean)
+
+      sendMessage(
+        content = "📍 Shared location: $clean",
+        coordinates = clean,
+        replyTo = requestMessage,
+        channelId = requestMessage.channelId
+      )
+
+      authRepository.updateCoordinates(clean)
+    }
   }
 
   private fun syncDeletedAccounts() {
