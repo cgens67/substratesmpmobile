@@ -10,20 +10,17 @@ plugins {
 
 android {
   namespace = "com.joseph.substratesmp"
-  // BUMPED TO 37 TO SUPPORT COMPOSE ALPHA
   compileSdk = 37
 
   defaultConfig {
     applicationId = "com.joseph.substratesmp"
     minSdk = 24
-    // BUMPED TO 37 TO SUPPORT COMPOSE ALPHA
     targetSdk = 37
     versionCode = 1
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    // Reduce APK size from 224MB to ~40-60MB by only packaging ARM architectures
     ndk {
       abiFilters.addAll(listOf("arm64-v8a", "armeabi-v7a"))
     }
@@ -90,9 +87,10 @@ dependencies {
 
   implementation(libs.firebase.firestore)
   implementation(libs.firebase.auth)
-  // Added Firebase Cloud Messaging for Background Push Notifications
-  implementation("com.google.firebase:firebase-messaging")
   
+  // Free Background Push Notifications via OneSignal SDK
+  implementation("com.onesignal:OneSignal:5.1.28")
+
   implementation(libs.androidx.credentials)
   implementation(libs.androidx.credentials.play.services)
   implementation(libs.googleid)
