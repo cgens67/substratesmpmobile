@@ -220,7 +220,7 @@ fun ChannelDrawerContent(
             modifier = Modifier
               .fillMaxWidth()
               .clickable {
-                clipboardManager.setText(AnnotatedString("mc.substratesmp.net:19132"))
+                clipboardManager.setText(AnnotatedString("103.175.50.61:25568"))
               }
               .padding(vertical = 2.dp)
           ) {
@@ -231,13 +231,13 @@ fun ChannelDrawerContent(
             ) {
               Column {
                 Text(
-                  text = "mc.substratesmp.net",
+                  text = "103.175.50.61",
                   style = CoordinateTextStyle,
                   color = MaterialTheme.colorScheme.primary,
                   fontWeight = FontWeight.Bold
                 )
                 Text(
-                  text = "Port: 19132 (Tap to copy)",
+                  text = "Port: 25568 (Tap to copy)",
                   style = MaterialTheme.typography.labelSmall,
                   color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
