@@ -521,7 +521,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
         val sticker = latest.getBoolean("isSticker") ?: false
         val fn = latest.getString("fileName")
         val dur = latest.getLong("audioDurationSeconds")?.toInt() ?: 0
-        val coords = latest.getString("coordinates")
+        val coordinates = latest.getString("coordinates")
         val ts = latest.getLong("timestamp") ?: 0L
         val sender = latest.getString("senderName") ?: ""
         val readByList = (latest.get("readBy") as? List<*>)?.mapNotNull { it?.toString() } ?: emptyList()
@@ -538,7 +538,7 @@ class SubstrateViewModel(application: Application) : AndroidViewModel(applicatio
           img != null -> "📷 Photo"
           aud != null -> if (dur > 0) "🎤 Voice message" else "🎵 ${fn ?: "Audio file"}"
           fil != null -> "📄 ${fn ?: "Document"}"
-          coordinates != null && content.isBlank() -> "📍 $coords"
+          coordinates != null && content.isBlank() -> "📍 $coordinates"
           else -> content
         }
 
