@@ -1,5 +1,3 @@
---- START OF FILE substratesmpmobile-main/app/src/main/java/com/joseph/substratesmp/ui/components/StatusMusicSelectorSheet.kt ---
-
 package com.joseph.substratesmp.ui.components
 
 import android.content.Context
