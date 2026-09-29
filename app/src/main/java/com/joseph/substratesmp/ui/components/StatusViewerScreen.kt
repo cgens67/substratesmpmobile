@@ -74,7 +74,7 @@ fun StatusViewerScreen(
     "DIAMOND" -> Brush.verticalGradient(listOf(Color(0xFF005C8A), Color(0xFF00E5FF)))
     "GOLDEN" -> Brush.verticalGradient(listOf(Color(0xFF7A5800), Color(0xFFFFD700)))
     "OBSIDIAN" -> Brush.verticalGradient(listOf(Color(0xFF0F131C), Color(0xFF273142)))
-    else -> Brush.verticalGradient(listOf(Color(0xFF005C4B), Color(0xFF00A884))) // EMERALD
+    else -> Brush.verticalGradient(listOf(Color(0xFF004085), Color(0xFF007AFF))) // Sapphire Blue
   }
 
   LaunchedEffect(status.id) {
